@@ -1,0 +1,46 @@
+# This Jamfile requires boost-build v2 to build.
+
+import path ;
+import modules ;
+import os ;
+
+BOOST_ROOT = [ modules.peek : BOOST_ROOT ] ;
+
+ECHO "BOOST_ROOT =" $(BOOST_ROOT) ;
+ECHO "OS =" [ os.name ] ;
+
+if $(BOOST_ROOT)
+{
+	use-project /boost : $(BOOST_ROOT) ;
+}
+
+SOURCES = simulator io_service high_resolution_timer
+	high_resolution_clock tcp_socket ;
+
+lib simulator
+	: # sources
+	src/$(SOURCES).cpp
+
+	: # requirements
+	<include>include
+	<library>/boost/chrono//boost_chrono
+	<library>/boost/system//boost_system
+
+	: # default build
+
+	: # usage requirements
+	<include>include
+
+	;
+
+project
+	: requirements
+	<library>simulator
+	: default-build
+	<link>static
+	;
+
+test-suite simulator-tests :
+	[ run test/timer.cpp ]
+	[ run test/acceptor.cpp ]
+	;
