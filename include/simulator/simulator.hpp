@@ -40,6 +40,7 @@ namespace sim
 		struct channel;
 		struct packet;
 	}
+	struct simulation;
 
 	namespace chrono
 	{
@@ -106,7 +107,7 @@ namespace sim
 
 	struct high_resolution_timer
 	{
-		friend struct io_service;
+		friend struct sim::simulation;
 
 		typedef chrono::high_resolution_clock::time_point time_type;
 		typedef chrono::high_resolution_clock::duration duration_type;
@@ -554,16 +555,57 @@ namespace sim
 	// and time.
 	struct io_service
 	{
-		// it calls fire() when a timer fires
-		friend struct high_resolution_timer;
-
 		struct work : boost::asio::io_service::work
 		{
 			work(io_service& ios) :
 				boost::asio::io_service::work(ios.get_internal_service()) {}
 		};
 
-		io_service();
+		io_service(sim::simulation& sim, ip::address const& ip);
+/*
+		std::size_t run(boost::system::error_code& ec);
+		std::size_t run();
+
+		std::size_t poll(boost::system::error_code& ec);
+		std::size_t poll();
+
+		std::size_t poll_one(boost::system::error_code& ec);
+		std::size_t poll_one();
+
+		void stop();
+		bool stopped() const;
+		void reset();
+*/
+		void dispatch(boost::function<void()> handler);
+		void post(boost::function<void()> handler);
+
+		// internal interface
+		boost::asio::io_service& get_internal_service();
+
+		void add_timer(high_resolution_timer* t);
+		void remove_timer(high_resolution_timer* t);
+
+		ip::tcp::endpoint bind_socket(ip::tcp::socket* socket, ip::tcp::endpoint ep
+			, boost::system::error_code& ec);
+		void unbind_socket(ip::tcp::socket* socket
+			, ip::tcp::endpoint ep);
+		boost::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
+			, ip::tcp::endpoint const& target, boost::system::error_code& ec);
+
+	private:
+
+		sim::simulation& m_sim;
+		ip::address m_ip;
+	};
+
+	} // asio
+
+	struct simulation
+	{
+		// it calls fire() when a timer fires
+		friend struct high_resolution_timer;
+
+		simulation();
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -577,47 +619,42 @@ namespace sim
 		void stop();
 		bool stopped() const;
 		void reset();
-
-		void dispatch(boost::function<void()> handler);
-		void post(boost::function<void()> handler);
-
-
 		// private interface
 
-		void add_timer(high_resolution_timer* t);
-		void remove_timer(high_resolution_timer* t);
+		void add_timer(asio::high_resolution_timer* t);
+		void remove_timer(asio::high_resolution_timer* t);
 
 		boost::asio::io_service& get_internal_service()
 		{ return m_service; }
 
-		ip::tcp::endpoint bind_socket(ip::tcp::socket* socket, ip::tcp::endpoint ep
+		asio::ip::tcp::endpoint bind_socket(asio::ip::tcp::socket* socket
+			, asio::ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
-		void unbind_socket(ip::tcp::socket* socket
-			, ip::tcp::endpoint ep);
+		void unbind_socket(asio::ip::tcp::socket* socket
+			, asio::ip::tcp::endpoint ep);
 
-		boost::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
-			, ip::tcp::endpoint const& target, boost::system::error_code& ec);
+		boost::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
+			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
 
 	private:
 		struct timer_compare
 		{
-			bool operator()(high_resolution_timer const* lhs, high_resolution_timer const* rhs)
+			bool operator()(asio::high_resolution_timer const* lhs
+				, asio::high_resolution_timer const* rhs)
 			{ return lhs->expires_at() < rhs->expires_at(); }
 		};
 
 		// all non-expired timers
-		typedef std::multiset<high_resolution_timer*, timer_compare> timer_queue_t;
+		typedef std::multiset<asio::high_resolution_timer*, timer_compare> timer_queue_t;
 		timer_queue_t m_timer_queue;
-		
 		// underlying message queue
 		boost::asio::io_service m_service;
-		typedef std::map<ip::tcp::endpoint, ip::tcp::socket*> listen_sockets_t;
+		typedef std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>
+			listen_sockets_t;
 		typedef listen_sockets_t::iterator listen_socket_iter_t;
 		listen_sockets_t m_listen_sockets;
 		bool m_stopped;
 	};
-
-	} // asio
 
 	namespace aux
 	{

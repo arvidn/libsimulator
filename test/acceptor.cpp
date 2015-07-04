@@ -21,6 +21,7 @@ All rights reserved.
 
 using namespace sim::asio;
 using namespace sim::chrono;
+using sim::simulation;
 
 char send_buffer[10000];
 char recv_buffer[10000];
@@ -105,39 +106,40 @@ void on_connected(boost::system::error_code const& ec
 
 int main()
 {
-	io_service ios;
-	ip::tcp::acceptor listener(ios);
+	simulation sim;
+	io_service incoming_ios(sim, ip::address_v4::from_string("40.30.20.10"));
+	io_service outgoing_ios(sim, ip::address_v4::from_string("10.20.30.40"));
+	ip::tcp::acceptor listener(incoming_ios);
+
+	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
+		.time_since_epoch()).count());
 
 	boost::system::error_code ec;
 	listener.open(ip::tcp::v4(), ec);
-	listener.bind(ip::tcp::endpoint(ip::address::from_string("1.2.3.4"), 1337)
-		, ec);
+	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	listener.bind(ip::tcp::endpoint(ip::address(), 1337), ec);
+	if (ec) printf("[%4d] bind failed: %s\n", millis, ec.message().c_str());
 	listener.listen(10, ec);
+	if (ec) printf("[%4d] listen failed: %s\n", millis, ec.message().c_str());
 
-	ip::tcp::socket incoming(ios);
+	ip::tcp::socket incoming(incoming_ios);
 	ip::tcp::endpoint remote_endpoint;
 	listener.async_accept(incoming, remote_endpoint
 		, boost::bind(&incoming_connection, _1, boost::ref(incoming)
 		, boost::cref(remote_endpoint)));
 
-	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
-		.time_since_epoch()).count());
 	printf("[%4d] connecting\n", millis);
-	ip::tcp::socket outgoing(ios);
+	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
-	outgoing.bind(ip::tcp::endpoint(ip::address::from_string("4.3.2.1"), 1337)
-		, ec);
-	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("1.2.3.4")
+	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
 		, 1337), boost::bind(&on_connected, _1, boost::ref(outgoing)));
 
-	ios.run(ec);
+	sim.run(ec);
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
-	printf("[%4d] io_service::run() returned: %s at: %d\n"
-		, millis, ec.message().c_str()
-		, int(duration_cast<milliseconds>(high_resolution_clock::now()
-				.time_since_epoch()).count()));
-
+	printf("[%4d] simulation::run() returned: %s\n"
+		, millis, ec.message().c_str());
 }
 

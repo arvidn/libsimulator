@@ -24,6 +24,7 @@ int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
 
 using namespace sim::chrono;
 using namespace sim::asio;
+using sim::simulation;
 
 void print_time(high_resolution_timer& timer
 	, boost::system::error_code const& ec)
@@ -37,6 +38,8 @@ void print_time(high_resolution_timer& timer
 		, millis
 		, ec.message().c_str());
 
+	assert(millis == expected_timestamps[counter]);
+
 	++counter;
 	if (counter < 5)
 	{
@@ -47,14 +50,15 @@ void print_time(high_resolution_timer& timer
 
 int main()
 {
-	io_service ios;
+	simulation sim;
+	io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
 	high_resolution_timer timer(ios);
 
 	timer.expires_from_now(seconds(1));
 	timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
 
 	boost::system::error_code ec;
-	ios.run(ec);
+	sim.run(ec);
 
 	printf("io_service::run() returned: %s at: %d\n"
 		, ec.message().c_str()

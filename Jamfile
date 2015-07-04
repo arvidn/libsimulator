@@ -14,7 +14,7 @@ if $(BOOST_ROOT)
 	use-project /boost : $(BOOST_ROOT) ;
 }
 
-SOURCES = simulator io_service high_resolution_timer
+SOURCES = simulator simulation io_service high_resolution_timer
 	high_resolution_clock tcp_socket ;
 
 lib simulator

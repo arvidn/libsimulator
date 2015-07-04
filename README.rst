@@ -31,6 +31,7 @@ The currently (partially) supported classes are:
 * asio::ip::tcp::endpoint
 * asio::ip::address
 * asio::ip::tcp::socket
+* asio::io_service;
 
 Work in progress:
 
@@ -45,16 +46,24 @@ The network socket and resolver classes simulate a network. Sockets can be bound
 to any valid internet address, and will implicitly form a new node on the
 network.
 
-limitations
------------
+usage
+-----
 
-When connecting a socket to a listening socket, both the connecting and the
-accepting sockets must first be bound to specific IPs. Binding to ``INADDR_ANY``
-is not supported, as there is no obvious mechanism to determine which IP address
-the requesting node should be assigned. If one simulated computer binds both a
-UDP and TCP socket to ``INADDR_ANY``, in real life they would listen on the same
-IPs, but there is no way to signal that two sockets belong to the same virtual
-network node other than specifying its IP address.
+The ``io_service`` object is significantly different from the one in boost.asio.
+This is because one simulation may only have a single message loop and a single
+ordering of events. This single message loop is provided by the ``simulation``
+class. Each simulation should have only one such object. An ``io_service``
+object represents a single node on the network. When creating an io_service, you
+have to pass in the simulation it belongs to as well as the IP address it should
+have.
+
+When creating sockets, binding and connecting them, the io_service object
+determines what ``INADDR_ANY`` resolves to (the IP assigned to that node).
+
+The only aspects of the io_service interface that's preserved are ``post()``,
+``dispatch()`` and constructing timers and sockets. In short, the ``run()`` and
+``poll()`` family of functions do not exist. Every io_service object is assumed
+to be run, and all of their events are handled by the simulation object.
 
 None of the synchronous APIs are supported, for obvious reasons.
 
