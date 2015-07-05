@@ -349,7 +349,7 @@ namespace ip {
 		std::size_t bytes_transferred = write_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block
 				, boost::system::generic_category())
-			|| (bytes_transferred < 1475 && bytes_transferred < buf_size))
+			|| (!ec && bytes_transferred < 1475 && bytes_transferred < buf_size))
 		{
 			m_total_sent += bytes_transferred;
 			int remote = m_channel->remote_idx(this);
