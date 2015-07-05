@@ -39,6 +39,8 @@ namespace ip {
 		, m_open(false)
 		, m_is_v4(true)
 		, m_non_blocking(false)
+		, m_recv_null_buffers(false)
+		, m_send_null_buffers(false)
 	{}
 
 	tcp::socket::~socket()
@@ -70,16 +72,14 @@ namespace ip {
 		return m_open;
 	}
 
+	// used to attach an incoming connection to this
 	void tcp::socket::internal_connect(tcp::endpoint const& bind_ip
 		, boost::shared_ptr<aux::channel> const& c
 		, boost::system::error_code& ec)
 	{
 		open(m_is_v4 ? tcp::v4() : tcp::v6(), ec);
 		if (ec) return;
-		tcp::endpoint ep = bind_ip;
-		ep.port(0);
-		bind(ep, ec);
-		if (ec) return;
+		m_bound_to = bind_ip;
 		m_channel = c;
 	}
 
@@ -165,8 +165,18 @@ namespace ip {
 		return ec;
 	}
 
-	std::size_t tcp::socket::available(boost::system::error_code & ec) const
+	std::size_t tcp::socket::available(boost::system::error_code& ec) const
 	{
+		if (!m_open)
+		{
+			ec.assign(error::bad_descriptor, boost::system::generic_category());
+			return 0;
+		}
+		if (!m_channel)
+		{
+			ec.assign(error::not_connected, boost::system::generic_category());
+			return 0;
+		}
 		if (m_incoming_queue.empty()) return 0;
 
 		std::size_t ret = 0;
@@ -195,6 +205,8 @@ namespace ip {
 			m_io_service.post(boost::bind(m_recv_handler
 				, boost::system::error_code(error::operation_aborted), 0));
 			m_recv_handler.clear();
+			m_recv_buffer.clear();
+			m_recv_null_buffers = false;
 		}
 
 		if (m_send_handler)
@@ -202,6 +214,7 @@ namespace ip {
 			m_io_service.post(boost::bind(m_send_handler
 				, boost::system::error_code(error::operation_aborted), 0));
 			m_send_handler.clear();
+			m_send_null_buffers = false;
 		}
 
 		if (m_connect_handler)
@@ -285,6 +298,13 @@ namespace ip {
 
 		// find remote socket
 		boost::system::error_code ec;
+		if (m_bound_to.address() == ip::address())
+		{
+			ip::tcp::endpoint addr = m_io_service.bind_socket(this
+				, ip::tcp::endpoint(), ec);
+			if (ec) return;
+			m_bound_to = addr;
+		}
 		m_channel = m_io_service.internal_connect(this, target, ec);
 		if (ec)
 		{
@@ -298,6 +318,24 @@ namespace ip {
 
 		// the acceptor socket will call internal_connect_complete once the
 		// connection is established
+	}
+
+	void tcp::socket::abort_recv_handler()
+	{
+		m_io_service.post(boost::bind(m_recv_handler
+			, boost::system::error_code(error::operation_aborted), 0));
+		m_recv_handler.clear();
+		m_recv_buffer.clear();
+		m_recv_null_buffers = false;
+	}
+
+	void tcp::socket::abort_send_handler()
+	{
+		m_io_service.post(boost::bind(m_send_handler
+			, boost::system::error_code(error::operation_aborted), 0));
+		m_send_handler.clear();
+		m_send_buffer.clear();
+		m_send_null_buffers = false;
 	}
 
 	void tcp::socket::async_write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
@@ -327,6 +365,7 @@ namespace ip {
 			m_io_service.post(boost::bind(handler, ec, 0));
 			m_send_handler.clear();
 			m_send_buffer.clear();
+			m_send_null_buffers = false;
 			return;
 		}
 
@@ -335,6 +374,7 @@ namespace ip {
 		m_io_service.post(boost::bind(handler, boost::system::error_code(), m_total_sent));
 		m_send_handler.clear();
 		m_send_buffer.clear();
+		m_send_null_buffers = false;
 		m_total_sent = 0;
 	}
 
@@ -454,6 +494,7 @@ namespace ip {
 		}
 
 		typedef std::vector<boost::asio::mutable_buffer> buffers_t;
+		m_recv_buffer = bufs;
 		buffers_t::iterator recv_iter = m_recv_buffer.begin();
 		int total_received = 0;
 		// the offset in the current receive buffer we're writing to. i.e. the
@@ -542,6 +583,7 @@ namespace ip {
 		{
 			m_recv_buffer = bufs;
 			m_recv_handler = handler;
+			m_recv_null_buffers = false;
 
 			if (!m_incoming_queue.empty())
 			{
@@ -557,12 +599,50 @@ namespace ip {
 			m_io_service.post(boost::bind(handler, ec, 0));
 			m_recv_handler.clear();
 			m_recv_buffer.clear();
+			m_recv_null_buffers = false;
 			return;
 		}
 
 		m_io_service.post(boost::bind(handler, ec, bytes_transferred));
 		m_recv_handler.clear();
 		m_recv_buffer.clear();
+		m_recv_null_buffers = false;
+	}
+
+	void tcp::socket::async_read_some_null_buffers_impl(
+		boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+	{
+		boost::system::error_code ec;
+		// null_buffers notifies the handler when data is available, without
+		// reading any
+		int bytes = available(ec);
+		if (ec)
+		{
+			m_io_service.post(boost::bind(handler, ec, 0));
+			m_recv_handler.clear();
+			m_recv_buffer.clear();
+			m_recv_null_buffers = false;
+			return;
+		}
+
+		if (bytes > 0)
+		{
+			m_io_service.post(boost::bind(handler, ec, 0));
+			m_recv_handler.clear();
+			m_recv_buffer.clear();
+			m_recv_null_buffers = false;
+			return;
+		}
+
+		m_recv_handler = handler;
+		m_recv_null_buffers = true;
+
+		if (!m_incoming_queue.empty())
+		{
+			m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
+			m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_null_buffers_impl
+				, this, handler));
+		}
 	}
 
 	int tcp::socket::internal_incoming_payload(char const* buffer, int size
@@ -583,11 +663,22 @@ namespace ip {
 			if (m_incoming_queue.size() == 1
 				&& m_recv_handler)
 			{
-				// we have an async. read operation outstanding, and we just put one
-				// packet in our incoming queue.
+				if (m_recv_null_buffers)
+				{
+					m_io_service.post(boost::bind(m_recv_handler
+						, boost::system::error_code(), 0));
+					m_recv_handler.clear();
+					m_recv_buffer.clear();
+					m_recv_null_buffers = false;
+				}
+				else
+				{
+					// we have an async. read operation outstanding, and we just put one
+					// packet in our incoming queue.
 
-				// try to read from it and potentially fire the handler
-				async_read_some_impl(m_recv_buffer, m_recv_handler);
+					// try to read from it and potentially fire the handler
+					async_read_some_impl(m_recv_buffer, m_recv_handler);
+				}
 			}
 		}
 

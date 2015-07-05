@@ -25,6 +25,8 @@ using sim::simulation;
 
 char send_buffer[10000];
 char recv_buffer[10000];
+int num_received = 0;
+int num_sent = 0;
 
 void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 	, ip::tcp::socket& sock)
@@ -36,6 +38,9 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 		printf("[%4d] send error %s\n", millis, ec.message().c_str());
 		return;
 	}
+
+	num_sent += bytes_transferred;
+
 	printf("[%4d] sent %d bytes\n", millis, int(bytes_transferred));
 	printf("closing\n");
 	sock.close();
@@ -51,6 +56,8 @@ void on_receive(boost::system::error_code const& ec
 		printf("[%4d] receive error %s\n", millis, ec.message().c_str());
 		return;
 	}
+
+	num_received += bytes_transferred;
 
 	printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
 
@@ -71,10 +78,17 @@ void incoming_connection(boost::system::error_code const& ec
 	}
 
 	boost::system::error_code err;
+	ip::tcp::endpoint remote_endpoint = sock.remote_endpoint(err);
+	if (ec) printf("[%4d] local_endpoint failed: %s\n", millis, ec.message().c_str());
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
+	if (ec) printf("[%4d] remote_endpoint failed: %s\n", millis, ec.message().c_str());
 	printf("[%4d] received incoming connection from: %s:%d. local endpoint: %s:%d\n"
 		, millis, ep.address().to_string().c_str(), ep.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
+	assert(local_endpoint.port() == 1337);
+	assert(local_endpoint.address().to_string() == "40.30.20.10");
+	assert(remote_endpoint.port() != 0);
+	assert(remote_endpoint.address().to_string() == "10.20.30.40");
 
 	sock.async_read_some(sim::asio::mutable_buffers_1(recv_buffer, sizeof(recv_buffer))
 		, boost::bind(&on_receive, _1, _2, boost::ref(sock)));
@@ -93,11 +107,18 @@ void on_connected(boost::system::error_code const& ec
 
 	boost::system::error_code err;
 	ip::tcp::endpoint remote_endpoint = sock.remote_endpoint(err);
+	if (ec) printf("[%4d] remote_endpoint failed: %s\n", millis, ec.message().c_str());
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
+	if (ec) printf("[%4d] local_endpoint failed: %s\n", millis, ec.message().c_str());
 	printf("[%4d] made outgoing connection to: %s:%d. local endpoint: %s:%d\n"
 		, millis
 		, remote_endpoint.address().to_string().c_str(), remote_endpoint.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
+
+	assert(remote_endpoint.port() == 1337);
+	assert(remote_endpoint.address().to_string() == "40.30.20.10");
+	assert(local_endpoint.port() != 0);
+	assert(local_endpoint.address().to_string() == "10.20.30.40");
 
 	printf("sending %d bytes\n", int(sizeof(send_buffer)));
 	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
@@ -139,6 +160,10 @@ int main()
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
+
+	assert(num_received == sizeof(send_buffer));
+	assert(num_sent == sizeof(send_buffer));
+
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }

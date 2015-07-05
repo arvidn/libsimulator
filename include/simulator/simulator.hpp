@@ -153,6 +153,7 @@ namespace sim
 	typedef high_resolution_timer waitable_timer;
 
 	namespace error = boost::asio::error;
+	typedef boost::asio::null_buffers null_buffers;
 
 	namespace ip {
 
@@ -287,7 +288,16 @@ namespace sim
 			{
 				std::vector<boost::asio::const_buffer> b(bufs.begin(), bufs.end());
 				m_total_sent = 0;
+				if (m_send_handler) abort_send_handler();
 				async_write_some_impl(b, handler);
+			}
+
+			void async_read_some(null_buffers const&
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				if (m_recv_handler) abort_recv_handler();
+				async_read_some_null_buffers_impl(handler);
 			}
 
 			template <class BufferSequence>
@@ -315,6 +325,8 @@ namespace sim
 			{
 				std::vector<boost::asio::mutable_buffer> b(bufs.begin(), bufs.end());
 				m_total_sent = 0;
+				if (m_recv_handler) abort_recv_handler();
+
 				async_read_some_impl(b, handler);
 			}
 
@@ -373,6 +385,8 @@ namespace sim
 				, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
 			void async_read_some_impl(std::vector<boost::asio::mutable_buffer> const& bufs
 				, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+			void async_read_some_null_buffers_impl(
+				boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
 			std::size_t write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
 				, boost::system::error_code& ec);
 			std::size_t read_some_impl(std::vector<boost::asio::mutable_buffer> const& bufs
@@ -381,6 +395,9 @@ namespace sim
 				, boost::shared_ptr<aux::channel> const& c
 				, boost::system::error_code& ec);
 			void internal_connect_complete(boost::system::error_code const& ec);
+
+			void abort_send_handler();
+			void abort_recv_handler();
 
 			// this returns the number of bytes actually queued up. If it's less
 			// than 'size', the `full_queue` flag will be set and the caller will
@@ -464,6 +481,10 @@ namespace sim
 
 			// true if the socket is set to non-blocking mode
 			bool m_non_blocking;
+
+			// true if the currently outstanding read operation is for null_buffers
+			bool m_recv_null_buffers;
+			bool m_send_null_buffers;
 
 			// if this socket is connected to another endpoint, this object is
 			// shared between both sockets and contain information and state about

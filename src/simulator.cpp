@@ -212,7 +212,7 @@ namespace sim
 		{
 			// notify the incoming connection that it failed
 			c->sockets[0]->internal_connect_complete(boost::system::error_code(
-					error::connection_reset));
+				error::connection_reset));
 		}
 
 		c->sockets[1] = m_accept_into;
