@@ -410,6 +410,7 @@ namespace sim
 				chrono::high_resolution_clock::time_point receive_time);
 			void internal_incoming_eof(
 				chrono::high_resolution_clock::time_point receive_time);
+			void maybe_wakeup_reader();
 
 			// request to be notified when there's more space in the incoming queue
 			void subscribe_to_queue_drain();

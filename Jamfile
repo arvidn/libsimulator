@@ -44,5 +44,6 @@ test-suite simulator-tests :
 	[ run test/timer.cpp ]
 	[ run test/acceptor.cpp ]
 	[ run test/multi_accept.cpp ]
+	[ run test/null_buffers.cpp ]
 	;
 

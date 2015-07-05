@@ -83,24 +83,6 @@ namespace ip {
 		m_channel = c;
 	}
 
-	void tcp::socket::internal_incoming_reset(time_point receive_time)
-	{
-		aux::packet p;
-		p.type = aux::packet::error;
-		p.ec = asio::error::connection_reset;
-		p.receive_time = receive_time;
-		m_incoming_queue.push_back(p);
-	}
-
-	void tcp::socket::internal_incoming_eof(time_point receive_time)
-	{
-		aux::packet p;
-		p.type = aux::packet::error;
-		p.ec = asio::error::eof;
-		p.receive_time = receive_time;
-		m_incoming_queue.push_back(p);
-	}
-
 	boost::system::error_code tcp::socket::bind(ip::tcp::endpoint const& ep
 		, boost::system::error_code& ec)
 	{
@@ -169,12 +151,12 @@ namespace ip {
 	{
 		if (!m_open)
 		{
-			ec.assign(error::bad_descriptor, boost::system::generic_category());
+			ec = boost::system::error_code(error::bad_descriptor);
 			return 0;
 		}
 		if (!m_channel)
 		{
-			ec.assign(error::not_connected, boost::system::generic_category());
+			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
 		if (m_incoming_queue.empty()) return 0;
@@ -185,6 +167,15 @@ namespace ip {
 			, end(m_incoming_queue.end()); i != end; ++i)
 		{
 			if (i->receive_time > now) break;
+			if (i->type == aux::packet::error)
+			{
+				if (ret > 0) return ret;
+
+				// if the read buffer is drained and there is an error, report that
+				// error.
+				ec = i->ec;
+				return 0;
+			}
 			ret += i->buffer.size();
 		}
 		return ret;
@@ -347,8 +338,7 @@ namespace ip {
 
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = write_some_impl(bufs, ec);
-		if (ec == boost::system::error_code(error::would_block
-				, boost::system::generic_category())
+		if (ec == boost::system::error_code(error::would_block)
 			|| (!ec && bytes_transferred < 1475 && bytes_transferred < buf_size))
 		{
 			m_total_sent += bytes_transferred;
@@ -392,12 +382,12 @@ namespace ip {
 	{
 		if (!m_open)
 		{
-			ec.assign(error::bad_descriptor, boost::system::generic_category());
+			ec = boost::system::error_code(error::bad_descriptor);
 			return 0;
 		}
 		if (!m_channel)
 		{
-			ec.assign(error::not_connected, boost::system::generic_category());
+			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
 
@@ -405,7 +395,7 @@ namespace ip {
 		tcp::socket* s = m_channel->sockets[remote];
 		if (s == NULL)
 		{
-			ec.assign(error::not_connected, boost::system::generic_category());
+			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
 
@@ -416,7 +406,7 @@ namespace ip {
 			// this indicates that the send buffer is very large, we should
 			// probably not be able to stuff more bytes down it
 			// wait for the receiving end to pop some bytes off
-			ec.assign(error::would_block, boost::system::generic_category());
+			ec = boost::system::error_code(error::would_block);
 			return 0;
 		}
 
@@ -456,7 +446,7 @@ namespace ip {
 				{
 					if (ret == 0)
 					{
-						ec.assign(error::would_block, boost::system::generic_category());
+						ec = boost::system::error_code(error::would_block);
 						s->subscribe_to_queue_drain();
 						return 0;
 					}
@@ -476,12 +466,12 @@ namespace ip {
 		assert(!bufs.empty());
 		if (!m_open)
 		{
-			ec.assign(error::bad_descriptor, boost::system::generic_category());
+			ec = boost::system::error_code(error::bad_descriptor);
 			return 0;
 		}
 		if (!m_channel)
 		{
-			ec.assign(error::not_connected, boost::system::generic_category());
+			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
 
@@ -489,7 +479,7 @@ namespace ip {
 		if (m_incoming_queue.empty()
 			|| m_incoming_queue.front().receive_time > now)
 		{
-			ec.assign(error::would_block, boost::system::generic_category());
+			ec = boost::system::error_code(error::would_block);
 			return 0;
 		}
 
@@ -578,8 +568,7 @@ namespace ip {
 
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);
-		if (ec == boost::system::error_code(error::would_block
-				, boost::system::generic_category()))
+		if (ec == boost::system::error_code(error::would_block))
 		{
 			m_recv_buffer = bufs;
 			m_recv_handler = handler;
@@ -645,6 +634,32 @@ namespace ip {
 		}
 	}
 
+	// if there is an outstanding read operation, and this was the first incoming
+	// operation since we last drained, wake up the reader
+	void tcp::socket::maybe_wakeup_reader()
+	{
+		if (m_incoming_queue.size() == 1
+			&& m_recv_handler)
+		{
+			if (m_recv_null_buffers)
+			{
+				m_io_service.post(boost::bind(m_recv_handler
+					, boost::system::error_code(), 0));
+				m_recv_handler.clear();
+				m_recv_buffer.clear();
+				m_recv_null_buffers = false;
+			}
+			else
+			{
+				// we have an async. read operation outstanding, and we just put one
+				// packet in our incoming queue.
+
+				// try to read from it and potentially fire the handler
+				async_read_some_impl(m_recv_buffer, m_recv_handler);
+			}
+		}
+	}
+
 	int tcp::socket::internal_incoming_payload(char const* buffer, int size
 		, time_point receive_time)
 	{
@@ -660,30 +675,32 @@ namespace ip {
 			p.type = aux::packet::payload;
 			p.receive_time = receive_time;
 			p.buffer.assign(buffer, buffer + sent);
-			if (m_incoming_queue.size() == 1
-				&& m_recv_handler)
-			{
-				if (m_recv_null_buffers)
-				{
-					m_io_service.post(boost::bind(m_recv_handler
-						, boost::system::error_code(), 0));
-					m_recv_handler.clear();
-					m_recv_buffer.clear();
-					m_recv_null_buffers = false;
-				}
-				else
-				{
-					// we have an async. read operation outstanding, and we just put one
-					// packet in our incoming queue.
-
-					// try to read from it and potentially fire the handler
-					async_read_some_impl(m_recv_buffer, m_recv_handler);
-				}
-			}
+			maybe_wakeup_reader();
 		}
 
 		return sent;
 	}
+
+	void tcp::socket::internal_incoming_reset(time_point receive_time)
+	{
+		aux::packet p;
+		p.type = aux::packet::error;
+		p.ec = asio::error::connection_reset;
+		p.receive_time = receive_time;
+		m_incoming_queue.push_back(p);
+		maybe_wakeup_reader();
+	}
+
+	void tcp::socket::internal_incoming_eof(time_point receive_time)
+	{
+		aux::packet p;
+		p.type = aux::packet::error;
+		p.ec = asio::error::eof;
+		p.receive_time = receive_time;
+		m_incoming_queue.push_back(p);
+		maybe_wakeup_reader();
+	}
+
 
 	void tcp::socket::subscribe_to_queue_drain()
 	{
