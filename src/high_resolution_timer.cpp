@@ -55,9 +55,9 @@ namespace sim
 	{
 		ec.clear();
 		if (m_expired) return 0;
-
 		m_expired = true;
 		m_io_service.remove_timer(this);
+		if (!m_handler) return 0;
 		fire(boost::asio::error::operation_aborted);
 		return 1;
 	}
@@ -123,12 +123,14 @@ namespace sim
 
 	void high_resolution_timer::wait()
 	{
+		assert(false);
 		boost::system::error_code ec;
 		wait(ec);
 	}
 
 	void high_resolution_timer::wait(boost::system::error_code& ec)
 	{
+		assert(false);
 		time_type now = chrono::high_resolution_clock::now();
 		if (now >= m_expiration_time) return;
 		chrono::high_resolution_clock::fast_forward(m_expiration_time - now);
@@ -147,12 +149,10 @@ namespace sim
 
 	void high_resolution_timer::fire(boost::system::error_code ec)
 	{
-		if (m_expired) return;
 		m_expired = true;
-		if (m_handler) {
-			m_io_service.post(boost::bind(m_handler, ec));
-			m_handler.clear();
-		}
+		if (!m_handler) return;
+		m_io_service.post(boost::bind(m_handler, ec));
+		m_handler.clear();
 	}
 
 	} // asio

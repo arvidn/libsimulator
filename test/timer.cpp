@@ -32,11 +32,17 @@ void print_time(high_resolution_timer& timer
 	using namespace sim::chrono;
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
-				.time_since_epoch()).count());
+		.time_since_epoch()).count());
 	printf("[%d] timer fired at: %d milliseconds. error: %s\n"
 		, counter
 		, millis
 		, ec.message().c_str());
+
+	if (ec)
+	{
+		assert(millis == 0);
+		return;
+	}
 
 	assert(millis == expected_timestamps[counter]);
 
@@ -54,6 +60,10 @@ int main()
 	io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
 	high_resolution_timer timer(ios);
 
+	timer.expires_from_now(seconds(10));
+	timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+
+	timer.cancel();
 	timer.expires_from_now(seconds(1));
 	timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
 

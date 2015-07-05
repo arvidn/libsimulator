@@ -433,6 +433,7 @@ namespace ip {
 		std::vector<boost::asio::mutable_buffer> const& bufs
 		, boost::system::error_code& ec)
 	{
+		assert(!bufs.empty());
 		if (!m_open)
 		{
 			ec.assign(error::bad_descriptor, boost::system::generic_category());
@@ -470,6 +471,7 @@ namespace ip {
 				// read, deliver the error
 				if (total_received > 0) break;
 
+				m_incoming_queue.erase(m_incoming_queue.begin());
 				ec = p.ec;
 				m_channel.reset();
 				return 0;
@@ -531,6 +533,8 @@ namespace ip {
 	void tcp::socket::async_read_some_impl(std::vector<boost::asio::mutable_buffer> const& bufs
 		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
+		assert(!bufs.empty());
+
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block

@@ -144,6 +144,12 @@ namespace sim
 		check_accept_queue();
 	}
 
+	void tcp::acceptor::do_check_accept_queue(boost::system::error_code const& ec)
+	{
+		if (ec) return;
+		check_accept_queue();
+	}
+
 	void tcp::acceptor::check_accept_queue()
 	{
 		if (!is_open())
@@ -185,15 +191,19 @@ namespace sim
 		if (completes > now)
 		{
 			m_rtt_timer.expires_at(completes);
-			m_rtt_timer.async_wait(boost::bind(&tcp::acceptor::check_accept_queue
-				, this));
+			m_rtt_timer.async_wait(boost::bind(&tcp::acceptor::do_check_accept_queue
+				, this, _1));
 			return;
 		}
 
 		// this was initiated at least one 3-way handshake ago.
 		// we can pick it up and consider it connected
 		boost::system::error_code ec;
-		*m_remote_endpoint = c->sockets[0]->local_endpoint(ec);
+		if (m_remote_endpoint)
+		{
+			*m_remote_endpoint = c->sockets[0]->local_endpoint(ec);
+		}
+
 		if (!ec) {
 			m_accept_into->internal_connect(m_bound_to, c, ec);
 		}

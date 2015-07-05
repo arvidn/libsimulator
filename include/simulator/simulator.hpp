@@ -325,7 +325,7 @@ namespace sim
 			void cancel();
 
 			template <class Option>
-			boost::system::error_code set_option(Option const& op
+			boost::system::error_code set_option(Option const&
 				, boost::system::error_code& ec) { return ec; }
 
 			boost::system::error_code set_option(receive_buffer_size const& op
@@ -335,14 +335,14 @@ namespace sim
 				return ec;
 			}
 
-			boost::system::error_code set_option(send_buffer_size const& op
+			boost::system::error_code set_option(send_buffer_size const&
 				, boost::system::error_code& ec)
 			{
 				// TODO: implement
 				return ec;
 			}
 
-			boost::system::error_code set_option(reuse_address const& op
+			boost::system::error_code set_option(reuse_address const&
 				, boost::system::error_code& ec)
 			{
 				// TODO: implement
@@ -350,7 +350,7 @@ namespace sim
 			}
 
 			template <class Option>
-			boost::system::error_code get_option(Option& op
+			boost::system::error_code get_option(Option&
 				, boost::system::error_code& ec) { return ec; }
 
 			boost::system::error_code get_option(receive_buffer_size& op
@@ -361,7 +361,8 @@ namespace sim
 			}
 
 			template <class IoControl>
-			void io_control(IoControl const& ioc, boost::system::error_code& ec) {}
+			boost::system::error_code io_control(IoControl const&
+				, boost::system::error_code& ec) { return ec; }
 
 			boost::system::error_code io_control(non_blocking_io const& ioc
 				, boost::system::error_code& ec)
@@ -496,6 +497,7 @@ namespace sim
 			// check the incoming connection queue to see if any connection in
 			// there is ready to be accepted and delivered to the user
 			void check_accept_queue();
+			void do_check_accept_queue(boost::system::error_code const& ec);
 
 			boost::function<void(boost::system::error_code const&)> m_accept_handler;
 
@@ -562,7 +564,8 @@ namespace sim
 		};
 
 		io_service(sim::simulation& sim, ip::address const& ip);
-/*
+		io_service();
+
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
 
@@ -575,7 +578,7 @@ namespace sim
 		void stop();
 		bool stopped() const;
 		void reset();
-*/
+
 		void dispatch(boost::function<void()> handler);
 		void post(boost::function<void()> handler);
 

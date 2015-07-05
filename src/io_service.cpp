@@ -32,27 +32,47 @@ namespace sim { namespace asio {
 		, m_ip(ip)
 	{}
 
-/*
+	io_service::io_service()
+		: m_sim(*reinterpret_cast<sim::simulation*>(NULL))
+	{
+		assert(false);
+	}
+
+	std::size_t io_service::run()
+	{
+		assert(false);
+		return 0;
+	}
+
+	std::size_t io_service::run(boost::system::error_code& ec)
+	{
+		assert(false);
+		return 0;
+	}
+
 	std::size_t io_service::poll()
 	{
-		return m_service.poll();
+		assert(false);
+		return 0;
 	}
 
 	std::size_t io_service::poll(boost::system::error_code& ec)
 	{
-		return m_service.poll(ec);
+		assert(false);
+		return 0;
 	}
 
 	std::size_t io_service::poll_one()
 	{
-		return m_service.poll_one();
+		assert(false);
+		return 0;
 	}
 
 	std::size_t io_service::poll_one(boost::system::error_code& ec)
 	{
-		return m_service.poll_one(ec);
+		assert(false);
+		return 0;
 	}
-*/
 
 	void io_service::dispatch(boost::function<void()> handler)
 	{ m_sim.get_internal_service().dispatch(handler); }
