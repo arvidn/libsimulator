@@ -510,6 +510,7 @@ namespace sim
 				, boost::function<void(boost::system::error_code const&)> h);
 
 			boost::system::error_code close(boost::system::error_code& ec);
+			void close();
 
 			// private interface
 			virtual bool internal_is_listening();
@@ -621,6 +622,7 @@ namespace sim
 
 		sim::simulation& m_sim;
 		ip::address m_ip;
+		bool m_stopped;
 	};
 
 	} // asio

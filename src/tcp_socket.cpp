@@ -643,11 +643,9 @@ namespace ip {
 		{
 			if (m_recv_null_buffers)
 			{
-				m_io_service.post(boost::bind(m_recv_handler
-					, boost::system::error_code(), 0));
-				m_recv_handler.clear();
-				m_recv_buffer.clear();
-				m_recv_null_buffers = false;
+				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
+				m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_null_buffers_impl
+					, this, m_recv_handler));
 			}
 			else
 			{

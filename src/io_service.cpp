@@ -30,12 +30,29 @@ namespace sim { namespace asio {
 	io_service::io_service(sim::simulation& sim, asio::ip::address const& ip)
 		: m_sim(sim)
 		, m_ip(ip)
+		, m_stopped(false)
 	{}
 
 	io_service::io_service()
 		: m_sim(*reinterpret_cast<sim::simulation*>(NULL))
 	{
 		assert(false);
+	}
+
+	void io_service::stop()
+	{
+		// TODO: cancel all outstanding handler associated with this io_service
+		m_stopped = true;
+	}
+
+	bool io_service::stopped() const
+	{
+		return m_stopped;
+	}
+
+	void io_service::reset()
+	{
+		m_stopped = false;
 	}
 
 	std::size_t io_service::run()

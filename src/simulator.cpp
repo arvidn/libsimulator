@@ -77,6 +77,13 @@ namespace sim
 		return socket::close(ec);
 	}
 
+	void tcp::acceptor::close()
+	{
+		boost::system::error_code ec;
+		close(ec);
+		if (ec) throw boost::system::system_error(ec);
+	}
+
 	boost::system::error_code tcp::acceptor::cancel(boost::system::error_code& ec)
 	{
 		if (m_accept_handler)
