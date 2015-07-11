@@ -33,6 +33,8 @@ namespace ip {
 		, m_next_send(chrono::high_resolution_clock::now())
 		, m_recv_sender(NULL)
 		, m_recv_timer(ios)
+		, m_send_timer(ios)
+		, m_recv_null_buffers(0)
 		, m_queue_size(0)
 		, m_is_v4(true)
 	{}
@@ -141,6 +143,7 @@ namespace ip {
 	{
 		m_io_service.post(boost::bind(m_send_handler
 			, boost::system::error_code(error::operation_aborted), 0));
+		m_send_timer.cancel();
 		m_send_handler.clear();
 //		m_send_buffer.clear();
 	}
@@ -152,6 +155,26 @@ namespace ip {
 		m_recv_timer.cancel();
 		m_recv_handler.clear();
 		m_recv_buffer.clear();
+	}
+
+	void udp::socket::async_send(const asio::null_buffers& bufs
+		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+	{
+		if (m_send_handler) abort_send_handler();
+
+		// TODO: make the send buffer size configurable
+		time_point now = chrono::high_resolution_clock::now();
+		if (m_next_send  - now > chrono::milliseconds(1000))
+		{
+			// our send queue is too large.
+			m_recv_timer.expires_at(m_next_send - chrono::milliseconds(1000) / 2);
+			m_recv_timer.async_wait(boost::bind(&udp::socket::async_send
+				, this, bufs, handler));
+			return;
+		}
+
+		// the socket is writable, post the completion handler immediately
+		m_io_service.post(boost::bind(handler, boost::system::error_code(), 0));
 	}
 
 	std::size_t udp::socket::receive_from_impl(
@@ -195,11 +218,51 @@ namespace ip {
 			memcpy(ptr, &p.buffer[0], to_copy);
 			read += to_copy;
 			p.buffer.erase(p.buffer.begin(), p.buffer.begin() + to_copy);
+			m_queue_size -= to_copy;
 			if (p.buffer.empty()) break;
 		}
 
 		m_incoming_queue.erase(m_incoming_queue.begin());
 		return read;
+	}
+
+	void udp::socket::async_receive_null_buffers_impl(
+		udp::endpoint* sender
+		, boost::function<void(boost::system::error_code const&
+			, std::size_t)> const& handler)
+	{
+		if (!m_open)
+		{
+			m_io_service.post(boost::bind(handler
+				, boost::system::error_code(error::bad_descriptor), 0));
+			return;
+		}
+
+		if (m_bound_to == udp::endpoint())
+		{
+			m_io_service.post(boost::bind(handler
+				, boost::system::error_code(error::invalid_argument), 0));
+			return;
+		}
+
+		time_point now = chrono::high_resolution_clock::now();
+		if (!m_incoming_queue.empty())
+		{
+			if (m_incoming_queue.front().receive_time > now)
+			{
+				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
+				m_recv_timer.async_wait(boost::bind(&udp::socket::async_receive_null_buffers_impl
+					, this, sender, handler));
+				return;
+			}
+
+			m_io_service.post(boost::bind(handler, boost::system::error_code(), 0));
+			return;
+		}
+
+		m_recv_null_buffers = true;
+		m_recv_handler = handler;
+		m_recv_sender = sender;
 	}
 
 	void udp::socket::async_receive_from_impl(
@@ -215,17 +278,18 @@ namespace ip {
 		std::size_t bytes_transferred = receive_from_impl(bufs, sender, 0, ec);
 		if (ec == boost::system::error_code(error::would_block))
 		{
-			m_recv_buffer = bufs;
-			m_recv_handler = handler;
-			m_recv_sender = sender;
-			m_recv_null_buffers = false;
-
 			if (!m_incoming_queue.empty())
 			{
 				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
 				m_recv_timer.async_wait(boost::bind(&udp::socket::async_receive_from_impl
 					, this, bufs, sender, 0, handler));
 			}
+
+			m_recv_buffer = bufs;
+			m_recv_handler = handler;
+			m_recv_sender = sender;
+			m_recv_null_buffers = false;
+
 			return;
 		}
 
@@ -297,7 +361,8 @@ namespace ip {
 		const double nanoseconds_per_byte = 1000000000.0
 			/ double(bandwidth);
 
-		if (now - m_next_send > chrono::milliseconds(1000))
+		// TODO: make the send buffer size configurable
+		if (m_next_send - now > chrono::milliseconds(1000))
 		{
 			// our send queue is too large.
 			ec = boost::system::error_code(asio::error::would_block);
@@ -346,8 +411,7 @@ namespace ip {
 		// there is an outstanding operation waiting for an incoming packet
 		if (m_recv_null_buffers)
 		{
-			assert(false && "not implemented");
-//			async_receive_null_buffers_impl(m_recv_buffer, m_recv_sender, 0, m_recv_handler);
+			async_receive_null_buffers_impl(m_recv_sender, m_recv_handler);
 		}
 		else
 		{

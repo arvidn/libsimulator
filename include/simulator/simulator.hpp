@@ -328,6 +328,39 @@ namespace sim
 				return ret;
 			}
 
+			void async_send(const asio::null_buffers& bufs
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler);
+
+			void async_receive(asio::null_buffers const& bufs
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				if (m_recv_handler) abort_recv_handler();
+				async_receive_null_buffers_impl(NULL, handler);
+			}
+
+			void async_receive_from(asio::null_buffers const& bufs
+				, udp::endpoint& sender
+				, socket_base::message_flags flags
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				if (m_recv_handler) abort_recv_handler();
+				async_receive_null_buffers_impl(&sender, handler);
+			}
+
+			void async_receive_from(asio::null_buffers const& bufs
+				, udp::endpoint& sender
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				// TODO: does it make sense to receive null_buffers and still have a
+				// sender argument?
+				if (m_recv_handler) abort_recv_handler();
+				async_receive_null_buffers_impl(&sender, handler);
+			}
+
 			template <class BufferSequence>
 			void async_receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender
@@ -367,6 +400,7 @@ namespace sim
 				, udp::endpoint& sender)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				assert(!b.empty());
 				if (m_recv_handler) abort_recv_handler();
 				boost::system::error_code ec;
 				std::size_t ret = receive_from_impl(b, &sender, 0, ec);
@@ -380,6 +414,7 @@ namespace sim
 				, socket_base::message_flags)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				assert(!b.empty());
 				if (m_recv_handler) abort_recv_handler();
 				boost::system::error_code ec;
 				std::size_t ret = receive_from_impl(b, &sender, 0, ec);
@@ -394,6 +429,7 @@ namespace sim
 				, boost::system::error_code& ec)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				assert(!b.empty());
 				if (m_recv_handler) abort_recv_handler();
 				return receive_from_impl(b, &sender, 0, ec);
 			}
@@ -418,10 +454,16 @@ namespace sim
 				, socket_base::message_flags flags
 				, boost::system::error_code& ec);
 
+			void async_receive_null_buffers_impl(
+				udp::endpoint* sender
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler);
+
 		private:
 			void maybe_wakeup_reader();
 			void abort_send_handler();
 			void abort_recv_handler();
+
 			std::size_t send_to_impl(std::vector<asio::const_buffer> const& b
 				, udp::endpoint const& dst, message_flags flags
 				, boost::system::error_code& ec);
@@ -453,6 +495,8 @@ namespace sim
 			udp::endpoint* m_recv_sender;
 
 			asio::high_resolution_timer m_recv_timer;
+
+			asio::high_resolution_timer m_send_timer;
 
 			// this is the incoming queue of packets for each socket
 			std::vector<aux::packet> m_incoming_queue;
@@ -686,7 +730,6 @@ namespace sim
 
 			// true if the currently outstanding read operation is for null_buffers
 			bool m_recv_null_buffers;
-			bool m_send_null_buffers;
 
 			// if this socket is connected to another endpoint, this object is
 			// shared between both sockets and contain information and state about

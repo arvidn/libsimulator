@@ -37,7 +37,6 @@ namespace ip {
 		, m_recv_timer(ios)
 		, m_is_v4(true)
 		, m_recv_null_buffers(false)
-		, m_send_null_buffers(false)
 	{}
 
 	tcp::socket::~socket()
@@ -197,7 +196,6 @@ namespace ip {
 			m_io_service.post(boost::bind(m_send_handler
 				, boost::system::error_code(error::operation_aborted), 0));
 			m_send_handler.clear();
-			m_send_null_buffers = false;
 		}
 
 		if (m_connect_handler)
@@ -319,7 +317,6 @@ namespace ip {
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_send_handler.clear();
 		m_send_buffer.clear();
-		m_send_null_buffers = false;
 	}
 
 	void tcp::socket::async_write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
@@ -348,7 +345,6 @@ namespace ip {
 			m_io_service.post(boost::bind(handler, ec, 0));
 			m_send_handler.clear();
 			m_send_buffer.clear();
-			m_send_null_buffers = false;
 			return;
 		}
 
@@ -357,7 +353,6 @@ namespace ip {
 		m_io_service.post(boost::bind(handler, boost::system::error_code(), m_total_sent));
 		m_send_handler.clear();
 		m_send_buffer.clear();
-		m_send_null_buffers = false;
 		m_total_sent = 0;
 	}
 
