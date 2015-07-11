@@ -137,10 +137,40 @@ namespace sim { namespace asio {
 		m_sim.unbind_socket(socket, ep);
 	}
 
+	ip::udp::endpoint io_service::bind_udp_socket(ip::udp::socket* socket
+		, ip::udp::endpoint ep, boost::system::error_code& ec)
+	{
+		if (ep.address() == ip::address())
+		{
+			ep.address(m_ip);
+		}
+		else if (ep.address() != m_ip)
+		{
+			// you can only bind to the IP assigned to this node.
+			// TODO: support loopback
+			ec.assign(boost::system::errc::address_not_available
+				, boost::system::generic_category());
+			return ip::udp::endpoint();
+		}
+
+		return m_sim.bind_udp_socket(socket, ep, ec);
+	}
+
+	void io_service::unbind_udp_socket(ip::udp::socket* socket
+		, ip::udp::endpoint ep)
+	{
+		m_sim.unbind_udp_socket(socket, ep);
+	}
+
 	boost::shared_ptr<aux::channel> io_service::internal_connect(ip::tcp::socket* s
 		, ip::tcp::endpoint const& target, boost::system::error_code& ec)
 	{
 		return m_sim.internal_connect(s, target, ec);
+	}
+
+	ip::udp::socket* io_service::find_udp_socket(ip::udp::endpoint const& ep)
+	{
+		return m_sim.find_udp_socket(ep);
 	}
 
 } // asio

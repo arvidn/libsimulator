@@ -28,17 +28,14 @@ namespace asio {
 namespace ip {
 
 	tcp::socket::socket(io_service& ios)
-		: m_io_service(ios)
+		: socket_base(ios)
 		, m_connect_timer(ios)
 		, m_next_send(chrono::high_resolution_clock::now())
 		, m_total_sent(0)
 		, m_queue_size(0)
-		, m_max_receive_queue_size(3 * 1024 * 1024)
 		, m_receive_queue_full(false)
 		, m_recv_timer(ios)
-		, m_open(false)
 		, m_is_v4(true)
-		, m_non_blocking(false)
 		, m_recv_null_buffers(false)
 		, m_send_null_buffers(false)
 	{}
@@ -65,11 +62,6 @@ namespace ip {
 		boost::system::error_code ec;
 		open(protocol, ec);
 		if (ec) throw boost::system::system_error(ec);
-	}
-
-	bool tcp::socket::is_open() const
-	{
-		return m_open;
 	}
 
 	// used to attach an incoming connection to this
@@ -315,6 +307,7 @@ namespace ip {
 	{
 		m_io_service.post(boost::bind(m_recv_handler
 			, boost::system::error_code(error::operation_aborted), 0));
+		m_recv_timer.cancel();
 		m_recv_handler.clear();
 		m_recv_buffer.clear();
 		m_recv_null_buffers = false;
@@ -638,23 +631,19 @@ namespace ip {
 	// operation since we last drained, wake up the reader
 	void tcp::socket::maybe_wakeup_reader()
 	{
-		if (m_incoming_queue.size() == 1
-			&& m_recv_handler)
-		{
-			if (m_recv_null_buffers)
-			{
-				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
-				m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_null_buffers_impl
-					, this, m_recv_handler));
-			}
-			else
-			{
-				// we have an async. read operation outstanding, and we just put one
-				// packet in our incoming queue.
+		if (m_incoming_queue.size() != 1 || !m_recv_handler) return;
 
-				// try to read from it and potentially fire the handler
-				async_read_some_impl(m_recv_buffer, m_recv_handler);
-			}
+		if (m_recv_null_buffers)
+		{
+			async_read_some_null_buffers_impl(m_recv_handler);
+		}
+		else
+		{
+			// we have an async. read operation outstanding, and we just put one
+			// packet in our incoming queue.
+
+			// try to read from it and potentially fire the handler
+			async_read_some_impl(m_recv_buffer, m_recv_handler);
 		}
 	}
 

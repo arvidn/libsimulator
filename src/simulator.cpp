@@ -24,16 +24,11 @@ All rights reserved.
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
 
-namespace sim
-{
-	namespace asio {
+namespace sim {
+namespace asio {
+namespace ip {
 
-	namespace ip {
-
-	udp::socket::socket(io_service& ios)
-		: boost::asio::ip::udp::socket(ios.get_internal_service())
-		, m_io_service(ios)
-	{}
+	// ----- resolver ------
 
 	udp::resolver::resolver(io_service& ios)
 		: boost::asio::ip::udp::resolver(ios.get_internal_service())
@@ -257,26 +252,25 @@ namespace sim
 		: boost::asio::ip::tcp::resolver(ios.get_internal_service())
 	{}
 
-	} // ip
+} // ip
+} // asio
 
-	} // asio
+namespace aux {
 
-	namespace aux {
+	int channel::remote_idx(asio::ip::tcp::socket const* self) const
+	{
+		if (sockets[0] == self) return 1;
+		if (sockets[1] == self) return 0;
+		assert(false && "invalid socket");
+	}
 
-		int channel::remote_idx(asio::ip::tcp::socket const* self) const
-		{
-			if (sockets[0] == self) return 1;
-			if (sockets[1] == self) return 0;
-			assert(false && "invalid socket");
-		}
+	int channel::self_idx(asio::ip::tcp::socket const* self) const
+	{
+		if (sockets[0] == self) return 0;
+		if (sockets[1] == self) return 1;
+		assert(false && "invalid socket");
+	}
 
-		int channel::self_idx(asio::ip::tcp::socket const* self) const
-		{
-			if (sockets[0] == self) return 0;
-			if (sockets[1] == self) return 1;
-			assert(false && "invalid socket");
-		}
-
-	} // aux
+} // aux
 } // sim
 

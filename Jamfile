@@ -15,7 +15,7 @@ if $(BOOST_ROOT)
 }
 
 SOURCES = simulator simulation io_service high_resolution_timer
-	high_resolution_clock tcp_socket ;
+	high_resolution_clock tcp_socket udp_socket socket_base ;
 
 lib simulator
 	: # sources
@@ -45,5 +45,6 @@ test-suite simulator-tests :
 	[ run test/acceptor.cpp ]
 	[ run test/multi_accept.cpp ]
 	[ run test/null_buffers.cpp ]
+	[ run test/udp_socket.cpp ]
 	;
 

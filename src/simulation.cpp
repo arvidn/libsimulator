@@ -139,6 +139,56 @@ namespace sim
 		m_listen_sockets.erase(i);
 	}
 
+	ip::udp::endpoint simulation::bind_udp_socket(ip::udp::socket* socket
+		, ip::udp::endpoint ep, boost::system::error_code& ec)
+	{
+		assert(ep.address() != boost::asio::ip::address());
+
+		if (ep.port() < 1024 && ep.port() > 0)
+		{
+			// emulate process not running as root
+			ec = boost::asio::error::access_denied;
+			return ip::udp::endpoint();
+		}
+
+		if (ep.port() == 0)
+		{
+			// if the socket is being bound to port 0, it means the system picks a
+			// free port.
+			ep.port(2000);
+			udp_socket_iter_t i = m_udp_sockets.lower_bound(ep);
+			while (i != m_udp_sockets.end() && i->first == ep)
+			{
+				ep.port(ep.port() + 1);
+				if (ep.port() > 65530)
+				{
+					ec = boost::asio::error::address_in_use;
+					return ip::udp::endpoint();
+				}
+				i = m_udp_sockets.lower_bound(ep);
+			}
+		}
+
+		udp_socket_iter_t i = m_udp_sockets.lower_bound(ep);
+		if (i != m_udp_sockets.end() && i->first == ep)
+		{
+			ec = boost::asio::error::address_in_use;
+			return ip::udp::endpoint();
+		}
+
+		m_udp_sockets.insert(i, std::make_pair(ep, socket));
+		ec.clear();
+		return ep;
+	}
+
+	void simulation::unbind_udp_socket(ip::udp::socket* socket
+		, ip::udp::endpoint ep)
+	{
+		udp_socket_iter_t i = m_udp_sockets.find(ep);
+		if (i == m_udp_sockets.end() || i->second != socket) return;
+		m_udp_sockets.erase(i);
+	}
+
 	boost::shared_ptr<aux::channel> simulation::internal_connect(
 		asio::ip::tcp::socket* s
 		, ip::tcp::endpoint const& target, boost::system::error_code& ec)
@@ -176,6 +226,13 @@ namespace sim
 		if (ec) return boost::shared_ptr<aux::channel>();
 
 		return c;
+	}
+
+	ip::udp::socket* simulation::find_udp_socket(ip::udp::endpoint const& ep)
+	{
+		udp_socket_iter_t i = m_udp_sockets.find(ep);
+		if (i == m_udp_sockets.end()) return NULL;
+		return i->second;
 	}
 
 }

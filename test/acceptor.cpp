@@ -18,6 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include <boost/bind.hpp>
+#include "test.hpp"
 
 using namespace sim::asio;
 using namespace sim::chrono;
@@ -79,9 +80,9 @@ void incoming_connection(boost::system::error_code const& ec
 
 	boost::system::error_code err;
 	ip::tcp::endpoint remote_endpoint = sock.remote_endpoint(err);
-	if (ec) printf("[%4d] local_endpoint failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("local_endpoint", err);
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
-	if (ec) printf("[%4d] remote_endpoint failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("remote_endpoint", err);
 	printf("[%4d] received incoming connection from: %s:%d. local endpoint: %s:%d\n"
 		, millis, ep.address().to_string().c_str(), ep.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
@@ -107,9 +108,10 @@ void on_connected(boost::system::error_code const& ec
 
 	boost::system::error_code err;
 	ip::tcp::endpoint remote_endpoint = sock.remote_endpoint(err);
-	if (ec) printf("[%4d] remote_endpoint failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("remote_endpoint", err);
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
-	if (ec) printf("[%4d] local_endpoint failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("local_endpoint", err);
+
 	printf("[%4d] made outgoing connection to: %s:%d. local endpoint: %s:%d\n"
 		, millis
 		, remote_endpoint.address().to_string().c_str(), remote_endpoint.port()
@@ -137,11 +139,11 @@ int main()
 
 	boost::system::error_code ec;
 	listener.open(ip::tcp::v4(), ec);
-	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("open", ec);
 	listener.bind(ip::tcp::endpoint(ip::address(), 1337), ec);
-	if (ec) printf("[%4d] bind failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("bind", ec);
 	listener.listen(10, ec);
-	if (ec) printf("[%4d] listen failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("listen", ec);
 
 	ip::tcp::socket incoming(incoming_ios);
 	ip::tcp::endpoint remote_endpoint;
@@ -152,7 +154,7 @@ int main()
 	printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
-	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	exit_on_error("open", ec);
 	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
 		, 1337), boost::bind(&on_connected, _1, boost::ref(outgoing)));
 

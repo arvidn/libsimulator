@@ -27,3 +27,6 @@ bin
 *.exe
 *.out
 *.app
+
+# temporaries
+.*
