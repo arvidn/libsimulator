@@ -42,7 +42,7 @@ namespace ip {
 	tcp::socket::~socket()
 	{
 		boost::system::error_code ec;
-		cancel(ec);
+		close(ec);
 	}
 
 	boost::system::error_code tcp::socket::open(tcp protocol
@@ -182,21 +182,8 @@ namespace ip {
 
 	boost::system::error_code tcp::socket::cancel(boost::system::error_code & ec)
 	{
-		if (m_recv_handler)
-		{
-			m_io_service.post(boost::bind(m_recv_handler
-				, boost::system::error_code(error::operation_aborted), 0));
-			m_recv_handler.clear();
-			m_recv_buffer.clear();
-			m_recv_null_buffers = false;
-		}
-
-		if (m_send_handler)
-		{
-			m_io_service.post(boost::bind(m_send_handler
-				, boost::system::error_code(error::operation_aborted), 0));
-			m_send_handler.clear();
-		}
+		if (m_recv_handler) abort_recv_handler();
+		if (m_send_handler) abort_send_handler();
 
 		if (m_connect_handler)
 		{

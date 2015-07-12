@@ -286,6 +286,7 @@ namespace sim
 			typedef socket lowest_layer_type;
 
 			socket(io_service& ios);
+			~socket();
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
@@ -495,7 +496,6 @@ namespace sim
 			udp::endpoint* m_recv_sender;
 
 			asio::high_resolution_timer m_recv_timer;
-
 			asio::high_resolution_timer m_send_timer;
 
 			// this is the incoming queue of packets for each socket

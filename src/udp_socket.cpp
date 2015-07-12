@@ -39,6 +39,12 @@ namespace ip {
 		, m_is_v4(true)
 	{}
 
+	udp::socket::~socket()
+	{
+		boost::system::error_code ec;
+		close(ec);
+	}
+
 	udp::endpoint udp::socket::local_endpoint(boost::system::error_code& ec)
 		const
 	{
@@ -129,6 +135,10 @@ namespace ip {
 	boost::system::error_code udp::socket::cancel(boost::system::error_code& ec)
 	{
 		// cancel outstanding async operations
+		if (m_recv_handler) abort_recv_handler();
+		if (m_send_handler) abort_send_handler();
+		m_recv_timer.cancel(ec);
+		m_send_timer.cancel(ec);
 		return ec;
 	}
 
