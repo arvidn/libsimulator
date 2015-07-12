@@ -48,7 +48,6 @@ namespace ip {
 	boost::system::error_code tcp::socket::open(tcp protocol
 		, boost::system::error_code& ec)
 	{
-		// TODO: what if it's already open?
 		close(ec);
 		m_open = true;
 		m_is_v4 = (protocol == ip::tcp::v4());
@@ -545,32 +544,27 @@ namespace ip {
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block))
 		{
-			m_recv_buffer = bufs;
-			m_recv_handler = handler;
-			m_recv_null_buffers = false;
-
 			if (!m_incoming_queue.empty())
 			{
 				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
 				m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_impl
 					, this, bufs, handler));
 			}
+
+			m_recv_buffer = bufs;
+			m_recv_handler = handler;
+			m_recv_null_buffers = false;
+
 			return;
 		}
 
 		if (ec)
 		{
 			m_io_service.post(boost::bind(handler, ec, 0));
-			m_recv_handler.clear();
-			m_recv_buffer.clear();
-			m_recv_null_buffers = false;
 			return;
 		}
 
 		m_io_service.post(boost::bind(handler, ec, bytes_transferred));
-		m_recv_handler.clear();
-		m_recv_buffer.clear();
-		m_recv_null_buffers = false;
 	}
 
 	void tcp::socket::async_read_some_null_buffers_impl(
@@ -583,30 +577,25 @@ namespace ip {
 		if (ec)
 		{
 			m_io_service.post(boost::bind(handler, ec, 0));
-			m_recv_handler.clear();
-			m_recv_buffer.clear();
-			m_recv_null_buffers = false;
 			return;
 		}
 
 		if (bytes > 0)
 		{
 			m_io_service.post(boost::bind(handler, ec, 0));
-			m_recv_handler.clear();
-			m_recv_buffer.clear();
-			m_recv_null_buffers = false;
 			return;
 		}
-
-		m_recv_handler = handler;
-		m_recv_null_buffers = true;
 
 		if (!m_incoming_queue.empty())
 		{
 			m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
 			m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_null_buffers_impl
 				, this, handler));
+			return;
 		}
+
+		m_recv_handler = handler;
+		m_recv_null_buffers = true;
 	}
 
 	// if there is an outstanding read operation, and this was the first incoming
@@ -627,6 +616,10 @@ namespace ip {
 			// try to read from it and potentially fire the handler
 			async_read_some_impl(m_recv_buffer, m_recv_handler);
 		}
+
+		m_recv_handler.clear();
+		m_recv_buffer.clear();
+		m_recv_null_buffers = false;
 	}
 
 	int tcp::socket::internal_incoming_payload(char const* buffer, int size

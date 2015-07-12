@@ -427,11 +427,13 @@ namespace ip {
 		{
 			async_receive_from_impl(m_recv_buffer, m_recv_sender, 0, m_recv_handler);
 		}
+
+		m_recv_handler.clear();
+		m_recv_buffer.clear();
+		m_recv_sender = NULL;
 	}
 
-
-	}
-	}
-
-}
+} // ip
+} // asio
+} // sim
 
