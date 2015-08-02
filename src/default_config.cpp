@@ -53,6 +53,11 @@ namespace sim {
 		return route(it->second);
 	}
 
+	int default_config::path_mtu(asio::ip::address ip1, asio::ip::address ip2)
+	{
+		return 1475;
+	}
+
 	// return the hops an outgoing packet from ep need to traverse before
 	// reaching the network (for instance a DSL modem)
 	route default_config::outgoing_route(asio::ip::address ip)

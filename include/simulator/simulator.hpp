@@ -946,6 +946,8 @@ namespace sim
 		route const& get_incoming_route() const
 		{ return m_incoming_route; }
 
+		int get_path_mtu(asio::ip::address ip) const;
+
 	private:
 
 		sim::simulation& m_sim;
@@ -981,6 +983,12 @@ namespace sim
 		// return the hops an outgoing packet from ep need to traverse before
 		// reaching the network (for instance a DSL modem)
 		virtual route outgoing_route(asio::ip::address ip) = 0;
+
+		// return the path MTU between the two IP addresses
+		// For TCP sockets, this will be called once when the connection is
+		// established. For UDP sockets it's called for every burst of packets
+		// that are sent
+		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2) = 0;
 	};
 
 	struct default_config : configuration
@@ -992,6 +1000,8 @@ namespace sim
 			, asio::ip::address dst) override final;
 		virtual route incoming_route(asio::ip::address ip) override final;
 		virtual route outgoing_route(asio::ip::address ip) override final;
+		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2)
+			override final;
 
 	private:
 		std::shared_ptr<queue> m_network;

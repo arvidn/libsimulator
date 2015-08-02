@@ -38,6 +38,11 @@ namespace sim { namespace asio {
 		assert(false);
 	}
 
+	int io_service::get_path_mtu(asio::ip::address ip) const
+	{
+		return m_sim.config().path_mtu(m_ip, ip);
+	}
+
 	void io_service::stop()
 	{
 		// TODO: cancel all outstanding handler associated with this io_service

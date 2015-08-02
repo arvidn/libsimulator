@@ -33,7 +33,7 @@ namespace ip {
 	tcp::socket::socket(io_service& ios)
 		: socket_base(ios)
 		, m_connect_timer(ios)
-		, m_mss(1475) // TODO: make configurable
+		, m_mss(1475)
 		, m_queue_size(0)
 		, m_recv_timer(ios)
 		, m_is_v4(true)
@@ -297,6 +297,8 @@ namespace ip {
 			m_bound_to = addr;
 		}
 		m_channel = m_io_service.internal_connect(this, target, ec);
+		m_mss = m_io_service.get_path_mtu(target.address());
+		m_cwnd = m_mss * 2;
 		if (ec)
 		{
 			m_channel.reset();
