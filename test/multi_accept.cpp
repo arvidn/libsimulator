@@ -17,11 +17,12 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include <boost/bind.hpp>
+#include <functional>
 
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
+using namespace std::placeholders;
 
 void incoming_connection(boost::system::error_code const& ec
 	, ip::tcp::socket& sock, ip::tcp::acceptor& listener)
@@ -38,8 +39,8 @@ void incoming_connection(boost::system::error_code const& ec
 	printf("[%4d] received incoming connection\n", millis);
 	sock.close();
 
-	listener.async_accept(sock, boost::bind(&incoming_connection
-		, _1, boost::ref(sock), boost::ref(listener)));
+	listener.async_accept(sock, std::bind(&incoming_connection
+		, _1, std::ref(sock), std::ref(listener)));
 }
 
 int counter = 0;
@@ -60,8 +61,11 @@ void on_connected(boost::system::error_code const& ec
 
 	if (++counter > 5) return;
 
+	boost::system::error_code err;
+	sock.open(ip::tcp::v4(), err);
+	if (err) printf("[%4d] open failed: %s\n", millis, err.message().c_str());
 	sock.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
-		, 1337), boost::bind(&on_connected, _1, boost::ref(sock)));
+		, 1337), std::bind(&on_connected, _1, std::ref(sock)));
 }
 
 int main()
@@ -84,15 +88,15 @@ int main()
 
 	ip::tcp::socket incoming(incoming_ios);
 	listener.async_accept(incoming
-		, boost::bind(&incoming_connection, _1, boost::ref(incoming)
-		, boost::ref(listener)));
+		, std::bind(&incoming_connection, _1, std::ref(incoming)
+		, std::ref(listener)));
 
 	printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
 	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
-		, 1337), boost::bind(&on_connected, _1, boost::ref(outgoing)));
+		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);
 

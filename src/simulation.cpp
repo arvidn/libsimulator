@@ -24,9 +24,13 @@ using namespace sim::asio;
 
 namespace sim
 {
-	simulation::simulation()
-		: m_stopped(false)
-	{}
+	simulation::simulation(configuration& config)
+		: m_config(config)
+		, m_internal_ios(*this, asio::ip::address_v4::from_string("0.0.0.0"))
+		, m_stopped(false)
+	{
+		m_config.build(*this);
+	}
 
 	std::size_t simulation::run()
 	{
@@ -189,7 +193,7 @@ namespace sim
 		m_udp_sockets.erase(i);
 	}
 
-	boost::shared_ptr<aux::channel> simulation::internal_connect(
+	std::shared_ptr<aux::channel> simulation::internal_connect(
 		asio::ip::tcp::socket* s
 		, ip::tcp::endpoint const& target, boost::system::error_code& ec)
 	{
@@ -198,7 +202,7 @@ namespace sim
 		if (i == m_listen_sockets.end())
 		{
 			ec = boost::system::error_code(error::connection_refused);
-			return boost::shared_ptr<aux::channel>();
+			return std::shared_ptr<aux::channel>();
 		}
 
 		// make sure it's a listening socket
@@ -206,33 +210,49 @@ namespace sim
 		if (!remote->internal_is_listening())
 		{
 			ec = boost::system::error_code(error::connection_refused);
-			return boost::shared_ptr<aux::channel>();
+			return std::shared_ptr<aux::channel>();
 		}
 
 		// create a channel
-		boost::shared_ptr<aux::channel> c = boost::make_shared<aux::channel>();
-		c->sockets[0] = s;
+		std::shared_ptr<aux::channel> c = std::make_shared<aux::channel>();
 
-		// TODO: ask policy object about delays for this pair
-		c->delay[0] = chrono::milliseconds(50);
-		c->delay[1] = chrono::milliseconds(50);
-		c->incoming_bandwidth[0] = 1024 * 1024;
-		c->incoming_bandwidth[1] = 1024 * 1024;
+		asio::ip::tcp::endpoint from = s->local_endpoint(ec);
 
-		c->initiated = chrono::high_resolution_clock::now();
+		route network_route = m_config.channel_route(from.address()
+			, target.address());
+		c->hops[0] = remote->get_outgoing_route() + network_route + s->get_incoming_route();
+		c->hops[1] = s->get_outgoing_route() + network_route + remote->get_incoming_route();
 
-		// add channel to listen queue (fail if queue is full)
-		remote->internal_accept_queue(c, ec);
-		if (ec) return boost::shared_ptr<aux::channel>();
+		c->ep[0] = s->local_endpoint(ec);
+		c->ep[1] = remote->local_endpoint(ec);
+
+		aux::packet p;
+		p.type = aux::packet::syn;
+		p.overhead = 28;
+		p.from = asio::ip::udp::endpoint(from.address(), from.port());
+		p.channel = c;
+		if (ec) return std::shared_ptr<aux::channel>();
+
+		p.hops = c->hops[1];
+
+		forward_packet(std::move(p));
 
 		return c;
 	}
 
-	ip::udp::socket* simulation::find_udp_socket(ip::udp::endpoint const& ep)
+	route simulation::find_udp_socket(asio::ip::udp::socket const& socket
+		, ip::udp::endpoint const& ep)
 	{
 		udp_socket_iter_t i = m_udp_sockets.find(ep);
-		if (i == m_udp_sockets.end()) return NULL;
-		return i->second;
+		if (i == m_udp_sockets.end()) route();
+
+		ip::udp::endpoint src = socket.local_endpoint();
+		route network_route = m_config.channel_route(src.address(), ep.address());
+
+		// ask the socket for its incoming route
+		network_route.append(i->second->get_incoming_route());
+
+		return network_route;
 	}
 
 }

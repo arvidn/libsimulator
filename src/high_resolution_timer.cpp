@@ -18,7 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <boost/system/error_code.hpp>
 
 namespace sim
@@ -151,8 +151,8 @@ namespace sim
 	{
 		m_expired = true;
 		if (!m_handler) return;
-		m_io_service.post(boost::bind(m_handler, ec));
-		m_handler.clear();
+		m_io_service.post(std::bind(m_handler, ec));
+		m_handler = 0;
 	}
 
 	} // asio

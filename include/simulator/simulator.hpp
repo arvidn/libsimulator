@@ -30,8 +30,10 @@ All rights reserved.
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <vector>
+#include <functional>
 
 namespace sim
 {
@@ -39,7 +41,56 @@ namespace sim
 	{
 		struct channel;
 		struct packet;
+		struct sink_forwarder;
 	}
+
+	// this is an interface for somthing that can accept incoming packets,
+	// such as queues, sockets, NATs and TCP congestion windows
+	struct sink
+	{
+		virtual void incoming_packet(aux::packet p) = 0;
+	};
+
+	// this represents a network route (a series of sinks to pass a packet
+	// through)
+	struct route
+	{
+		route() = default;
+		route(route&&) = default;
+		route(route const&) = default;
+		route& operator=(route&&) = default;
+		route& operator=(route const&) = default;
+		route(std::shared_ptr<sink> const& s) { append(s); }
+
+		friend route operator+(route lhs, route rhs)
+		{
+			lhs.append(std::move(rhs));
+			return lhs;
+		}
+
+		std::shared_ptr<sink> next_hop() const { return hops.front(); }
+		std::shared_ptr<sink> pop_front()
+		{
+			std::shared_ptr<sink> ret(std::move(hops.front()));
+			hops.erase(hops.begin());
+			return ret;
+		}
+		void replace_last(std::shared_ptr<sink> s) { hops.back() = s; }
+		void prepend(route const& r)
+		{ hops.insert(hops.begin(), r.hops.begin(), r.hops.end()); }
+		void prepend(std::shared_ptr<sink> s) { hops.insert(hops.begin(), s); }
+		void append(route const& r)
+		{ hops.insert(hops.end(), r.hops.begin(), r.hops.end()); }
+		void append(std::shared_ptr<sink> s) { hops.push_back(s); }
+		bool empty() const { return hops.empty(); }
+
+
+	private:
+		std::vector<std::shared_ptr<sink>> hops;
+	};
+
+	void forward_packet(aux::packet p);
+
 	struct simulation;
 
 	namespace chrono
@@ -246,9 +297,20 @@ namespace sim
 
 		typedef int message_flags;
 
+		// internal interface
+
+		route get_incoming_route();
+		route get_outgoing_route();
+
 	protected:
 
 		io_service& m_io_service;
+
+		// this is an object implementing the sink interface, forwarding
+		// packets to this socket. If this socket is destructed, this forwarder
+		// is redirected to just drop packets. This is necessary since sinks
+		// must be held by shared_ptr, and socket objects aren't.
+		std::shared_ptr<aux::sink_forwarder> m_forwarder;
 
 		// whether the socket is open or not
 		bool m_open;
@@ -279,7 +341,7 @@ namespace sim
 			ip::udp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct socket : socket_base
+		struct socket : socket_base, sink
 		{
 			typedef ip::udp::endpoint endpoint_type;
 			typedef ip::udp protocol_type;
@@ -439,9 +501,8 @@ namespace sim
 
 			// internal interface
 
-			void internal_incoming_payload(std::vector<const_buffer> const& b
-				, chrono::high_resolution_clock::time_point receive_time
-				, udp::endpoint const& from);
+			// implements sink
+			virtual void incoming_packet(aux::packet p) override final;
 
 			void async_receive_from_impl(std::vector<asio::mutable_buffer> const& bufs
 				, udp::endpoint* sender
@@ -552,7 +613,7 @@ namespace sim
 			ip::tcp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct socket : socket_base
+		struct socket : socket_base, sink
 		{
 			typedef ip::tcp::endpoint endpoint_type;
 			typedef ip::tcp protocol_type;
@@ -584,9 +645,17 @@ namespace sim
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
-				m_total_sent = 0;
 				if (m_send_handler) abort_send_handler();
 				async_write_some_impl(b, handler);
+			}
+
+			void async_write_some(null_buffers const& bufs
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				if (m_send_handler) abort_send_handler();
+				assert(false && "not supported yet");
+//				async_write_some_null_buffers_impl(b, handler);
 			}
 
 			void async_read_some(null_buffers const&
@@ -621,7 +690,6 @@ namespace sim
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
-				m_total_sent = 0;
 				if (m_recv_handler) abort_recv_handler();
 
 				async_read_some_impl(b, handler);
@@ -638,38 +706,22 @@ namespace sim
 			using socket_base::io_control;
 
 			// private interface
+
+			// implements sink
+			virtual void incoming_packet(aux::packet p) override;
+
 			void internal_connect(tcp::endpoint const& bind_ip
-				, boost::shared_ptr<aux::channel> const& c
+				, std::shared_ptr<aux::channel> const& c
 				, boost::system::error_code& ec);
-			void internal_connect_complete(boost::system::error_code const& ec);
 
 			void abort_send_handler();
 			void abort_recv_handler();
 
-			// this returns the number of bytes actually queued up. If it's less
-			// than 'size', the `full_queue` flag will be set and the caller will
-			// be notified of more space in the queue via the
-			// advertised_receive_window() call. At that point it can stuff more
-			// bytes down the socket.
-			int internal_incoming_payload(char const* buffer, int size
-				, chrono::high_resolution_clock::time_point receive_time);
-			void internal_incoming_reset(
-				chrono::high_resolution_clock::time_point receive_time);
-			void internal_incoming_eof(
-				chrono::high_resolution_clock::time_point receive_time);
-			void maybe_wakeup_reader();
-
-			// request to be notified when there's more space in the incoming queue
-			void subscribe_to_queue_drain();
-
-			// this is called by the other end when it drains some of its incoming
-			// queue. But only if we requested to subscribe to it.
-			void internal_on_buffer_drained();
-
 			virtual bool internal_is_listening();
-			virtual void internal_accept_queue(boost::shared_ptr<aux::channel> c
-				, boost::system::error_code& ec);
 		protected:
+
+			void maybe_wakeup_reader();
+			void maybe_wakeup_writer();
 
 			void async_write_some_impl(std::vector<asio::const_buffer> const& bufs
 				, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
@@ -681,25 +733,26 @@ namespace sim
 				, boost::system::error_code& ec);
 			std::size_t read_some_impl(std::vector<asio::mutable_buffer> const& bufs
 				, boost::system::error_code& ec);
+
+			void send_packet(aux::packet p);
+
+			// called when a packet is dropped
+			void packet_dropped(aux::packet p);
+
 			ip::tcp::endpoint m_bound_to;
 
 			boost::function<void(boost::system::error_code const&)> m_connect_handler;
 
 			asio::high_resolution_timer m_connect_timer;
 
-			// this is the next time we'll have an opportunity to send another
-			// outgoing packet. This is used to implement the bandwidth constraints
-			// of channels. This may be in the past, in which case it's OK to send
-			// a packet immediately.
-			chrono::high_resolution_clock::time_point m_next_send;
+			// the tcp "packet size" (segment size)
+			int m_mss;
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
 			boost::function<void(boost::system::error_code const&, std::size_t)>
 				m_send_handler;
 
-			// the total number of bytes sent
-			int m_total_sent;
 			std::vector<asio::const_buffer> m_send_buffer;
 
 			// this is the incoming queue of packets for each socket
@@ -707,13 +760,6 @@ namespace sim
 
 			// the number of bytes in the incoming packet queue
 			int m_queue_size;
-
-			// if the incoming queue is too big, we won't stuff more bytes down it.
-			// instead we ask the receiving side to notify us when some of it has
-			// been drained. Setting this to true indicates that we want the
-			// receiver to notify the sender once it pulls some bytes off the
-			// queue.
-			bool m_receive_queue_full;
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
@@ -731,10 +777,36 @@ namespace sim
 			// true if the currently outstanding read operation is for null_buffers
 			bool m_recv_null_buffers;
 
+			// true if the currenly outstanding write operation is for null_buffers
+			bool m_send_null_buffers;
+
 			// if this socket is connected to another endpoint, this object is
 			// shared between both sockets and contain information and state about
 			// the channel.
-			boost::shared_ptr<aux::channel> m_channel;
+			std::shared_ptr<aux::channel> m_channel;
+
+			std::uint64_t m_next_outgoing_seq;
+			std::uint64_t m_next_incoming_seq;
+
+			// the sequence number of the last dropped packet. We should only cut
+			// the cwnd in half once per round-trip. If a whole window is lost, we
+			// need to only halve it once
+			std::uint64_t m_last_drop_seq;
+
+			// the current congestion window size (in bytes)
+			int m_cwnd;
+
+			// the number of bytes that have been sent but not ACKed yet
+			int m_bytes_in_flight;
+
+			// reorder buffer for when packets are dropped
+			std::unordered_map<std::uint64_t, aux::packet> m_reorder_buffer;
+
+			// the sizes of packets given their sequence number
+			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
+
+			// packets to re-send (because they were dropped)
+			std::vector<aux::packet> m_outgoing_packets;
 		};
 
 		struct acceptor : socket
@@ -757,9 +829,11 @@ namespace sim
 			void close();
 
 			// private interface
+
+			// implements sink
+			virtual void incoming_packet(aux::packet p) override final;
 			virtual bool internal_is_listening();
-			virtual void internal_accept_queue(boost::shared_ptr<aux::channel> c
-				, boost::system::error_code& ec);
+
 		private:
 			// check the incoming connection queue to see if any connection in
 			// there is ready to be accepted and delivered to the user
@@ -767,11 +841,6 @@ namespace sim
 			void do_check_accept_queue(boost::system::error_code const& ec);
 
 			boost::function<void(boost::system::error_code const&)> m_accept_handler;
-
-			// this timer is used to introduce the delay of accepting connections.
-			// The initiating side completes the connection handshake after one
-			// RTT, the accepting side completes it in 1.5 RTTs.
-			high_resolution_timer m_rtt_timer;
 
 			// the number of half-open incoming connections this listen socket can
 			// hold. If this is -1, this socket is not yet listening and incoming
@@ -781,7 +850,7 @@ namespace sim
 			// these are incoming connection attempts. Both half-open and
 			// completely connected. When accepting a connection, this queue is
 			// checked first before waiting for a connection attempt.
-			typedef std::vector<boost::shared_ptr<aux::channel> > incoming_conns_t;
+			typedef std::vector<std::shared_ptr<aux::channel> > incoming_conns_t;
 			incoming_conns_t m_incoming_queue;
 
 			// the socket to accept a connection into
@@ -865,26 +934,82 @@ namespace sim
 		void unbind_udp_socket(ip::udp::socket* socket
 			, ip::udp::endpoint ep);
 
-		boost::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
+		std::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
 			, ip::tcp::endpoint const& target, boost::system::error_code& ec);
 
-		ip::udp::socket* find_udp_socket(ip::udp::endpoint const& ep);
+		route find_udp_socket(asio::ip::udp::socket const& socket
+			, ip::udp::endpoint const& ep);
+
+		route const& get_outgoing_route() const
+		{ return m_outgoing_route; }
+
+		route const& get_incoming_route() const
+		{ return m_incoming_route; }
 
 	private:
 
 		sim::simulation& m_sim;
 		ip::address m_ip;
+
+		// these are determined by the configuration. They may include NATs and
+		// DSL modems (queues)
+		route m_outgoing_route;
+		route m_incoming_route;
+
 		bool m_stopped;
 	};
 
 	} // asio
+
+	struct configuration;
+	struct queue;
+
+	// user supplied configuration of the network to simulate
+	struct configuration
+	{
+		// build the network
+		virtual void build(simulation& sim) = 0;
+
+		// return the hops on the network packets from src to dst need to traverse
+		virtual route channel_route(asio::ip::address src
+			, asio::ip::address dst) = 0;
+
+		// return the hops an incoming packet to ep need to traverse before
+		// reaching the socket (for instance a NAT)
+		virtual route incoming_route(asio::ip::address ip) = 0;
+
+		// return the hops an outgoing packet from ep need to traverse before
+		// reaching the network (for instance a DSL modem)
+		virtual route outgoing_route(asio::ip::address ip) = 0;
+	};
+
+	struct default_config : configuration
+	{
+		default_config() : m_sim(nullptr) {}
+
+		virtual void build(simulation& sim) override final;
+		virtual route channel_route(asio::ip::address src
+			, asio::ip::address dst) override final;
+		virtual route incoming_route(asio::ip::address ip) override final;
+		virtual route outgoing_route(asio::ip::address ip) override final;
+
+	private:
+		std::shared_ptr<queue> m_network;
+		std::map<asio::ip::address, std::shared_ptr<queue>> m_incoming;
+		std::map<asio::ip::address, std::shared_ptr<queue>> m_outgoing;
+		simulation* m_sim;
+	};
+
+	namespace aux {
+		extern default_config default_cfg;
+	}
 
 	struct simulation
 	{
 		// it calls fire() when a timer fires
 		friend struct high_resolution_timer;
 
-		simulation();
+		simulation(configuration& config = aux::default_cfg);
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -906,6 +1031,8 @@ namespace sim
 		boost::asio::io_service& get_internal_service()
 		{ return m_service; }
 
+		asio::io_service& get_io_service() { return m_internal_ios; }
+
 		asio::ip::tcp::endpoint bind_socket(asio::ip::tcp::socket* socket
 			, asio::ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
@@ -918,9 +1045,14 @@ namespace sim
 		void unbind_udp_socket(asio::ip::udp::socket* socket
 			, asio::ip::udp::endpoint ep);
 
-		boost::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
+		std::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
 			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
-		asio::ip::udp::socket* find_udp_socket(asio::ip::udp::endpoint const& ep);
+
+		route find_udp_socket(
+			asio::ip::udp::socket const& socket
+			, asio::ip::udp::endpoint const& ep);
+
+		configuration& config() const { return m_config; }
 
 	private:
 		struct timer_compare
@@ -930,11 +1062,16 @@ namespace sim
 			{ return lhs->expires_at() < rhs->expires_at(); }
 		};
 
+		configuration& m_config;
+
 		// all non-expired timers
 		typedef std::multiset<asio::high_resolution_timer*, timer_compare> timer_queue_t;
 		timer_queue_t m_timer_queue;
 		// underlying message queue
 		boost::asio::io_service m_service;
+
+		// used for internal timers
+		asio::io_service m_internal_ios;
 
 		typedef std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>
 			listen_sockets_t;
@@ -953,21 +1090,70 @@ namespace sim
 	{
 		struct packet
 		{
+			packet()
+				: type(uninitialized)
+				, overhead{20}
+				, seq_nr{0}
+			{}
+
+			// to keep things simple, don't drop ACKs or errors
+			bool ok_to_drop() const
+			{
+				return type != syn_ack && type != ack && type != error;
+			}
+
 			enum type_t
 			{
-				error, // the error is set
-				payload
+				uninitialized, // invalid type (used for debugging)
+				syn, // TCP connect
+				syn_ack, // TCP connection accepted
+				ack, // the seq_nr is interpreted as "we received this"
+				error, // the error_code (ec) is set
+				payload // the buffer is filled
 			} type;
 
 			boost::system::error_code ec;
 
-			// the time when this packet should be received
-			chrono::high_resolution_clock::time_point receive_time;
-
+			// actual payload
 			std::vector<boost::uint8_t> buffer;
 
-			// only used for UDP packets
+			// used for UDP packets
 			asio::ip::udp::endpoint from;
+
+			// the number of bytes of overhead for this packet. The total packet
+			// size is the number of bytes in the buffer + this number
+			int overhead;
+
+			// each hop in the route will pop itself off and forward the packet to
+			// the next hop
+			route hops;
+
+			// for SYN packets, this is set to the channel we're trying to
+			// establish
+			std::shared_ptr<channel> channel;
+
+			// sequence number of this packet (used for debugging)
+			std::uint64_t seq_nr;
+
+			// this function must be called with this packet in case the packet is
+			// dropped.
+			boost::function<void(aux::packet)> drop_fun;
+		};
+
+		struct sink_forwarder : sink
+		{
+			sink_forwarder(sink* dst) : m_dst(dst) {}
+
+			virtual void incoming_packet(packet p) override final
+			{
+				if (m_dst == nullptr) return;
+				m_dst->incoming_packet(std::move(p));
+			}
+
+			void clear() { m_dst = nullptr; }
+
+		private:
+			sink* m_dst;
 		};
 
 		/* the channel can be in the following states:
@@ -987,36 +1173,55 @@ namespace sim
 		*/
 		struct channel
 		{
-			channel()
-			{
-				sockets[0] = NULL;
-				sockets[1] = NULL;
-			}
-			// index 0 is the socket that initiated the connection. index 1 may be
-			// zero while the connection is half-open
-			asio::ip::tcp::socket* sockets[2];
+			channel() {}
+			// index 0 is the incoming route to the socket that initiated the connection.
+			// index 1 may be empty while the connection is half-open
+			route hops[2];
 
-			// the delay represents the *incoming* delay to that socket. The sum of
-			// these two is the RTT between the nodes.
-			chrono::high_resolution_clock::duration delay[2];
+			// the endpoint of each end of the channel
+			asio::ip::tcp::endpoint ep[2];
 
-			// the number of bytes per second the respective socket can receive
-			int incoming_bandwidth[2];
-
-			// this is the time the initiating socket initiated its connection
-			// attempt. This is primarily used while the connection is half-open
-			// and to time when it's accepted by the other side.
-			chrono::high_resolution_clock::time_point initiated;
-
-			int remote_idx(asio::ip::tcp::socket const* self) const;
-			int self_idx(asio::ip::tcp::socket const* self) const;
-
-			// TODO: move to tcp::socket
-			void send_reset(int idx);
-			void send_eof(int idx);
+			int remote_idx(asio::ip::tcp::endpoint self) const;
+			int self_idx(asio::ip::tcp::endpoint self) const;
 		};
-	}
 
+	} // aux
+
+	// this is a queue. It can be configured to contrain
+	struct queue : sink
+	{
+		queue(asio::io_service& ios, int bandwidth
+			, chrono::high_resolution_clock::duration propagation_delay
+			, int max_queue_size);
+
+		virtual void incoming_packet(aux::packet p) override final;
+
+	private:
+
+		void begin_send_next_packet();
+		void next_packet_sent();
+
+		// the queue can't hold more than this number of bytes. Once it's full,
+		// any new packets arriving will be dropped (tail drop)
+		const int m_max_queue_size;
+
+		// the amount of time it takes to forward a packet. Every packet is
+		// delayed by at least this much before being forwarded
+		const chrono::high_resolution_clock::duration m_forwarding_latency;
+
+		// the number of bytes per second that can be sent. This includes the
+		// packet overhead
+		const int m_bandwidth;
+
+		// the number of bytes currently in the packet queue
+		int m_queue_size;
+
+		// this is the queue of packets and the time each packet was enqueued
+		std::vector<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
+		asio::high_resolution_timer m_forward_timer;
+
+		chrono::high_resolution_clock::time_point m_last_forward;
+	};
 }
 
 #endif // SIMULATOR_HPP_INCLUDED

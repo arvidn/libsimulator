@@ -33,11 +33,23 @@ namespace ip {
 	{
 	}
 
+	route socket_base::get_incoming_route()
+	{
+		route ret = m_io_service.get_incoming_route();
+		assert(m_forwarder);
+		ret.append(m_forwarder);
+		return ret;
+	}
+
+	route socket_base::get_outgoing_route()
+	{
+		return route(m_io_service.get_outgoing_route());
+	}
+
 	bool socket_base::is_open() const
 	{
 		return m_open;
 	}
-
 }
 }
 }

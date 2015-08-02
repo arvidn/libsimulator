@@ -18,8 +18,9 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <boost/system/error_code.hpp>
+#include <boost/function.hpp>
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
@@ -101,6 +102,7 @@ namespace ip {
 		m_open = true;
 		m_is_v4 = (protocol == ip::udp::v4());
 		ec.clear();
+		m_forwarder = std::make_shared<aux::sink_forwarder>(this);
 		return ec;
 	}
 
@@ -125,6 +127,13 @@ namespace ip {
 			m_bound_to = ip::udp::endpoint();
 		}
 		m_open = false;
+
+		// prevent any more packets from being delivered to this socket
+		if (m_forwarder)
+		{
+			m_forwarder->clear();
+			m_forwarder.reset();
+		}
 
 		cancel(ec);
 
@@ -151,19 +160,19 @@ namespace ip {
 
 	void udp::socket::abort_send_handler()
 	{
-		m_io_service.post(boost::bind(m_send_handler
+		m_io_service.post(std::bind(m_send_handler
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_send_timer.cancel();
-		m_send_handler.clear();
+		m_send_handler = 0;
 //		m_send_buffer.clear();
 	}
 
 	void udp::socket::abort_recv_handler()
 	{
-		m_io_service.post(boost::bind(m_recv_handler
+		m_io_service.post(std::bind(m_recv_handler
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_recv_timer.cancel();
-		m_recv_handler.clear();
+		m_recv_handler = 0;
 		m_recv_buffer.clear();
 	}
 
@@ -178,13 +187,13 @@ namespace ip {
 		{
 			// our send queue is too large.
 			m_recv_timer.expires_at(m_next_send - chrono::milliseconds(1000) / 2);
-			m_recv_timer.async_wait(boost::bind(&udp::socket::async_send
+			m_recv_timer.async_wait(std::bind(&udp::socket::async_send
 				, this, bufs, handler));
 			return;
 		}
 
 		// the socket is writable, post the completion handler immediately
-		m_io_service.post(boost::bind(handler, boost::system::error_code(), 0));
+		m_io_service.post(std::bind(handler, boost::system::error_code(), 0));
 	}
 
 	std::size_t udp::socket::receive_from_impl(
@@ -206,9 +215,7 @@ namespace ip {
 			return 0;
 		}
 
-		time_point now = chrono::high_resolution_clock::now();
-		if (m_incoming_queue.empty()
-			|| m_incoming_queue.front().receive_time > now)
+		if (m_incoming_queue.empty())
 		{
 			ec = boost::system::error_code(error::would_block);
 			return 0;
@@ -243,30 +250,21 @@ namespace ip {
 	{
 		if (!m_open)
 		{
-			m_io_service.post(boost::bind(handler
+			m_io_service.post(std::bind(handler
 				, boost::system::error_code(error::bad_descriptor), 0));
 			return;
 		}
 
 		if (m_bound_to == udp::endpoint())
 		{
-			m_io_service.post(boost::bind(handler
+			m_io_service.post(std::bind(handler
 				, boost::system::error_code(error::invalid_argument), 0));
 			return;
 		}
 
-		time_point now = chrono::high_resolution_clock::now();
 		if (!m_incoming_queue.empty())
 		{
-			if (m_incoming_queue.front().receive_time > now)
-			{
-				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
-				m_recv_timer.async_wait(boost::bind(&udp::socket::async_receive_null_buffers_impl
-					, this, sender, handler));
-				return;
-			}
-
-			m_io_service.post(boost::bind(handler, boost::system::error_code(), 0));
+			m_io_service.post(std::bind(handler, boost::system::error_code(), 0));
 			return;
 		}
 
@@ -288,13 +286,6 @@ namespace ip {
 		std::size_t bytes_transferred = receive_from_impl(bufs, sender, 0, ec);
 		if (ec == boost::system::error_code(error::would_block))
 		{
-			if (!m_incoming_queue.empty())
-			{
-				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
-				m_recv_timer.async_wait(boost::bind(&udp::socket::async_receive_from_impl
-					, this, bufs, sender, 0, handler));
-			}
-
 			m_recv_buffer = bufs;
 			m_recv_handler = handler;
 			m_recv_sender = sender;
@@ -305,16 +296,16 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(boost::bind(handler, ec, 0));
-			m_recv_handler.clear();
+			m_io_service.post(std::bind(handler, ec, 0));
+			m_recv_handler = 0;
 			m_recv_buffer.clear();
 			m_recv_sender = NULL;
 			m_recv_null_buffers = false;
 			return;
 		}
 
-		m_io_service.post(boost::bind(handler, ec, bytes_transferred));
-		m_recv_handler.clear();
+		m_io_service.post(std::bind(handler, ec, bytes_transferred));
+		m_recv_handler = 0;
 		m_recv_buffer.clear();
 		m_recv_sender = NULL;
 		m_recv_null_buffers = false;
@@ -351,7 +342,6 @@ namespace ip {
 		// this is outgoing bandwidth
 		// TODO: make this configurable
 		const int bandwidth = 1000000; // 1 MB/s
-		const duration delay = chrono::milliseconds(50);
 		const int mtu = 1475;
 
 		if (ret > mtu)
@@ -360,54 +350,59 @@ namespace ip {
 			return 0;
 		}
 
-		udp::socket* s = m_io_service.find_udp_socket(dst);
-		if (s == NULL)
-		{
-			// the packet is silently dropped
-			return ret;
-		}
-
 		// determine the bandwidth in terms of nanoseconds / byte
 		const double nanoseconds_per_byte = 1000000000.0
 			/ double(bandwidth);
 
 		// TODO: make the send buffer size configurable
-		if (m_next_send - now > chrono::milliseconds(1000))
+		if (m_next_send - now > chrono::milliseconds(500))
 		{
 			// our send queue is too large.
 			ec = boost::system::error_code(asio::error::would_block);
 			return 0;
 		}
 
-		m_next_send = (std::max)(now, m_next_send);
-		time_point receive_time = m_next_send + delay;
+		route hops = m_io_service.find_udp_socket(*this, dst);
+		if (hops.empty())
+		{
+			// the packet is silently dropped
+			// TODO: it would be nice if this would result in a round-trip time
+			// with an ICMP host unreachable or connection_refused error
+			return ret;
+		}
 
-		// this may still drop the packet if the incoming queue is too large
-		s->internal_incoming_payload(b, receive_time, m_bound_to);
+		hops.prepend(m_io_service.get_outgoing_route());
+
+		m_next_send = (std::max)(now, m_next_send);
+
+		aux::packet p;
+		p.overhead = 28;
+		p.type = aux::packet::payload;
+		p.from = m_bound_to;
+		p.hops = hops;
+		for (std::vector<asio::const_buffer>::const_iterator i = b.begin()
+			, end(b.end()); i != end; ++i)
+		{
+			p.buffer.insert(p.buffer.end(), asio::buffer_cast<uint8_t const*>(*i)
+				, asio::buffer_cast<uint8_t const*>(*i) + asio::buffer_size(*i));
+		}
+
+		const int packet_size = p.buffer.size() + p.overhead;
+		forward_packet(std::move(p));
 
 		m_next_send += chrono::duration_cast<duration>(chrono::nanoseconds(
-			boost::int64_t(nanoseconds_per_byte * ret)));
+			boost::int64_t(nanoseconds_per_byte * packet_size)));
 
 		return ret;
 	}
 
-	void udp::socket::internal_incoming_payload(std::vector<const_buffer> const& b
-		, chrono::high_resolution_clock::time_point receive_time
-		, udp::endpoint const& from)
+	void udp::socket::incoming_packet(aux::packet p)
 	{
-		// silent drop
-		if (m_queue_size > 256 * 1024) return;
+		const int packet_size = p.buffer.size() + p.overhead;
 
-		aux::packet p;
-		p.receive_time = receive_time;
-		p.type = aux::packet::payload;
-		p.from = from;
-		for (std::vector<asio::const_buffer>::const_iterator i = b.begin(), end(b.end());
-			i != end; ++i)
-		{
-			p.buffer.insert(p.buffer.end(), buffer_cast<boost::uint8_t const*>(*i)
-				, buffer_cast<boost::uint8_t const*>(*i) + buffer_size(*i));
-		}
+		// silent drop. If the application isn't reading fast enough, drop packets
+		if (m_queue_size + packet_size > 256 * 1024) return;
+
 		m_queue_size += p.buffer.size();
 		m_incoming_queue.push_back(p);
 
@@ -428,7 +423,7 @@ namespace ip {
 			async_receive_from_impl(m_recv_buffer, m_recv_sender, 0, m_recv_handler);
 		}
 
-		m_recv_handler.clear();
+		m_recv_handler = 0;
 		m_recv_buffer.clear();
 		m_recv_sender = NULL;
 	}

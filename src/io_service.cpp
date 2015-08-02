@@ -23,15 +23,14 @@ All rights reserved.
 
 namespace sim { namespace asio {
 
-	// TODO: an io_service could be assumed to be a network node. The main
-	// message loop would have to be run in a higher level object (like a
-	// simulation). Each io_service could be constructed with its IP address and
-	// possibly some network parameters (like in- and out latency)
 	io_service::io_service(sim::simulation& sim, asio::ip::address const& ip)
 		: m_sim(sim)
 		, m_ip(ip)
 		, m_stopped(false)
-	{}
+	{
+		m_outgoing_route = m_sim.config().outgoing_route(ip);
+		m_incoming_route = m_sim.config().incoming_route(ip);
+	}
 
 	io_service::io_service()
 		: m_sim(*reinterpret_cast<sim::simulation*>(NULL))
@@ -162,15 +161,16 @@ namespace sim { namespace asio {
 		m_sim.unbind_udp_socket(socket, ep);
 	}
 
-	boost::shared_ptr<aux::channel> io_service::internal_connect(ip::tcp::socket* s
+	std::shared_ptr<aux::channel> io_service::internal_connect(ip::tcp::socket* s
 		, ip::tcp::endpoint const& target, boost::system::error_code& ec)
 	{
 		return m_sim.internal_connect(s, target, ec);
 	}
 
-	ip::udp::socket* io_service::find_udp_socket(ip::udp::endpoint const& ep)
+	route io_service::find_udp_socket(asio::ip::udp::socket const& socket
+		, ip::udp::endpoint const& ep)
 	{
-		return m_sim.find_udp_socket(ep);
+		return m_sim.find_udp_socket(socket, ep);
 	}
 
 } // asio

@@ -31,11 +31,11 @@ The currently (partially) supported classes are:
 * asio::ip::tcp::endpoint
 * asio::ip::address
 * asio::ip::tcp::socket
+* asio::ip::udp::socket
 * asio::io_service;
 
 Work in progress:
 
-* asio::ip::udp::socket
 * asio::ip::udp::resolver
 * asio::ip::tcp::resolver
 
@@ -73,7 +73,8 @@ example
 Here's a simple example illustrating the asio timer::
 
 	#include "simulator/simulator.hpp"
-	#include <boost/bind.hpp>
+	#include <functional>
+	#include <boost/system.hpp>
 
 	void print_time(sim::asio::high_resolution_timer& timer
 		, boost::system::error_code const& ec)
@@ -91,7 +92,7 @@ Here's a simple example illustrating the asio timer::
 		if (counter < 5)
 		{
 			timer.expires_from_now(seconds(counter));
-			timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+			timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 		}
 	}
 
@@ -103,7 +104,7 @@ Here's a simple example illustrating the asio timer::
 		sim::asio::high_resolution_timer timer(ios);
 
 		timer.expires_from_now(seconds(1));
-		timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+		timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 		boost::system::error_code ec;
 		ios.run(ec);

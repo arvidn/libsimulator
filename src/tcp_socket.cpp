@@ -17,11 +17,14 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include <boost/bind.hpp>
+#include <functional>
 #include <boost/system/error_code.hpp>
+#include <boost/function.hpp>
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
+
+using namespace std::placeholders;
 
 namespace sim {
 namespace asio {
@@ -30,13 +33,17 @@ namespace ip {
 	tcp::socket::socket(io_service& ios)
 		: socket_base(ios)
 		, m_connect_timer(ios)
-		, m_next_send(chrono::high_resolution_clock::now())
-		, m_total_sent(0)
+		, m_mss(1475) // TODO: make configurable
 		, m_queue_size(0)
-		, m_receive_queue_full(false)
 		, m_recv_timer(ios)
 		, m_is_v4(true)
 		, m_recv_null_buffers(false)
+		, m_send_null_buffers(false)
+		, m_next_outgoing_seq(0)
+		, m_next_incoming_seq(0)
+		, m_last_drop_seq(0)
+		, m_cwnd(m_mss * 2)
+		, m_bytes_in_flight(0)
 	{}
 
 	tcp::socket::~socket()
@@ -52,6 +59,7 @@ namespace ip {
 		m_open = true;
 		m_is_v4 = (protocol == ip::tcp::v4());
 		ec.clear();
+		m_forwarder = std::make_shared<aux::sink_forwarder>(this);
 		return ec;
 	}
 
@@ -64,13 +72,15 @@ namespace ip {
 
 	// used to attach an incoming connection to this
 	void tcp::socket::internal_connect(tcp::endpoint const& bind_ip
-		, boost::shared_ptr<aux::channel> const& c
+		, std::shared_ptr<aux::channel> const& c
 		, boost::system::error_code& ec)
 	{
 		open(m_is_v4 ? tcp::v4() : tcp::v6(), ec);
 		if (ec) return;
 		m_bound_to = bind_ip;
 		m_channel = c;
+		assert(m_forwarder);
+		c->hops[1].replace_last(m_forwarder);
 	}
 
 	boost::system::error_code tcp::socket::bind(ip::tcp::endpoint const& ep
@@ -111,16 +121,20 @@ namespace ip {
 	{
 		if (m_channel)
 		{
-			int remote = m_channel->remote_idx(this);
-			int self = m_channel->self_idx(this);
-			tcp::socket* s = m_channel->sockets[remote];
-			if (s)
+			int remote = m_channel->remote_idx(m_bound_to);
+			route hops = m_channel->hops[remote];
+			if (!hops.empty())
 			{
-				time_point receive_time = chrono::high_resolution_clock::now()
-					+ m_channel->delay[remote];
-				s->internal_incoming_eof(receive_time);
+				aux::packet p;
+				p.type = aux::packet::error;
+				p.ec = asio::error::eof;
+				p.from = asio::ip::udp::endpoint(
+					m_bound_to.address(), m_bound_to.port());
+				p.overhead = 40;
+				p.hops = hops;
+				p.seq_nr = m_next_outgoing_seq++;
+				send_packet(std::move(p));
 			}
-			m_channel->sockets[self] = NULL;
 			m_channel.reset();
 		}
 
@@ -130,6 +144,13 @@ namespace ip {
 			m_bound_to = ip::tcp::endpoint();
 		}
 		m_open = false;
+
+		// prevent any more packets from being delivered to this socket
+		if (m_forwarder)
+		{
+			m_forwarder->clear();
+			m_forwarder.reset();
+		}
 
 		cancel(ec);
 
@@ -149,17 +170,21 @@ namespace ip {
 			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
-		if (m_incoming_queue.empty()) return 0;
+		if (m_incoming_queue.empty())
+		{
+			return 0;
+		}
 
 		std::size_t ret = 0;
-		time_point now = chrono::high_resolution_clock::now();
 		for (std::vector<aux::packet>::const_iterator i = m_incoming_queue.begin()
 			, end(m_incoming_queue.end()); i != end; ++i)
 		{
-			if (i->receive_time > now) break;
 			if (i->type == aux::packet::error)
 			{
-				if (ret > 0) return ret;
+				if (ret > 0)
+				{
+					return ret;
+				}
 
 				// if the read buffer is drained and there is an error, report that
 				// error.
@@ -186,12 +211,11 @@ namespace ip {
 
 		if (m_connect_handler)
 		{
-			m_io_service.post(boost::bind(m_connect_handler
+			m_io_service.post(std::bind(m_connect_handler
 				, boost::system::error_code(error::operation_aborted)));
-			m_connect_handler.clear();
+			m_connect_handler = 0;
 		}
 
-		m_total_sent = 0;
 		ec.clear();
 		return ec;
 	}
@@ -223,8 +247,7 @@ namespace ip {
 		return ret;
 	}
 
-	tcp::endpoint tcp::socket::remote_endpoint(boost::system::error_code& ec)
-		const
+	tcp::endpoint tcp::socket::remote_endpoint(boost::system::error_code& ec) const
 	{
 		if (!m_open)
 		{
@@ -238,14 +261,8 @@ namespace ip {
 			return tcp::endpoint();
 		}
 
-		int remote = m_channel->remote_idx(this);
-		if (m_channel->sockets[remote] == NULL)
-		{
-			ec = error::not_connected;
-			return tcp::endpoint();
-		}
-
-		return m_channel->sockets[remote]->local_endpoint(ec);
+		int remote = m_channel->remote_idx(m_bound_to);
+		return m_channel->ep[remote];
 	}
 
 	tcp::endpoint tcp::socket::remote_endpoint() const
@@ -259,6 +276,13 @@ namespace ip {
 	void tcp::socket::async_connect(tcp::endpoint const& target
 		, boost::function<void(boost::system::error_code const&)> h)
 	{
+		if (!m_open)
+		{
+			m_io_service.post(std::bind(h
+				, boost::system::error_code(error::bad_descriptor)));
+			return;
+		}
+
 		assert(h);
 		assert(!m_connect_handler);
 		m_connect_handler = h;
@@ -278,8 +302,8 @@ namespace ip {
 			m_channel.reset();
 			// TODO: ask the policy object what the round-trip to this endpoint is
 			m_connect_timer.expires_from_now(chrono::milliseconds(50));
-			m_connect_timer.async_wait(boost::bind(m_connect_handler, ec));
-			m_connect_handler.clear();
+			m_connect_timer.async_wait(std::bind(m_connect_handler, ec));
+			m_connect_handler = 0;
 			return;
 		}
 
@@ -289,20 +313,21 @@ namespace ip {
 
 	void tcp::socket::abort_recv_handler()
 	{
-		m_io_service.post(boost::bind(m_recv_handler
+		m_io_service.post(std::bind(m_recv_handler
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_recv_timer.cancel();
-		m_recv_handler.clear();
+		m_recv_handler = 0;
 		m_recv_buffer.clear();
 		m_recv_null_buffers = false;
 	}
 
 	void tcp::socket::abort_send_handler()
 	{
-		m_io_service.post(boost::bind(m_send_handler
+		m_io_service.post(std::bind(m_send_handler
 			, boost::system::error_code(error::operation_aborted), 0));
-		m_send_handler.clear();
+		m_send_handler = 0;
 		m_send_buffer.clear();
+		m_send_null_buffers = false;
 	}
 
 	void tcp::socket::async_write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
@@ -314,13 +339,8 @@ namespace ip {
 
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = write_some_impl(bufs, ec);
-		if (ec == boost::system::error_code(error::would_block)
-			|| (!ec && bytes_transferred < 1475 && bytes_transferred < buf_size))
+		if (ec == boost::system::error_code(error::would_block))
 		{
-			m_total_sent += bytes_transferred;
-			int remote = m_channel->remote_idx(this);
-			tcp::socket* s = m_channel->sockets[remote];
-			s->subscribe_to_queue_drain();
 			m_send_handler = handler;
 			m_send_buffer = bufs;
 			return;
@@ -328,26 +348,16 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(boost::bind(handler, ec, 0));
-			m_send_handler.clear();
+			m_io_service.post(std::bind(handler, ec, 0));
+			m_send_handler = 0;
 			m_send_buffer.clear();
 			return;
 		}
 
-		m_total_sent += bytes_transferred;
-
-		m_io_service.post(boost::bind(handler, boost::system::error_code(), m_total_sent));
-		m_send_handler.clear();
+		m_io_service.post(std::bind(handler, boost::system::error_code()
+				, bytes_transferred));
+		m_send_handler = 0;
 		m_send_buffer.clear();
-		m_total_sent = 0;
-	}
-
-	// this is called by the other socket when it has read some out of its
-	// receive buffer (and we indicated that we wanted to be notified)
-	void tcp::socket::internal_on_buffer_drained()
-	{
-		if (!m_send_handler) return;
-		async_write_some_impl(m_send_buffer, m_send_handler);
 	}
 
 	std::size_t tcp::socket::write_some_impl(
@@ -365,17 +375,15 @@ namespace ip {
 			return 0;
 		}
 
-		int remote = m_channel->remote_idx(this);
-		tcp::socket* s = m_channel->sockets[remote];
-		if (s == NULL)
+		int remote = m_channel->remote_idx(m_bound_to);
+		route hops = m_channel->hops[remote];
+		if (hops.empty())
 		{
 			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
 
-		time_point now = chrono::high_resolution_clock::now();
-
-		if (m_next_send > now + chrono::seconds(2))
+		if (m_bytes_in_flight + m_mss > m_cwnd)
 		{
 			// this indicates that the send buffer is very large, we should
 			// probably not be able to stuff more bytes down it
@@ -384,13 +392,6 @@ namespace ip {
 			return 0;
 		}
 
-		// determine the bandwidth in terms of nanoseconds / byte
-		const double nanoseconds_per_byte = 1000000000.0
-			/ double(m_channel->incoming_bandwidth[remote]);
-
-		m_next_send = (std::max)(now, m_next_send);
-		time_point receive_time = m_next_send + m_channel->delay[remote];
-
 		typedef std::vector<boost::asio::const_buffer> buffers_t;
 		std::size_t ret = 0;
 
@@ -398,30 +399,31 @@ namespace ip {
 		{
 			// split up in packets
 			int buf_size = buffer_size(*i);
-			char const* buf = boost::asio::buffer_cast<char const*>(*i);
+			uint8_t const* buf = boost::asio::buffer_cast<uint8_t const*>(*i);
 			while (buf_size > 0)
 			{
-				int packet_size = (std::min)(buf_size, 1475);
-				int sent = s->internal_incoming_payload(buf, packet_size
-					, receive_time);
-				buf += sent;
-				buf_size -= sent;
-				ret += sent;
-				// update the time stamp of when we can send more bytes without
-				// exceeding the bandwidth limit
-				m_next_send += chrono::duration_cast<duration>(chrono::nanoseconds(
-					boost::int64_t(nanoseconds_per_byte * sent)));
-				receive_time = m_next_send + m_channel->delay[remote];
+				int packet_size = (std::min)(buf_size, m_mss);
+				aux::packet p;
+				p.type = aux::packet::payload;
+				p.buffer.assign(buf, buf + packet_size);
+				p.from = asio::ip::udp::endpoint(
+					m_bound_to.address(), m_bound_to.port());
+				p.overhead = 40;
+				p.hops = hops;
+				p.seq_nr = m_next_outgoing_seq++;
+				p.drop_fun = std::bind(&tcp::socket::packet_dropped, this, _1);
 
-				assert(sent <= packet_size);
-				// the send queue is full or too long
-				if (sent < packet_size
-					|| m_next_send > now + chrono::seconds(2))
+				send_packet(std::move(p));
+				buf += packet_size;
+				buf_size -= packet_size;
+				ret += packet_size;
+
+				if (m_bytes_in_flight + m_mss > m_cwnd)
 				{
+					// the congestion window is full
 					if (ret == 0)
 					{
 						ec = boost::system::error_code(error::would_block);
-						s->subscribe_to_queue_drain();
 						return 0;
 					}
 
@@ -449,9 +451,7 @@ namespace ip {
 			return 0;
 		}
 
-		time_point now = chrono::high_resolution_clock::now();
-		if (m_incoming_queue.empty()
-			|| m_incoming_queue.front().receive_time > now)
+		if (m_incoming_queue.empty())
 		{
 			ec = boost::system::error_code(error::would_block);
 			return 0;
@@ -468,7 +468,6 @@ namespace ip {
 		while (!m_incoming_queue.empty())
 		{
 			aux::packet& p = m_incoming_queue.front();
-			if (p.receive_time > now) break;
 
 			if (p.type == aux::packet::error)
 			{
@@ -520,17 +519,6 @@ namespace ip {
 
 		assert(total_received > 0);
 
-		if (m_receive_queue_full && m_channel)
-		{
-			m_receive_queue_full = false;
-			int remote = m_channel->remote_idx(this);
-			tcp::socket* s = m_channel->sockets[remote];
-			if (s) s->internal_on_buffer_drained();
-		}
-		else
-		{
-			m_receive_queue_full = false;
-		}
 		ec.clear();
 		return total_received;
 	}
@@ -544,27 +532,25 @@ namespace ip {
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block))
 		{
-			if (!m_incoming_queue.empty())
-			{
-				m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
-				m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_impl
-					, this, bufs, handler));
-			}
+			assert(m_incoming_queue.empty());
 
 			m_recv_buffer = bufs;
 			m_recv_handler = handler;
 			m_recv_null_buffers = false;
-
 			return;
 		}
 
 		if (ec)
 		{
-			m_io_service.post(boost::bind(handler, ec, 0));
+			m_io_service.post(std::bind(handler, ec, 0));
+			m_recv_handler = 0;
+			m_recv_buffer.clear();
 			return;
 		}
 
-		m_io_service.post(boost::bind(handler, ec, bytes_transferred));
+		m_io_service.post(std::bind(handler, ec, bytes_transferred));
+		m_recv_handler = 0;
+		m_recv_buffer.clear();
 	}
 
 	void tcp::socket::async_read_some_null_buffers_impl(
@@ -576,21 +562,17 @@ namespace ip {
 		int bytes = available(ec);
 		if (ec)
 		{
-			m_io_service.post(boost::bind(handler, ec, 0));
+			m_io_service.post(std::bind(handler, ec, 0));
+			m_recv_handler = 0;
+			m_recv_buffer.clear();
 			return;
 		}
 
 		if (bytes > 0)
 		{
-			m_io_service.post(boost::bind(handler, ec, 0));
-			return;
-		}
-
-		if (!m_incoming_queue.empty())
-		{
-			m_recv_timer.expires_at(m_incoming_queue.front().receive_time);
-			m_recv_timer.async_wait(boost::bind(&tcp::socket::async_read_some_null_buffers_impl
-				, this, handler));
+			m_io_service.post(std::bind(handler, ec, 0));
+			m_recv_handler = 0;
+			m_recv_buffer.clear();
 			return;
 		}
 
@@ -616,81 +598,154 @@ namespace ip {
 			// try to read from it and potentially fire the handler
 			async_read_some_impl(m_recv_buffer, m_recv_handler);
 		}
-
-		m_recv_handler.clear();
-		m_recv_buffer.clear();
-		m_recv_null_buffers = false;
 	}
 
-	int tcp::socket::internal_incoming_payload(char const* buffer, int size
-		, time_point receive_time)
+	void tcp::socket::maybe_wakeup_writer()
 	{
-		int sent = (std::min)(m_max_receive_queue_size - m_queue_size, size);
+		if (!m_send_handler) return;
 
-		if (sent > 0)
+		if (m_send_null_buffers)
 		{
-			assert(m_incoming_queue.empty()
-				|| m_incoming_queue.back().receive_time <= receive_time);
-			m_incoming_queue.push_back(aux::packet());
-			aux::packet& p = m_incoming_queue.back();
-
-			p.type = aux::packet::payload;
-			p.receive_time = receive_time;
-			p.buffer.assign(buffer, buffer + sent);
-			maybe_wakeup_reader();
+			assert(false && "not supported yet");
+//			async_write_some_null_buffers_impl(m_recv_handler);
 		}
-
-		return sent;
-	}
-
-	void tcp::socket::internal_incoming_reset(time_point receive_time)
-	{
-		aux::packet p;
-		p.type = aux::packet::error;
-		p.ec = asio::error::connection_reset;
-		p.receive_time = receive_time;
-		m_incoming_queue.push_back(p);
-		maybe_wakeup_reader();
-	}
-
-	void tcp::socket::internal_incoming_eof(time_point receive_time)
-	{
-		aux::packet p;
-		p.type = aux::packet::error;
-		p.ec = asio::error::eof;
-		p.receive_time = receive_time;
-		m_incoming_queue.push_back(p);
-		maybe_wakeup_reader();
-	}
-
-
-	void tcp::socket::subscribe_to_queue_drain()
-	{
-		// once we pop data off the incoming queue, we should let the other end
-		// know, so it can send more bytes down the pipe
-		m_receive_queue_full = true;
-	}
-
-	// this is called on sockets that are used to accept incoming connections
-	// into
-	void tcp::socket::internal_connect_complete(
-		boost::system::error_code const& ec)
-	{
-		assert(m_connect_handler);
-		m_io_service.post(boost::bind(m_connect_handler, ec));
-		m_connect_handler.clear();
-		if (ec) m_channel.reset();
+		else
+		{
+			// we have an async. write operation outstanding
+			async_write_some_impl(m_send_buffer, m_send_handler);
+		}
 	}
 
 	bool tcp::socket::internal_is_listening() { return false; }
 
-	void tcp::socket::internal_accept_queue(boost::shared_ptr<aux::channel> c
-		, boost::system::error_code& ec)
+	void tcp::socket::send_packet(aux::packet p)
 	{
-		// this is not a listen socket
-		ec = boost::system::error_code(asio::error::connection_refused);
+		m_bytes_in_flight += p.buffer.size();
+		m_outstanding_packet_sizes[p.seq_nr] = p.buffer.size();
+
+		forward_packet(std::move(p));
 	}
 
+	void tcp::socket::packet_dropped(aux::packet p)
+	{
+		int remote = m_channel->remote_idx(m_bound_to);
+		p.hops = m_channel->hops[remote];
+		m_outgoing_packets.push_back(std::move(p));
+
+		const int packets_in_cwnd = m_cwnd / m_mss;
+
+		// we just recently dropped a packet and cut the cwnd in half,
+		// don't do it again already
+		if (m_last_drop_seq > 0 && p.seq_nr < m_last_drop_seq + packets_in_cwnd) return;
+
+		m_cwnd /= 2;
+		m_last_drop_seq = p.seq_nr;
+
+		// TODO: this should really happen one second later to be accurate
+		if (m_cwnd < m_mss) m_cwnd = m_mss;
+	}
+
+	void tcp::socket::incoming_packet(aux::packet p)
+	{
+		switch (p.type)
+		{
+			case aux::packet::uninitialized:
+			{
+				assert(false && "uninitialized packet");
+				return;
+			}
+			case aux::packet::ack:
+			{
+				// if the socket just became writeable, we need to notify the
+				// client. First we want to know whether it was not writeable.
+				const bool was_writeable = m_bytes_in_flight + m_mss > m_cwnd;
+
+				auto it = m_outstanding_packet_sizes.find(p.seq_nr);
+				assert(it != m_outstanding_packet_sizes.end());
+				const int acked_bytes = it->second;
+				m_outstanding_packet_sizes.erase(it);
+				assert(m_bytes_in_flight >= acked_bytes);
+				m_bytes_in_flight -= acked_bytes;
+
+				// potentially resend packets
+				while (!m_outgoing_packets.empty()
+					&& m_bytes_in_flight + m_outgoing_packets.front().buffer.size()
+					<= m_cwnd)
+				{
+					aux::packet pkt = std::move(m_outgoing_packets.front());
+					m_outgoing_packets.erase(m_outgoing_packets.begin());
+					send_packet(std::move(pkt));
+				}
+
+				// update cwnd based on the number of bytes ACKed.
+				// every round-trip, increase the window size by one packet
+				// (MSS)
+				m_cwnd += m_mss * acked_bytes / m_cwnd;
+
+				// TODO: implement slow-start
+
+				const bool is_writeable = m_bytes_in_flight + m_mss <= m_cwnd;
+
+				if (!was_writeable && is_writeable)
+					maybe_wakeup_writer();
+
+				return;
+			}
+			case aux::packet::syn:
+			{
+				// TODO: return connection refused
+				return;
+			}
+			case aux::packet::syn_ack:
+			{
+				assert(m_connect_handler);
+				boost::system::error_code ec;
+				m_io_service.post(std::bind(m_connect_handler, ec));
+				m_connect_handler = 0;
+				if (ec) m_channel.reset();
+				return;
+			}
+			case aux::packet::error:
+			case aux::packet::payload:
+			{
+				aux::packet ack;
+				ack.type = aux::packet::ack;
+				ack.seq_nr = p.seq_nr;
+
+				int remote = m_channel->remote_idx(m_bound_to);
+				ack.hops = m_channel->hops[remote];
+				forward_packet(std::move(ack));
+
+				// if the sequence number is out-of-order, put it in the
+				// m_incoming_packets queue
+				if (p.seq_nr != m_next_incoming_seq)
+				{
+					m_reorder_buffer.insert(std::make_pair(p.seq_nr, std::move(p)));
+					return;
+				}
+
+				// this packet was in-order. increment the expected next sequence
+				// number.
+				++m_next_incoming_seq;
+				m_incoming_queue.push_back(std::move(p));
+
+				// also, perhaps there are some packets that arrived out-of-order,
+				// check to see
+				auto it = m_reorder_buffer.find(m_next_incoming_seq);
+				while (it != m_reorder_buffer.end())
+				{
+					aux::packet pkt = std::move(it->second);
+					m_reorder_buffer.erase(it);
+					m_incoming_queue.push_back(std::move(pkt));
+					++m_next_incoming_seq;
+					it = m_reorder_buffer.find(m_next_incoming_seq);
+				}
+
+				maybe_wakeup_reader();
+				return;
+			}
+		}
+	}
 }
 }
 }

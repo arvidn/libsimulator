@@ -17,11 +17,12 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include <boost/bind.hpp>
+#include <functional>
 
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
+using namespace std::placeholders;
 
 char send_buffer[10000];
 char recv_buffer[10000];
@@ -40,8 +41,16 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 	}
 
 	num_sent += bytes_transferred;
+	printf("[%4d] sent %d bytes (total: %d)\n"
+		, millis, int(bytes_transferred), num_sent);
 
-	printf("[%4d] sent %d bytes\n", millis, int(bytes_transferred));
+	if (num_sent < 1000000)
+	{
+		sock.async_write_some(sim::asio::const_buffers_1(send_buffer
+				, (std::min)(1000000 - num_sent, int(sizeof(send_buffer))))
+			, std::bind(&on_sent, _1, _2, std::ref(sock)));
+		return;
+	}
 	printf("closing\n");
 	sock.close();
 }
@@ -68,10 +77,11 @@ void on_receive(boost::system::error_code const& ec
 
 	num_received += bytes_transferred;
 
-	printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
+	printf("[%4d] received %d bytes (total: %d)\n"
+		, millis, int(bytes_transferred), num_received);
 
 	sock.async_read_some(sim::asio::null_buffers()
-		, boost::bind(&on_receive, _1, _2, boost::ref(sock)));
+		, std::bind(&on_receive, _1, _2, std::ref(sock)));
 }
 
 void incoming_connection(boost::system::error_code const& ec
@@ -103,7 +113,7 @@ void incoming_connection(boost::system::error_code const& ec
 	if (err) printf("[%4d] ioctl failed: %s\n", millis, err.message().c_str());
 
 	sock.async_read_some(sim::asio::null_buffers()
-		, boost::bind(&on_receive, _1, _2, boost::ref(sock)));
+		, std::bind(&on_receive, _1, _2, std::ref(sock)));
 }
 
 void on_connected(boost::system::error_code const& ec
@@ -134,7 +144,7 @@ void on_connected(boost::system::error_code const& ec
 
 	printf("sending %d bytes\n", int(sizeof(send_buffer)));
 	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
-		, boost::bind(&on_sent, _1, _2, boost::ref(sock)));
+		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
 
 int main()
@@ -158,25 +168,26 @@ int main()
 	ip::tcp::socket incoming(incoming_ios);
 	ip::tcp::endpoint remote_endpoint;
 	listener.async_accept(incoming, remote_endpoint
-		, boost::bind(&incoming_connection, _1, boost::ref(incoming)
-		, boost::cref(remote_endpoint)));
+		, std::bind(&incoming_connection, _1, std::ref(incoming)
+		, std::cref(remote_endpoint)));
 
 	printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
 	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
-		, 1337), boost::bind(&on_connected, _1, boost::ref(outgoing)));
+		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
-
-	assert(num_received == sizeof(send_buffer));
-	assert(num_sent == sizeof(send_buffer));
-
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
+	printf("num_sent: %d num_received: %d\n"
+		, num_sent, num_received);
+
+	assert(num_received == num_sent);
+	assert(num_received == 1000000);
 }
 

@@ -17,7 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include <boost/bind.hpp>
+#include <functional>
 
 int counter = 0;
 int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
@@ -25,6 +25,7 @@ int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
 using namespace sim::chrono;
 using namespace sim::asio;
 using sim::simulation;
+using namespace std::placeholders;
 
 void print_time(high_resolution_timer& timer
 	, boost::system::error_code const& ec)
@@ -50,7 +51,7 @@ void print_time(high_resolution_timer& timer
 	if (counter < 5)
 	{
 		timer.expires_from_now(seconds(counter));
-		timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+		timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 	}
 }
 
@@ -61,11 +62,11 @@ int main()
 	high_resolution_timer timer(ios);
 
 	timer.expires_from_now(seconds(10));
-	timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 	timer.cancel();
 	timer.expires_from_now(seconds(1));
-	timer.async_wait(boost::bind(&print_time, boost::ref(timer), _1));
+	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 	boost::system::error_code ec;
 	sim.run(ec);

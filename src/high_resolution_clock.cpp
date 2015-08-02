@@ -18,7 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <boost/system/error_code.hpp>
 
 namespace sim { namespace chrono {

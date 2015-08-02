@@ -3,6 +3,7 @@
 import path ;
 import modules ;
 import os ;
+import testing ;
 
 BOOST_ROOT = [ modules.peek : BOOST_ROOT ] ;
 
@@ -14,8 +15,19 @@ if $(BOOST_ROOT)
 	use-project /boost : $(BOOST_ROOT) ;
 }
 
-SOURCES = simulator simulation io_service high_resolution_timer
-	high_resolution_clock tcp_socket udp_socket socket_base ;
+SOURCES =
+	simulator
+	simulation
+	io_service
+	high_resolution_timer
+	high_resolution_clock
+	tcp_socket
+	udp_socket
+	socket_base
+	queue
+	acceptor
+	default_config
+	;
 
 lib simulator
 	: # sources

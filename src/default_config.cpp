@@ -1,0 +1,74 @@
+/*
+
+Copyright (c) 2015, Arvid Norberg
+All rights reserved.
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+*/
+
+#include "simulator/simulator.hpp"
+#include <memory>
+
+typedef sim::chrono::high_resolution_clock::time_point time_point;
+typedef sim::chrono::high_resolution_clock::duration duration;
+using sim::chrono::milliseconds;
+using sim::chrono::duration_cast;
+
+namespace sim {
+
+	void default_config::build(simulation& sim)
+	{
+		// 0 bandwidth and 0 queue means infinite. The network itself only adds
+		// 50 ms latency
+		m_network = std::make_shared<queue>(std::ref(sim.get_io_service())
+			, 0, duration_cast<duration>(milliseconds(30)), 0);
+		m_sim = &sim;
+	}
+
+	route default_config::channel_route(asio::ip::address src
+		, asio::ip::address dst)
+	{
+		return route(m_network);
+	}
+
+	route default_config::incoming_route(asio::ip::address ip)
+	{
+		// incoming download rate is 800kB/s with a 200 kB queue
+		// and 1 ms forwarding delay
+		auto it = m_incoming.find(ip);
+		if (it != m_incoming.end()) return route(it->second);
+		it = m_incoming.insert(it, std::make_pair(ip, std::make_shared<queue>(
+			std::ref(m_sim->get_io_service()), 800 * 1000
+			, duration_cast<duration>(milliseconds(1)), 200 * 1000)));
+		return route(it->second);
+	}
+
+	// return the hops an outgoing packet from ep need to traverse before
+	// reaching the network (for instance a DSL modem)
+	route default_config::outgoing_route(asio::ip::address ip)
+	{
+		// outgoing upload rate is 200kB/s with a 200 kB queue
+		// and 1 ms forwarding delay
+		auto it = m_outgoing.find(ip);
+		if (it != m_outgoing.end()) return route(it->second);
+		it = m_outgoing.insert(it, std::make_pair(ip, std::make_shared<queue>(
+			std::ref(m_sim->get_io_service()), 200 * 1000
+			, duration_cast<duration>(milliseconds(1)), 200 * 1000 )));
+		return route(it->second);
+	}
+
+	namespace aux {
+		default_config default_cfg;
+	}
+}
+

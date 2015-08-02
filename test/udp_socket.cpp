@@ -18,12 +18,13 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include "test.hpp"
-#include <boost/bind.hpp>
+#include <functional>
 
 using namespace sim;
 using namespace sim::asio::ip;
 using namespace sim::chrono;
 using sim::simulation;
+using namespace std::placeholders;
 
 char receive_buf[1000];
 char send_buf[1000];
@@ -51,8 +52,8 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 	if (bytes_transferred == 100 * 10) return;
 
 	s.async_receive_from(asio::mutable_buffers_1(receive_buf,
-			sizeof(receive_buf)), ep, boost::bind(&on_receive, _1, _2
-			, boost::ref(s), boost::ref(ep)));
+			sizeof(receive_buf)), ep, std::bind(&on_receive, _1, _2
+			, std::ref(s), std::ref(ep)));
 }
 
 int main()
@@ -77,8 +78,8 @@ int main()
 
 	udp::endpoint remote_endpoint;
 	incoming.async_receive_from(asio::mutable_buffers_1(receive_buf,
-			sizeof(receive_buf)), remote_endpoint, boost::bind(&on_receive, _1, _2
-			, boost::ref(incoming), boost::ref(remote_endpoint)));
+			sizeof(receive_buf)), remote_endpoint, std::bind(&on_receive, _1, _2
+			, std::ref(incoming), std::ref(remote_endpoint)));
 
 	outgoing.io_control(udp::socket::non_blocking_io(true), ec);
 	exit_on_error("io_control non-blocking-io", ec);
