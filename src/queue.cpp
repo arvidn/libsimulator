@@ -27,14 +27,42 @@ namespace sim
 	queue::queue(asio::io_service& ios
 		, int bandwidth
 		, chrono::high_resolution_clock::duration propagation_delay
-		, int max_queue_size)
+		, int max_queue_size
+		, std::string name)
 		: m_max_queue_size(max_queue_size)
 		, m_forwarding_latency(propagation_delay)
 		, m_bandwidth(bandwidth)
 		, m_queue_size(0)
+		, m_node_name(name)
 		, m_forward_timer(ios)
 		, m_last_forward(chrono::high_resolution_clock::now())
 	{}
+
+	std::string queue::label() const
+	{
+		char ret[400];
+		int p = snprintf(ret, sizeof(ret), "%s\n", m_node_name.c_str());
+
+		if (m_bandwidth != 0)
+		{
+			p += snprintf(ret + p, sizeof(ret) - p, "rate: %d kB/s\n"
+				, m_bandwidth / 1000);
+		}
+
+		if (m_queue_size != 0)
+		{
+			p += snprintf(ret + p, sizeof(ret) - p, "queue: %d kB\n"
+				, m_queue_size / 1000);
+		}
+
+		if (m_forwarding_latency.count() != 0)
+		{
+			p += snprintf(ret + p, sizeof(ret) - p, "latency: %d ms\n"
+				, int(chrono::duration_cast<chrono::milliseconds>(m_forwarding_latency).count()));
+		}
+
+		return ret;
+	}
 
 	void queue::incoming_packet(aux::packet p)
 	{

@@ -31,6 +31,7 @@ All rights reserved.
 #include <boost/function.hpp>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <vector>
 #include <functional>
@@ -49,6 +50,11 @@ namespace sim
 	struct sink
 	{
 		virtual void incoming_packet(aux::packet p) = 0;
+
+		// used for visualization
+		virtual std::string label() const = 0;
+
+		virtual std::string attributes() const { return "shape=box"; }
 	};
 
 	// this represents a network route (a series of sinks to pass a packet
@@ -83,6 +89,8 @@ namespace sim
 		{ hops.insert(hops.end(), r.hops.begin(), r.hops.end()); }
 		void append(std::shared_ptr<sink> s) { hops.push_back(s); }
 		bool empty() const { return hops.empty(); }
+		std::shared_ptr<sink> last() const
+		{ return hops.back(); }
 
 
 	private:
@@ -503,6 +511,8 @@ namespace sim
 
 			// implements sink
 			virtual void incoming_packet(aux::packet p) override final;
+			virtual std::string label() const override final
+			{ return m_bound_to.address().to_string(); }
 
 			void async_receive_from_impl(std::vector<asio::mutable_buffer> const& bufs
 				, udp::endpoint* sender
@@ -709,6 +719,8 @@ namespace sim
 
 			// implements sink
 			virtual void incoming_packet(aux::packet p) override;
+			virtual std::string label() const override final
+			{ return m_bound_to.address().to_string(); }
 
 			void internal_connect(tcp::endpoint const& bind_ip
 				, std::shared_ptr<aux::channel> const& c
@@ -901,6 +913,14 @@ namespace sim
 
 		io_service(sim::simulation& sim, ip::address const& ip);
 		io_service();
+		~io_service();
+
+		// not copyable and non movable (it's not movable because we currently
+		// keep pointers to the io_service instances in the simulator object)
+		io_service(io_service const&) = delete;
+		io_service(io_service&&) = delete;
+		io_service& operator=(io_service const&) = delete;
+		io_service& operator=(io_service&&) = delete;
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -947,6 +967,7 @@ namespace sim
 		{ return m_incoming_route; }
 
 		int get_path_mtu(asio::ip::address ip) const;
+		ip::address get_ip() const { return m_ip; }
 
 	private:
 
@@ -1064,6 +1085,10 @@ namespace sim
 
 		configuration& config() const { return m_config; }
 
+		void add_io_service(asio::io_service* ios);
+		void remove_io_service(asio::io_service* ios);
+		std::vector<asio::io_service*> get_all_io_services() const;
+
 	private:
 		struct timer_compare
 		{
@@ -1073,6 +1098,9 @@ namespace sim
 		};
 
 		configuration& m_config;
+
+		// these are the io services that represent nodes on the network
+		std::unordered_set<asio::io_service*> m_nodes;
 
 		// all non-expired timers
 		typedef std::multiset<asio::high_resolution_timer*, timer_compare> timer_queue_t;
@@ -1160,6 +1188,9 @@ namespace sim
 				m_dst->incoming_packet(std::move(p));
 			}
 
+			virtual std::string label() const override final
+			{ return m_dst ? m_dst->label() : ""; }
+
 			void clear() { m_dst = nullptr; }
 
 		private:
@@ -1202,9 +1233,11 @@ namespace sim
 	{
 		queue(asio::io_service& ios, int bandwidth
 			, chrono::high_resolution_clock::duration propagation_delay
-			, int max_queue_size);
+			, int max_queue_size, std::string name = "queue");
 
 		virtual void incoming_packet(aux::packet p) override final;
+
+		virtual std::string label() const override final;
 
 	private:
 
@@ -1226,12 +1259,16 @@ namespace sim
 		// the number of bytes currently in the packet queue
 		int m_queue_size;
 
+		std::string m_node_name;
+
 		// this is the queue of packets and the time each packet was enqueued
 		std::vector<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
 		asio::high_resolution_timer m_forward_timer;
 
 		chrono::high_resolution_clock::time_point m_last_forward;
 	};
+
+	void dump_network_graph(simulation const& s, std::string filename);
 }
 
 #endif // SIMULATOR_HPP_INCLUDED

@@ -152,6 +152,8 @@ int main()
 		, std::bind(&incoming_connection, _1, std::ref(incoming)
 		, std::cref(remote_endpoint)));
 
+	dump_network_graph(sim, "accept.dot");
+
 	printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);

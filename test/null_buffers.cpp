@@ -165,6 +165,8 @@ int main()
 	listener.listen(10, ec);
 	if (ec) printf("[%4d] listen failed: %s\n", millis, ec.message().c_str());
 
+	dump_network_graph(sim, "null_buffers.dot");
+
 	ip::tcp::socket incoming(incoming_ios);
 	ip::tcp::endpoint remote_endpoint;
 	listener.async_accept(incoming, remote_endpoint

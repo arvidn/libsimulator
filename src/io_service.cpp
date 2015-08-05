@@ -30,6 +30,12 @@ namespace sim { namespace asio {
 	{
 		m_outgoing_route = m_sim.config().outgoing_route(ip);
 		m_incoming_route = m_sim.config().incoming_route(ip);
+		m_sim.add_io_service(this);
+	}
+
+	io_service::~io_service()
+	{
+		m_sim.remove_io_service(this);
 	}
 
 	io_service::io_service()

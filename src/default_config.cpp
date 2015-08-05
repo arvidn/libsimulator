@@ -31,7 +31,7 @@ namespace sim {
 		// 0 bandwidth and 0 queue means infinite. The network itself only adds
 		// 50 ms latency
 		m_network = std::make_shared<queue>(std::ref(sim.get_io_service())
-			, 0, duration_cast<duration>(milliseconds(30)), 0);
+			, 0, duration_cast<duration>(milliseconds(30)), 0, "network");
 		m_sim = &sim;
 	}
 
@@ -49,7 +49,7 @@ namespace sim {
 		if (it != m_incoming.end()) return route(it->second);
 		it = m_incoming.insert(it, std::make_pair(ip, std::make_shared<queue>(
 			std::ref(m_sim->get_io_service()), 800 * 1000
-			, duration_cast<duration>(milliseconds(1)), 200 * 1000)));
+			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem in")));
 		return route(it->second);
 	}
 
@@ -68,7 +68,7 @@ namespace sim {
 		if (it != m_outgoing.end()) return route(it->second);
 		it = m_outgoing.insert(it, std::make_pair(ip, std::make_shared<queue>(
 			std::ref(m_sim->get_io_service()), 200 * 1000
-			, duration_cast<duration>(milliseconds(1)), 200 * 1000 )));
+			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem out")));
 		return route(it->second);
 	}
 

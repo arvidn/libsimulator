@@ -255,5 +255,28 @@ namespace sim
 		return network_route;
 	}
 
+	void simulation::add_io_service(asio::io_service* ios)
+	{
+		bool added = m_nodes.insert(ios).second;
+		assert(added);
+	}
+
+	void simulation::remove_io_service(asio::io_service* ios)
+	{
+		auto it = m_nodes.find(ios);
+		assert(it != m_nodes.end());
+		m_nodes.erase(it);
+	}
+
+	std::vector<io_service*> simulation::get_all_io_services() const
+	{
+		std::vector<io_service*> ret;
+		ret.reserve(m_nodes.size());
+		std::remove_copy_if(
+			m_nodes.begin(), m_nodes.end(), std::back_inserter(ret)
+			, [](io_service* ios) { return ios->get_ip() == asio::ip::address(); });
+		return ret;
+	}
+
 }
 
