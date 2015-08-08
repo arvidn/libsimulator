@@ -64,11 +64,13 @@ lib simulator
 	<library>boost_chrono
 	<library>boost_system
 
+	<link>shared:<define>SIMULATOR_BUILDING_SHARED
+
 	: # default build
 
 	: # usage requirements
 	<include>include
-
+	<link>shared:<define>SIMULATOR_LINKING_SHARED
 	;
 
 project

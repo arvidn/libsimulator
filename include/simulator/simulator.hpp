@@ -19,6 +19,7 @@ All rights reserved.
 #ifndef SIMULATOR_HPP_INCLUDED
 #define SIMULATOR_HPP_INCLUDED
 
+#include <boost/config.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/basic_deadline_timer.hpp>
 #include <boost/asio/ip/udp.hpp>
@@ -43,6 +44,14 @@ All rights reserved.
 #include <vector>
 #include <functional>
 
+#ifdef SIMULATOR_BUILDING_SHARED
+#define SIMULATOR_DECL BOOST_SYMBOL_EXPORT
+#elif defined SIMULATOR_LINKING_SHARED
+#define SIMULATOR_DECL BOOST_SYMBOL_IMPORT
+#else
+#define SIMULATOR_DECL
+#endif
+
 namespace sim
 {
 	namespace aux
@@ -54,7 +63,7 @@ namespace sim
 
 	// this is an interface for somthing that can accept incoming packets,
 	// such as queues, sockets, NATs and TCP congestion windows
-	struct sink
+	struct SIMULATOR_DECL sink
 	{
 		virtual void incoming_packet(aux::packet p) = 0;
 
@@ -66,7 +75,7 @@ namespace sim
 
 	// this represents a network route (a series of sinks to pass a packet
 	// through)
-	struct route
+	struct SIMULATOR_DECL route
 	{
 		route() = default;
 		route(route&&) = default;
@@ -133,7 +142,7 @@ namespace sim
 #endif
 
 	// std.chrono / boost.chrono compatible high_resolution_clock using a simulated time
-	struct high_resolution_clock
+	struct SIMULATOR_DECL high_resolution_clock
 	{
 		typedef boost::int64_t rep;
 #if defined BOOST_ASIO_HAS_STD_CHRONO
@@ -171,7 +180,7 @@ namespace sim
 
 	struct io_service;
 
-	struct high_resolution_timer
+	struct SIMULATOR_DECL high_resolution_timer
 	{
 		friend struct sim::simulation;
 
@@ -227,7 +236,7 @@ namespace sim
 	typedef boost::asio::ip::address_v4 address_v4;
 	typedef boost::asio::ip::address_v6 address_v6;
 
-	struct socket_base
+	struct SIMULATOR_DECL socket_base
 	{
 		socket_base(io_service& ios);
 
@@ -340,7 +349,7 @@ namespace sim
 
 	};
 
-	struct udp
+	struct SIMULATOR_DECL udp
 	{
 		static udp v4() { return udp(AF_INET); }
 		static udp v6() { return udp(AF_INET6); }
@@ -609,7 +618,7 @@ namespace sim
 
 	}; // udp
 
-	struct tcp
+	struct SIMULATOR_DECL tcp
 	{
 		// temporary fix until the resolvers are implemented using our endpoint
 		tcp(boost::asio::ip::tcp p) : m_family(p.family()) {}
@@ -910,7 +919,7 @@ namespace sim
 
 	// boost.asio compatible io_service class that simulates the network
 	// and time.
-	struct io_service
+	struct SIMULATOR_DECL io_service
 	{
 		struct work : boost::asio::io_service::work
 		{
@@ -995,7 +1004,7 @@ namespace sim
 	struct queue;
 
 	// user supplied configuration of the network to simulate
-	struct configuration
+	struct SIMULATOR_DECL configuration
 	{
 		// build the network
 		virtual void build(simulation& sim) = 0;
@@ -1019,7 +1028,7 @@ namespace sim
 		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2) = 0;
 	};
 
-	struct default_config : configuration
+	struct SIMULATOR_DECL default_config : configuration
 	{
 		default_config() : m_sim(nullptr) {}
 
@@ -1039,10 +1048,10 @@ namespace sim
 	};
 
 	namespace aux {
-		extern default_config default_cfg;
+		extern SIMULATOR_DECL default_config default_cfg;
 	}
 
-	struct simulation
+	struct SIMULATOR_DECL simulation
 	{
 		// it calls fire() when a timer fires
 		friend struct high_resolution_timer;
@@ -1133,7 +1142,7 @@ namespace sim
 
 	namespace aux
 	{
-		struct packet
+		struct SIMULATOR_DECL packet
 		{
 			packet()
 				: type(uninitialized)
@@ -1185,7 +1194,7 @@ namespace sim
 			boost::function<void(aux::packet)> drop_fun;
 		};
 
-		struct sink_forwarder : sink
+		struct SIMULATOR_DECL sink_forwarder : sink
 		{
 			sink_forwarder(sink* dst) : m_dst(dst) {}
 
@@ -1219,7 +1228,7 @@ namespace sim
 			until the user calls async_accept (which in this case would complete
 			immediately).
 		*/
-		struct channel
+		struct SIMULATOR_DECL channel
 		{
 			channel() {}
 			// index 0 is the incoming route to the socket that initiated the connection.
@@ -1236,7 +1245,7 @@ namespace sim
 	} // aux
 
 	// this is a queue. It can be configured to contrain
-	struct queue : sink
+	struct SIMULATOR_DECL queue : sink
 	{
 		queue(asio::io_service& ios, int bandwidth
 			, chrono::high_resolution_clock::duration propagation_delay
@@ -1275,7 +1284,7 @@ namespace sim
 		chrono::high_resolution_clock::time_point m_last_forward;
 	};
 
-	void dump_network_graph(simulation const& s, std::string filename);
+	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
 }
 
 #endif // SIMULATOR_HPP_INCLUDED
