@@ -819,7 +819,7 @@ namespace sim
 			int m_bytes_in_flight;
 
 			// reorder buffer for when packets are dropped
-			std::unordered_map<std::uint64_t, aux::packet> m_reorder_buffer;
+			std::map<std::uint64_t, aux::packet> m_reorder_buffer;
 
 			// the sizes of packets given their sequence number
 			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
@@ -1175,7 +1175,7 @@ namespace sim
 
 			// for SYN packets, this is set to the channel we're trying to
 			// establish
-			std::shared_ptr<channel> channel;
+			std::shared_ptr<aux::channel> channel;
 
 			// sequence number of this packet (used for debugging)
 			std::uint64_t seq_nr;
