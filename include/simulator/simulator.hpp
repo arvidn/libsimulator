@@ -145,7 +145,7 @@ namespace sim
 			duration;
 #else
 		typedef boost::nano period;
-		typedef time_point<high_resolution_clock, nano>
+		typedef time_point<high_resolution_clock, boost::nano>
 			time_point;
 		typedef duration<boost::int64_t, boost::nano
 			duration;
