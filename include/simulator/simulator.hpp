@@ -410,7 +410,7 @@ namespace sim
 				, boost::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler);
 
-			void async_receive(asio::null_buffers const& bufs
+			void async_receive(asio::null_buffers const&
 				, boost::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
@@ -418,9 +418,9 @@ namespace sim
 				async_receive_null_buffers_impl(NULL, handler);
 			}
 
-			void async_receive_from(asio::null_buffers const& bufs
+			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
-				, socket_base::message_flags flags
+				, socket_base::message_flags /* flags */
 				, boost::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
@@ -428,7 +428,7 @@ namespace sim
 				async_receive_null_buffers_impl(&sender, handler);
 			}
 
-			void async_receive_from(asio::null_buffers const& bufs
+			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
 				, boost::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
@@ -666,9 +666,9 @@ namespace sim
 				async_write_some_impl(b, handler);
 			}
 
-			void async_write_some(null_buffers const& bufs
+			void async_write_some(null_buffers const&
 				, boost::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+					, std::size_t)> const& /* handler */)
 			{
 				if (m_send_handler) abort_send_handler();
 				assert(false && "not supported yet");
