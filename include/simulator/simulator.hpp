@@ -19,14 +19,21 @@ All rights reserved.
 #ifndef SIMULATOR_HPP_INCLUDED
 #define SIMULATOR_HPP_INCLUDED
 
+#include <boost/asio/detail/config.hpp>
 #include <boost/asio/basic_deadline_timer.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
+
+#if defined BOOST_ASIO_HAS_STD_CHRONO
+#include <chrono>
+#else
 #include <boost/chrono/duration.hpp>
 #include <boost/chrono/time_point.hpp>
 #include <boost/ratio.hpp>
+#endif
+
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
 #include <map>
