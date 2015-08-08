@@ -13,6 +13,32 @@ ECHO "OS =" [ os.name ] ;
 if $(BOOST_ROOT)
 {
 	use-project /boost : $(BOOST_ROOT) ;
+	alias boost_chrono : /boost/chrono//boost_chrono ;
+	alias boost_system : /boost/system//boost_system ;
+}
+else
+{
+
+	local boost-lib-search-path =
+		<search>/opt/local/lib
+		<search>/usr/lib
+		<search>/usr/local/lib
+		<search>/sw/lib
+		<search>/usr/g++/lib
+		<include>/usr/local/include
+		;
+
+	local boost-include-path =
+		<include>/opt/local/include
+		<include>/usr/local/include
+		<include>/usr/sfw/include
+	;
+
+	lib boost_chrono : : <name>boost_chrono $(boost-lib-search-path)
+		: : $(boost-include-path) ;
+
+	lib boost_system : : <name>boost_system $(boost-lib-search-path)
+		: : $(boost-include-path) ;
 }
 
 SOURCES =
@@ -35,8 +61,8 @@ lib simulator
 
 	: # requirements
 	<include>include
-	<library>/boost/chrono//boost_chrono
-	<library>/boost/system//boost_system
+	<library>boost_chrono
+	<library>boost_system
 
 	: # default build
 
