@@ -25,7 +25,6 @@ else
 		<search>/usr/local/lib
 		<search>/sw/lib
 		<search>/usr/g++/lib
-		<include>/usr/local/include
 		;
 
 	local boost-include-path =
