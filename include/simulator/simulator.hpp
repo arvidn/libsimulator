@@ -147,12 +147,11 @@ namespace sim
 		typedef boost::int64_t rep;
 #if defined BOOST_ASIO_HAS_STD_CHRONO
 		typedef std::nano period;
-		typedef std::chrono::time_point<high_resolution_clock
-			, std::chrono::nanoseconds> time_point;
+		typedef std::chrono::time_point<high_resolution_clock, nanoseconds> time_point;
 		typedef std::chrono::duration<boost::int64_t, std::nano> duration;
 #else
 		typedef boost::nano period;
-		typedef time_point<high_resolution_clock, boost::nano> time_point;
+		typedef time_point<high_resolution_clock, nanoseconds> time_point;
 		typedef duration<boost::int64_t, boost::nano> duration;
 #endif
 		static const bool is_steady = true;
