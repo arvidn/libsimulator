@@ -116,7 +116,7 @@ void dump_network_graph(simulation const& s, std::string filename)
 	for (auto ios : io_services)
 	{
 		std::shared_ptr<sink> ep = std::make_shared<endpoint>(*ios);
-		local_nodes.push_back({});
+		local_nodes.push_back(std::unordered_set<std::shared_ptr<sink>>());
 		local_nodes.back().insert(ep);
 
 		route in = ios->get_incoming_route();
