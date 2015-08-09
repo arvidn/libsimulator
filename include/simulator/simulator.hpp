@@ -980,6 +980,8 @@ namespace sim
 		int get_path_mtu(asio::ip::address ip) const;
 		ip::address get_ip() const { return m_ip; }
 
+		sim::simulation& sim() { return m_sim; }
+
 	private:
 
 		sim::simulation& m_sim;
