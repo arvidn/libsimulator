@@ -25,6 +25,7 @@ int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
 using namespace sim::chrono;
 using namespace sim::asio;
 using sim::simulation;
+using sim::default_config;
 using namespace std::placeholders;
 
 void print_time(high_resolution_timer& timer
@@ -57,7 +58,8 @@ void print_time(high_resolution_timer& timer
 
 int main()
 {
-	simulation sim;
+	default_config cfg;
+	simulation sim(cfg);
 	io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
 	high_resolution_timer timer(ios);
 

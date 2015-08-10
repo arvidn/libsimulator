@@ -71,9 +71,5 @@ namespace sim {
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem out")));
 		return route(it->second);
 	}
-
-	namespace aux {
-		default_config default_cfg;
-	}
 }
 

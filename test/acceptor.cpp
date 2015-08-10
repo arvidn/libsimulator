@@ -23,6 +23,7 @@ All rights reserved.
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
+using sim::default_config;
 using namespace std::placeholders;
 
 char send_buffer[10000];
@@ -130,7 +131,8 @@ void on_connected(boost::system::error_code const& ec
 
 int main()
 {
-	simulation sim;
+	default_config cfg;
+	simulation sim(cfg);
 	io_service incoming_ios(sim, ip::address_v4::from_string("40.30.20.10"));
 	io_service outgoing_ios(sim, ip::address_v4::from_string("10.20.30.40"));
 	ip::tcp::acceptor listener(incoming_ios);

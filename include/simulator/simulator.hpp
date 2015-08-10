@@ -1044,16 +1044,12 @@ namespace sim
 		simulation* m_sim;
 	};
 
-	namespace aux {
-		extern SIMULATOR_DECL default_config default_cfg;
-	}
-
 	struct SIMULATOR_DECL simulation
 	{
 		// it calls fire() when a timer fires
 		friend struct high_resolution_timer;
 
-		simulation(configuration& config = aux::default_cfg);
+		simulation(configuration& config);
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();

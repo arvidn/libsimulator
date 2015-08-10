@@ -24,6 +24,7 @@ using namespace sim;
 using namespace sim::asio::ip;
 using namespace sim::chrono;
 using sim::simulation;
+using sim::default_config;
 using namespace std::placeholders;
 
 char receive_buf[1000];
@@ -58,7 +59,8 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 int main()
 {
-	simulation sim;
+	default_config cfg;
+	simulation sim(cfg);
 	asio::io_service incoming_ios(sim, address_v4::from_string("40.30.20.10"));
 	asio::io_service outgoing_ios(sim, address_v4::from_string("10.20.30.40"));
 
