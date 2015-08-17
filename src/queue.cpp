@@ -102,17 +102,20 @@ namespace sim
 		}
 
 		m_last_forward = now;
-		if (m_bandwidth > 0)
+		if (m_bandwidth == 0)
 		{
-			const double nanoseconds_per_byte = 1000000000.0
-				/ double(m_bandwidth);
-
-			aux::packet const& p = m_queue.front().second;
-			const int packet_size = p.buffer.size() + p.overhead;
-
-			m_last_forward += chrono::duration_cast<duration>(chrono::nanoseconds(
-				boost::int64_t(nanoseconds_per_byte * packet_size)));
+			m_forward_timer.get_io_service().post(std::bind(&queue::next_packet_sent
+				, this));
+			return;
 		}
+		const double nanoseconds_per_byte = 1000000000.0
+			/ double(m_bandwidth);
+
+		aux::packet const& p = m_queue.front().second;
+		const int packet_size = p.buffer.size() + p.overhead;
+
+		m_last_forward += chrono::duration_cast<duration>(chrono::nanoseconds(
+			boost::int64_t(nanoseconds_per_byte * packet_size)));
 
 		m_forward_timer.expires_at(m_last_forward);
 		m_forward_timer.async_wait(std::bind(&queue::next_packet_sent

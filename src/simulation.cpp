@@ -78,6 +78,10 @@ namespace sim
 
 	void simulation::add_timer(high_resolution_timer* t)
 	{
+		if (t->expires_at() == sim::chrono::high_resolution_clock::now())
+		{
+			fprintf(stderr, "WARNING: timer scheduled for current time!\n");
+		}
 		m_timer_queue.insert(t);
 	}
 
