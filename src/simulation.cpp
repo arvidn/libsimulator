@@ -52,7 +52,7 @@ namespace sim
 				= chrono::high_resolution_clock::now();
 
 			if (!m_timer_queue.empty()) {
-				high_resolution_timer* next_timer = *m_timer_queue.begin();
+				asio::high_resolution_timer* next_timer = *m_timer_queue.begin();
 				chrono::high_resolution_clock::fast_forward(next_timer->expires_at() - now);
 
 				now = chrono::high_resolution_clock::now();
@@ -76,7 +76,7 @@ namespace sim
 	bool simulation::stopped() const { return m_stopped; }
 	void simulation::reset() { m_stopped = false; }
 
-	void simulation::add_timer(high_resolution_timer* t)
+	void simulation::add_timer(asio::high_resolution_timer* t)
 	{
 		if (t->expires_at() == sim::chrono::high_resolution_clock::now())
 		{
@@ -85,7 +85,7 @@ namespace sim
 		m_timer_queue.insert(t);
 	}
 
-	void simulation::remove_timer(high_resolution_timer* t)
+	void simulation::remove_timer(asio::high_resolution_timer* t)
 	{
 		assert(!m_timer_queue.empty());
 		timer_queue_t::iterator begin;
