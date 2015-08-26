@@ -360,7 +360,7 @@ namespace sim
 			ip::udp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct socket : socket_base, sink
+		struct SIMULATOR_DECL socket : socket_base, sink
 		{
 			typedef ip::udp::endpoint endpoint_type;
 			typedef ip::udp protocol_type;
@@ -634,7 +634,7 @@ namespace sim
 			ip::tcp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct socket : socket_base, sink
+		struct SIMULATOR_DECL socket : socket_base, sink
 		{
 			typedef ip::tcp::endpoint endpoint_type;
 			typedef ip::tcp protocol_type;
@@ -832,7 +832,7 @@ namespace sim
 			std::vector<aux::packet> m_outgoing_packets;
 		};
 
-		struct acceptor : socket
+		struct SIMULATOR_DECL acceptor : socket
 		{
 			acceptor(io_service& ios);
 			~acceptor();
@@ -887,7 +887,7 @@ namespace sim
 			acceptor& operator=(acceptor const&);
 		};
 
-		struct resolver : boost::asio::ip::tcp::resolver
+		struct SIMULATOR_DECL resolver : boost::asio::ip::tcp::resolver
 		{
 			resolver(io_service& ios);
 		};
