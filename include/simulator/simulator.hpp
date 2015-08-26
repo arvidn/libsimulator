@@ -592,7 +592,7 @@ namespace sim
 			bool m_is_v4;
 		};
 
-		struct resolver : boost::asio::ip::udp::resolver
+		struct SIMULATOR_DECL resolver : boost::asio::ip::udp::resolver
 		{
 			resolver(io_service& ios);
 		};
