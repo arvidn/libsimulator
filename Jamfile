@@ -66,8 +66,7 @@ lib simulator
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
 
 	# disable auto-link
-	<define>BOOST_SYSTEM_NO_LIB
-	<define>BOOST_CHRONO_NO_LIB
+	<define>BOOST_ALL_NO_LIB
 
 	: # default build
 
