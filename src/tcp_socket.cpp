@@ -336,7 +336,7 @@ namespace ip {
 		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		int buf_size = 0;
-		for (int i = 0; i < bufs.size(); ++i)
+		for (int i = 0; i < int(bufs.size()); ++i)
 			buf_size += buffer_size(bufs[i]);
 
 		boost::system::error_code ec;
@@ -671,8 +671,8 @@ namespace ip {
 
 				// potentially resend packets
 				while (!m_outgoing_packets.empty()
-					&& m_bytes_in_flight + m_outgoing_packets.front().buffer.size()
-					<= m_cwnd)
+					&& m_bytes_in_flight
+						+ int(m_outgoing_packets.front().buffer.size()) <= m_cwnd)
 				{
 					aux::packet pkt = std::move(m_outgoing_packets.front());
 					m_outgoing_packets.erase(m_outgoing_packets.begin());

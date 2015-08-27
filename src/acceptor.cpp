@@ -142,7 +142,7 @@ namespace ip {
 
 	void tcp::acceptor::incoming_packet(aux::packet p)
 	{
-		fprintf(stderr, "acceptor incoming packet (p: %lld)\n"
+		fprintf(stderr, "acceptor incoming packet (p: %llu)\n"
 			, p.seq_nr);
 		if (p.type != aux::packet::syn)
 		{
