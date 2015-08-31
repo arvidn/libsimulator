@@ -19,6 +19,9 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include <functional>
 
+#define __STDC_FORMAT_MACROS 1
+#include <cinttypes>
+
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
 
@@ -142,7 +145,7 @@ namespace ip {
 
 	void tcp::acceptor::incoming_packet(aux::packet p)
 	{
-		fprintf(stderr, "acceptor incoming packet (p: %llu)\n"
+		fprintf(stderr, "acceptor incoming packet (p: %" PRIu64 ")\n"
 			, p.seq_nr);
 		if (p.type != aux::packet::syn)
 		{
