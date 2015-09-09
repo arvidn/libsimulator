@@ -18,6 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include <functional>
+#include <cinttypes>
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
 
@@ -76,7 +77,12 @@ namespace ip {
 		, boost::system::error_code& ec)
 	{
 		open(m_is_v4 ? tcp::v4() : tcp::v6(), ec);
-		if (ec) return;
+		if (ec)
+		{
+			printf("tcp::socket::internal_connect() error: (%d) %s\n"
+				, ec.value(), ec.message().c_str());
+			return;
+		}
 		m_bound_to = bind_ip;
 		m_channel = c;
 		assert(m_forwarder);
@@ -151,6 +157,10 @@ namespace ip {
 			m_forwarder->clear();
 			m_forwarder.reset();
 		}
+
+		m_next_incoming_seq = 0;
+		m_next_outgoing_seq = 0;
+		m_last_drop_seq = 0;
 
 		cancel(ec);
 
@@ -276,12 +286,7 @@ namespace ip {
 	void tcp::socket::async_connect(tcp::endpoint const& target
 		, boost::function<void(boost::system::error_code const&)> h)
 	{
-		if (!m_open)
-		{
-			m_io_service.post(std::bind(h
-				, boost::system::error_code(error::bad_descriptor)));
-			return;
-		}
+		if (!m_open) open(target.protocol());
 
 		assert(h);
 		assert(!m_connect_handler);
@@ -478,12 +483,12 @@ namespace ip {
 				if (total_received > 0) break;
 
 				m_incoming_queue.erase(m_incoming_queue.begin());
+				assert(p.ec);
 				ec = p.ec;
 				m_channel.reset();
 				return 0;
 			}
-
-			if (p.type == aux::packet::payload)
+			else if (p.type == aux::packet::payload)
 			{
 				// copy bytes from the incoming queue into the receive buffer.
 				// both are vectors of buffers, so it can get a bit hairy
@@ -515,6 +520,11 @@ namespace ip {
 					}
 				}
 			}
+			else
+			{
+				assert(false);
+			}
+
 			if (recv_iter == m_recv_buffer.end())
 				break;
 		}
@@ -529,6 +539,7 @@ namespace ip {
 		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		assert(!bufs.empty());
+		assert(buffer_size(bufs[0]));
 
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);
@@ -722,6 +733,12 @@ namespace ip {
 				// m_incoming_packets queue
 				if (p.seq_nr != m_next_incoming_seq)
 				{
+					if (p.seq_nr < m_next_incoming_seq)
+					{
+						printf("TCP: incoming sequence number lower (%" PRId64 ") "
+							"than expected: %" PRId64 "\n", p.seq_nr, m_next_incoming_seq);
+					}
+
 					m_reorder_buffer.insert(std::make_pair(p.seq_nr, std::move(p)));
 					return;
 				}

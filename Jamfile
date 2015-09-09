@@ -52,6 +52,7 @@ SOURCES =
 	queue
 	acceptor
 	default_config
+	http_server
 	;
 
 lib simulator

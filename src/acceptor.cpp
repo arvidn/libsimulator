@@ -40,8 +40,17 @@ namespace ip {
 		close(ec);
 	}
 
+	void tcp::acceptor::listen(int qs)
+	{
+		boost::system::error_code ec;
+		listen(qs, ec);
+		if (ec) throw boost::system::system_error(ec);
+	}
+
 	void tcp::acceptor::listen(int qs, boost::system::error_code& ec)
 	{
+		if (qs == -1) qs = 20;
+
 		if (!m_open)
 		{
 			ec = error::bad_descriptor;
@@ -145,19 +154,30 @@ namespace ip {
 
 	void tcp::acceptor::incoming_packet(aux::packet p)
 	{
-		fprintf(stderr, "acceptor incoming packet (p: %" PRIu64 ")\n"
-			, p.seq_nr);
-		if (p.type != aux::packet::syn)
+		switch (p.type)
 		{
-			assert(false);
-			// TODO: not sure why this would happen. It would be nice to respond
-			// with a reset
-			// ignore for now
-			return;
+			case aux::packet::syn:
+				m_incoming_queue.push_back(p.channel);
+				check_accept_queue();
+				return;
+			case aux::packet::error:
+				assert(false); // something is not wired up correctly
+				if (m_accept_handler)
+				{
+					m_io_service.post(std::bind(m_accept_handler
+						, boost::system::error_code(error::operation_aborted)));
+					m_accept_handler = 0;
+					m_accept_into = NULL;
+					m_remote_endpoint = NULL;
+				}
+				return;
+			default:
+				assert(false);
+				// TODO: not sure why this would happen. It would be nice to respond
+				// with a reset
+				// ignore for now
+				return;
 		}
-
-		m_incoming_queue.push_back(p.channel);
-		check_accept_queue();
 	}
 
 	void tcp::acceptor::check_accept_queue()
@@ -205,6 +225,7 @@ namespace ip {
 		if (m_remote_endpoint) *m_remote_endpoint = c->ep[0];
 
 		boost::system::error_code ec;
+		// if the acceptor socket is closed. Any potential socket in the queue
 		m_accept_into->internal_connect(m_bound_to, c, ec);
 
 		// notify the other end

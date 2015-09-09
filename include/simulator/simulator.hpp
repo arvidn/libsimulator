@@ -108,7 +108,6 @@ namespace sim
 		std::shared_ptr<sink> last() const
 		{ return hops.back(); }
 
-
 	private:
 		std::vector<std::shared_ptr<sink>> hops;
 	};
@@ -172,6 +171,7 @@ namespace sim
 	using boost::asio::mutable_buffer;
 	using boost::asio::const_buffers_1;
 	using boost::asio::mutable_buffers_1;
+	using boost::asio::buffer;
 
 	struct io_service;
 
@@ -840,6 +840,7 @@ namespace sim
 			boost::system::error_code cancel(boost::system::error_code& ec);
 			void cancel();
 
+			void listen(int qs = -1);
 			void listen(int qs, boost::system::error_code& ec);
 
 			void async_accept(ip::tcp::socket& peer
