@@ -21,12 +21,12 @@ All rights reserved.
 namespace sim
 {
 
-	std::string send_response(int code, char const* status_message
+	std::string SIMULATOR_DECL send_response(int code, char const* status_message
 		, int len = 0, char const** extra_header = NULL);
 
 // This is a very simple http server that only supports a single concurrent
 // connection
-struct http_server
+struct SIMULATOR_DECL http_server
 {
 	http_server(asio::io_service& ios, int listen_port);
 
