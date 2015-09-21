@@ -77,18 +77,8 @@ namespace sim
 	// through)
 	struct SIMULATOR_DECL route
 	{
-		route() = default;
-		route(route&&) = default;
-		route(route const&) = default;
-		route& operator=(route&&) = default;
-		route& operator=(route const&) = default;
-		route(std::shared_ptr<sink> const& s) { append(s); }
-
 		friend route operator+(route lhs, route rhs)
-		{
-			lhs.append(std::move(rhs));
-			return lhs;
-		}
+		{ return lhs.append(std::move(rhs)); }
 
 		std::shared_ptr<sink> next_hop() const { return hops.front(); }
 		std::shared_ptr<sink> pop_front()
@@ -101,9 +91,9 @@ namespace sim
 		void prepend(route const& r)
 		{ hops.insert(hops.begin(), r.hops.begin(), r.hops.end()); }
 		void prepend(std::shared_ptr<sink> s) { hops.insert(hops.begin(), s); }
-		void append(route const& r)
-		{ hops.insert(hops.end(), r.hops.begin(), r.hops.end()); }
-		void append(std::shared_ptr<sink> s) { hops.push_back(s); }
+		route& append(route const& r)
+		{ hops.insert(hops.end(), r.hops.begin(), r.hops.end()); return *this; }
+		route& append(std::shared_ptr<sink> s) { hops.push_back(s); return *this; }
 		bool empty() const { return hops.empty(); }
 		std::shared_ptr<sink> last() const
 		{ return hops.back(); }
@@ -351,11 +341,11 @@ namespace sim
 
 		struct endpoint : boost::asio::ip::udp::endpoint
 		{
-			using boost::asio::ip::udp::endpoint::endpoint;
-
 			// this constructor is temporary, until we support the resolver
 			endpoint(boost::asio::ip::udp::endpoint const& ep)
 				: boost::asio::ip::udp::endpoint(ep) {}
+			endpoint(boost::asio::ip::address const& addr, int port)
+				: boost::asio::ip::udp::endpoint(addr, port) {}
 			endpoint() : boost::asio::ip::udp::endpoint() {}
 			ip::udp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
@@ -625,11 +615,11 @@ namespace sim
 
 		struct endpoint : boost::asio::ip::tcp::endpoint
 		{
-			using boost::asio::ip::tcp::endpoint::endpoint;
-
 			// this constructor is temporary, until we support the resolver
 			endpoint(boost::asio::ip::tcp::endpoint const& ep)
 				: boost::asio::ip::tcp::endpoint(ep) {}
+			endpoint(boost::asio::ip::address const& addr, int port)
+				: boost::asio::ip::tcp::endpoint(addr, port) {}
 			endpoint() : boost::asio::ip::tcp::endpoint() {}
 			ip::tcp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};

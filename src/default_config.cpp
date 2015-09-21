@@ -38,7 +38,7 @@ namespace sim {
 	route default_config::channel_route(asio::ip::address src
 		, asio::ip::address dst)
 	{
-		return route(m_network);
+		return route().append(m_network);
 	}
 
 	route default_config::incoming_route(asio::ip::address ip)
@@ -46,11 +46,11 @@ namespace sim {
 		// incoming download rate is 800kB/s with a 200 kB queue
 		// and 1 ms forwarding delay
 		auto it = m_incoming.find(ip);
-		if (it != m_incoming.end()) return route(it->second);
+		if (it != m_incoming.end()) return route().append(it->second);
 		it = m_incoming.insert(it, std::make_pair(ip, std::make_shared<queue>(
 			std::ref(m_sim->get_io_service()), 800 * 1000
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem in")));
-		return route(it->second);
+		return route().append(it->second);
 	}
 
 	int default_config::path_mtu(asio::ip::address ip1, asio::ip::address ip2)
@@ -65,11 +65,11 @@ namespace sim {
 		// outgoing upload rate is 200kB/s with a 200 kB queue
 		// and 1 ms forwarding delay
 		auto it = m_outgoing.find(ip);
-		if (it != m_outgoing.end()) return route(it->second);
+		if (it != m_outgoing.end()) return route().append(it->second);
 		it = m_outgoing.insert(it, std::make_pair(ip, std::make_shared<queue>(
 			std::ref(m_sim->get_io_service()), 200 * 1000
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem out")));
-		return route(it->second);
+		return route().append(it->second);
 	}
 }
 
