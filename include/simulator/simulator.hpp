@@ -27,6 +27,24 @@ All rights reserved.
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
 
+#if defined _MSC_VER && _MSC_VER < 1900
+#include <stdio.h>
+#include <stdarg.h>
+
+namespace sim {
+inline int snprintf(char* buf, int len, char const* fmt, ...)
+{
+	va_list lp;
+	int ret;
+	va_start(lp, fmt);
+	ret = _vsnprintf(buf, len, fmt, lp);
+	va_end(lp);
+	if (ret < 0) { buf[len-1] = 0; ret = len-1; }
+	return ret;
+}
+}
+#endif
+
 #if defined BOOST_ASIO_HAS_STD_CHRONO
 #include <chrono>
 #else
