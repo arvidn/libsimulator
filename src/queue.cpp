@@ -24,6 +24,8 @@ typedef sim::chrono::high_resolution_clock::duration duration;
 
 namespace sim
 {
+	using namespace aux;
+
 	queue::queue(asio::io_service& ios
 		, int bandwidth
 		, chrono::high_resolution_clock::duration propagation_delay

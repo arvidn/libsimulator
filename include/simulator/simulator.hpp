@@ -31,7 +31,7 @@ All rights reserved.
 #include <stdio.h>
 #include <stdarg.h>
 
-namespace sim {
+namespace sim { namespace aux {
 inline int snprintf(char* buf, int len, char const* fmt, ...)
 {
 	va_list lp;
@@ -42,7 +42,7 @@ inline int snprintf(char* buf, int len, char const* fmt, ...)
 	if (ret < 0) { buf[len-1] = 0; ret = len-1; }
 	return ret;
 }
-}
+}}
 #endif
 
 #if defined BOOST_ASIO_HAS_STD_CHRONO

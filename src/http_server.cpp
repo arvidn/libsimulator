@@ -29,6 +29,8 @@ using boost::system::error_code;
 
 namespace sim
 {
+	using namespace aux;
+
 	std::string send_response(int code, char const* status_message
 		, int len, char const** extra_header)
 	{
