@@ -10,6 +10,9 @@ BOOST_ROOT = [ modules.peek : BOOST_ROOT ] ;
 ECHO "BOOST_ROOT =" $(BOOST_ROOT) ;
 ECHO "OS =" [ os.name ] ;
 
+lib wsock32 : : <name>wsock32 <link>shared ;
+lib ws2_32 : : <name>ws2_32 <link>shared ;
+
 if $(BOOST_ROOT)
 {
 	use-project /boost : $(BOOST_ROOT) ;
@@ -63,6 +66,8 @@ lib simulator
 	<include>include
 	<library>boost_chrono
 	<library>boost_system
+	<target-os>windows:<library>ws2_32
+	<target-os>windows:<library>wsock32
 
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
 
@@ -72,6 +77,7 @@ lib simulator
 	: # default build
 
 	: # usage requirements
+	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
 	;
