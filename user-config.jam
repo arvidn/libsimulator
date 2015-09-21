@@ -1,0 +1,3 @@
+using msvc-12.0 ;
+using gcc : : <cxxflags>-std=c++11 ;
+

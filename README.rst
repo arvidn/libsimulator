@@ -1,6 +1,9 @@
 libsimulator
 ============
 
+.. image:: https://ci.appveyor.com/api/projects/status/0857n4g3f6mui90i/branch/master
+    :target: https://ci.appveyor.com/project/arvidn/libsimulator/branch/master
+
 *This is still in initial development, some of this README represents ambitions
 rather than the current state*
 
