@@ -302,7 +302,7 @@ namespace ip {
 			m_bound_to = addr;
 		}
 		m_channel = m_io_service.internal_connect(this, target, ec);
-		m_mss = m_io_service.get_path_mtu(target.address());
+		m_mss = m_io_service.get_path_mtu(m_bound_to.address(), target.address());
 		m_cwnd = m_mss * 2;
 		if (ec)
 		{

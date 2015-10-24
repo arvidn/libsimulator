@@ -32,7 +32,8 @@ The currently (partially) supported classes are:
 * asio::high_resolution_timer
 * asio::ip::tcp::acceptor
 * asio::ip::tcp::endpoint
-* asio::ip::address
+* asio::ip::address (v4 and v6 variants, these just defer to the actual
+  boost.asio types)
 * asio::ip::tcp::socket
 * asio::ip::udp::socket
 * asio::io_service;
@@ -45,10 +46,6 @@ Work in progress:
 The ``high_resolution_clock`` in the ``chrono`` namespace implements the timer
 concept from the chrono library.
 
-The network socket and resolver classes simulate a network. Sockets can be bound
-to any valid internet address, and will implicitly form a new node on the
-network.
-
 usage
 -----
 
@@ -58,17 +55,19 @@ ordering of events. This single message loop is provided by the ``simulation``
 class. Each simulation should have only one such object. An ``io_service``
 object represents a single node on the network. When creating an io_service, you
 have to pass in the simulation it belongs to as well as the IP address it should
-have.
+have. It is also possible to pass in multiple addresses to form a multi-homed
+node. For instance, one with both an IPv4 and IPv6 interface.
 
 When creating sockets, binding and connecting them, the io_service object
-determines what ``INADDR_ANY`` resolves to (the IP assigned to that node).
+determines what ``INADDR_ANY`` resolves to (the first IP assigned to that node).
 
 The only aspects of the io_service interface that's preserved are ``post()``,
 ``dispatch()`` and constructing timers and sockets. In short, the ``run()`` and
 ``poll()`` family of functions do not exist. Every io_service object is assumed
 to be run, and all of their events are handled by the simulation object.
 
-None of the synchronous APIs are supported, for obvious reasons.
+None of the synchronous APIs are supported, because that would require
+integration with OS threads and scheduler.
 
 example
 -------

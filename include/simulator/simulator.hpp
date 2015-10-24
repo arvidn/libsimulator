@@ -239,9 +239,17 @@ namespace sim
 	typedef boost::asio::ip::address_v4 address_v4;
 	typedef boost::asio::ip::address_v6 address_v6;
 
-	struct SIMULATOR_DECL socket_base
+	template <typename Protocol>
+	struct socket_base
 	{
-		socket_base(io_service& ios);
+		socket_base(io_service& ios)
+			: m_io_service(ios)
+			, m_open(false)
+			, m_non_blocking(false)
+			, m_max_receive_queue_size(64 * 1024)
+		{
+		}
+
 
 		// io_control
 		struct non_blocking_io
@@ -318,7 +326,10 @@ namespace sim
 			, boost::system::error_code& ec)
 		{ m_non_blocking = ioc.non_blocking; return ec; }
 
-		bool is_open() const;
+		bool is_open() const
+		{
+			return m_open;
+		}
 
 		io_service& get_io_service() const { return m_io_service; }
 
@@ -332,6 +343,8 @@ namespace sim
 	protected:
 
 		io_service& m_io_service;
+
+		typename Protocol::endpoint m_bound_to;
 
 		// this is an object implementing the sink interface, forwarding
 		// packets to this socket. If this socket is destructed, this forwarder
@@ -368,7 +381,7 @@ namespace sim
 			ip::udp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct SIMULATOR_DECL socket : socket_base, sink
+		struct SIMULATOR_DECL socket : socket_base<udp>, sink
 		{
 			typedef ip::udp::endpoint endpoint_type;
 			typedef ip::udp protocol_type;
@@ -429,6 +442,18 @@ namespace sim
 				if (m_recv_handler) abort_recv_handler();
 				async_receive_null_buffers_impl(NULL, handler);
 			}
+
+			template <class BufferSequence>
+			void async_receive(BufferSequence const& bufs
+				, boost::function<void(boost::system::error_code const&
+					, std::size_t)> const& handler)
+			{
+				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				if (m_recv_handler) abort_recv_handler();
+
+				async_receive_from_impl(b, nullptr, 0, handler);
+			}
+
 
 			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
@@ -559,8 +584,6 @@ namespace sim
 				, udp::endpoint const& dst, message_flags flags
 				, boost::system::error_code& ec);
 
-			udp::endpoint m_bound_to;
-
 			// this is the next time we'll have an opportunity to send another
 			// outgoing packet. This is used to implement the bandwidth constraints
 			// of channels. This may be in the past, in which case it's OK to send
@@ -642,7 +665,7 @@ namespace sim
 			ip::tcp protocol() const { return address().is_v4() ? v4() : v6(); }
 		};
 
-		struct SIMULATOR_DECL socket : socket_base, sink
+		struct SIMULATOR_DECL socket : socket_base<tcp>, sink
 		{
 			typedef ip::tcp::endpoint endpoint_type;
 			typedef ip::tcp protocol_type;
@@ -769,8 +792,6 @@ namespace sim
 
 			// called when a packet is dropped
 			void packet_dropped(aux::packet p);
-
-			ip::tcp::endpoint m_bound_to;
 
 			boost::function<void(boost::system::error_code const&)> m_connect_handler;
 
@@ -931,7 +952,9 @@ namespace sim
 				boost::asio::io_service::work(ios.get_internal_service()) {}
 		};
 
+		io_service(sim::simulation& sim);
 		io_service(sim::simulation& sim, ip::address const& ip);
+		io_service(sim::simulation& sim, std::vector<ip::address> const& ips);
 		io_service();
 		~io_service();
 
@@ -980,29 +1003,48 @@ namespace sim
 		route find_udp_socket(asio::ip::udp::socket const& socket
 			, ip::udp::endpoint const& ep);
 
-		route const& get_outgoing_route() const
-		{ return m_outgoing_route; }
+		route const& get_outgoing_route(ip::address ip) const
+		{ return m_outgoing_route.find(ip)->second; }
 
-		route const& get_incoming_route() const
-		{ return m_incoming_route; }
+		route const& get_incoming_route(ip::address ip) const
+		{ return m_incoming_route.find(ip)->second; }
 
-		int get_path_mtu(asio::ip::address ip) const;
-		ip::address get_ip() const { return m_ip; }
+		int get_path_mtu(asio::ip::address source, asio::ip::address dest) const;
+		std::vector<ip::address> const& get_ips() const { return m_ips; }
 
 		sim::simulation& sim() { return m_sim; }
 
 	private:
 
 		sim::simulation& m_sim;
-		ip::address m_ip;
+		std::vector<ip::address> m_ips;
 
 		// these are determined by the configuration. They may include NATs and
 		// DSL modems (queues)
-		route m_outgoing_route;
-		route m_incoming_route;
+		std::map<ip::address, route> m_outgoing_route;
+		std::map<ip::address, route> m_incoming_route;
 
 		bool m_stopped;
 	};
+
+	namespace ip {
+
+	template <typename Protocol>
+	route socket_base<Protocol>::get_incoming_route()
+	{
+		route ret = m_io_service.get_incoming_route(m_bound_to.address());
+		assert(m_forwarder);
+		ret.append(m_forwarder);
+		return ret;
+	}
+
+	template <typename Protocol>
+	route socket_base<Protocol>::get_outgoing_route()
+	{
+		return route(m_io_service.get_outgoing_route(m_bound_to.address()));
+	}
+
+	}
 
 	} // asio
 

@@ -26,7 +26,7 @@ namespace sim
 {
 	simulation::simulation(configuration& config)
 		: m_config(config)
-		, m_internal_ios(*this, asio::ip::address_v4::from_string("0.0.0.0"))
+		, m_internal_ios(*this)
 		, m_stopped(false)
 	{
 		m_config.build(*this);
@@ -278,7 +278,7 @@ namespace sim
 		ret.reserve(m_nodes.size());
 		std::remove_copy_if(
 			m_nodes.begin(), m_nodes.end(), std::back_inserter(ret)
-			, [](io_service* ios) { return ios->get_ip() == asio::ip::address(); });
+			, [](io_service* ios) { return ios->get_ips().empty(); });
 		return ret;
 	}
 

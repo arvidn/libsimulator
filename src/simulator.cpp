@@ -64,7 +64,13 @@ namespace
 
 		virtual std::string label() const override final
 		{
-			return m_ios.get_ip().to_string();
+			std::string ret;
+			for (auto const& ip : m_ios.get_ips())
+			{
+				ret += ip.to_string();
+				ret += " ";
+			}
+			return ret;
 		}
 
 		virtual std::string attributes() const override final
@@ -119,53 +125,59 @@ void dump_network_graph(simulation const& s, std::string filename)
 		local_nodes.push_back(std::unordered_set<std::shared_ptr<sink>>());
 		local_nodes.back().insert(ep);
 
-		route in = ios->get_incoming_route();
-		route out = ios->get_outgoing_route();
-
-		// this is the outgoing node for this endpoint. This is
-		// how it connects to the network.
-		const std::shared_ptr<sink> egress = out.empty() ? ep : out.last();
-
-		// first add both the incoming and outgoing chains
-		std::shared_ptr<sink> prev;
-		while (!in.empty())
+		for (auto const& ip : ios->get_ips())
 		{
-			auto node = in.pop_front();
-			local_nodes.back().insert(node);
-			if (prev) edges.insert({prev, node});
-			prev = node;
-		}
-		if (prev) edges.insert({prev, ep});
+			route in = ios->get_incoming_route(ip);
+			route out = ios->get_outgoing_route(ip);
 
-		prev = ep;
-		while (!out.empty())
-		{
-			auto node = out.pop_front();
-			local_nodes.back().insert(node);
-			edges.insert({prev, node});
-			prev = node;
-		}
+			// this is the outgoing node for this endpoint. This is
+			// how it connects to the network.
+			const std::shared_ptr<sink> egress = out.empty() ? ep : out.last();
 
-		// then connect the endpoint of those chains to the rest of the network.
-		// Since the network may be arbitrarily complex, we actually have to
-		// completely iterate over all other endpoints
-
-		for (auto ios2 : io_services)
-		{
-			route network = s.config().channel_route(
-				ios->get_ip(), ios2->get_ip());
-
-			std::shared_ptr<sink> last = ios2->get_incoming_route().next_hop();
-
-			prev = egress;
-			while (!network.empty())
+			// first add both the incoming and outgoing chains
+			std::shared_ptr<sink> prev;
+			while (!in.empty())
 			{
-				auto node = network.pop_front();
-				nodes.insert(node);
+				auto node = in.pop_front();
+				local_nodes.back().insert(node);
+				if (prev) edges.insert({prev, node});
+				prev = node;
+			}
+			if (prev) edges.insert({prev, ep});
+
+			prev = ep;
+			while (!out.empty())
+			{
+				auto node = out.pop_front();
+				local_nodes.back().insert(node);
 				edges.insert({prev, node});
 				prev = node;
 			}
-			edges.insert({prev, last});
+
+			// then connect the endpoint of those chains to the rest of the network.
+			// Since the network may be arbitrarily complex, we actually have to
+			// completely iterate over all other endpoints
+
+			for (auto ios2 : io_services)
+			{
+				for (auto const& ip2 : ios2->get_ips())
+				{
+					route network = s.config().channel_route(
+						ip, ip2);
+
+					std::shared_ptr<sink> last = ios2->get_incoming_route(ip2).next_hop();
+
+					prev = egress;
+					while (!network.empty())
+					{
+						auto node = network.pop_front();
+						nodes.insert(node);
+						edges.insert({prev, node});
+						prev = node;
+					}
+					edges.insert({prev, last});
+				}
+			}
 		}
 	}
 

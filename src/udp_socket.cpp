@@ -342,7 +342,7 @@ namespace ip {
 		// this is outgoing NIC bandwidth
 		// TODO: make this configurable
 		const int bandwidth = 100000000; // 100 MB/s
-		const int mtu = m_io_service.get_path_mtu(dst.address());
+		const int mtu = m_io_service.get_path_mtu(m_bound_to.address(), dst.address());
 
 		if (int(ret) > mtu)
 		{
@@ -371,7 +371,7 @@ namespace ip {
 			return ret;
 		}
 
-		hops.prepend(m_io_service.get_outgoing_route());
+		hops.prepend(m_io_service.get_outgoing_route(m_bound_to.address()));
 
 		m_next_send = (std::max)(now, m_next_send);
 

@@ -23,13 +23,24 @@ All rights reserved.
 
 namespace sim { namespace asio {
 
+	io_service::io_service(sim::simulation& sim)
+		: io_service(sim, std::vector<asio::ip::address>())
+	{}
+
 	io_service::io_service(sim::simulation& sim, asio::ip::address const& ip)
+		: io_service(sim, std::vector<asio::ip::address>{ip})
+	{}
+
+	io_service::io_service(sim::simulation& sim, std::vector<asio::ip::address> const& ips)
 		: m_sim(sim)
-		, m_ip(ip)
+		, m_ips(ips)
 		, m_stopped(false)
 	{
-		m_outgoing_route = m_sim.config().outgoing_route(ip);
-		m_incoming_route = m_sim.config().incoming_route(ip);
+		for (auto const& ip : m_ips)
+		{
+			m_outgoing_route[ip] = m_sim.config().outgoing_route(ip);
+			m_incoming_route[ip] = m_sim.config().incoming_route(ip);
+		}
 		m_sim.add_io_service(this);
 	}
 
@@ -44,9 +55,12 @@ namespace sim { namespace asio {
 		assert(false);
 	}
 
-	int io_service::get_path_mtu(asio::ip::address ip) const
+	int io_service::get_path_mtu(asio::ip::address source, asio::ip::address dest) const
 	{
-		return m_sim.config().path_mtu(m_ip, ip);
+		// TODO: it would be nice to actually traverse the virtual network nodes
+		// and ask for their MTU instead
+		assert(std::count(m_ips.begin(), m_ips.end(), source) > 0 && "source address must be a local address to this node/io_service");
+		return m_sim.config().path_mtu(source, dest);
 	}
 
 	void io_service::stop()
@@ -125,11 +139,14 @@ namespace sim { namespace asio {
 	ip::tcp::endpoint io_service::bind_socket(ip::tcp::socket* socket
 		, ip::tcp::endpoint ep, boost::system::error_code& ec)
 	{
+		assert(!m_ips.empty() && "you cannot use an internal io_service (one without an IP address) for creating and binding sockets");
 		if (ep.address() == ip::address())
 		{
-			ep.address(m_ip);
+			// TODO: pick the first local endpoint for now. In the future we may
+			// want have a bias toward
+			ep.address(m_ips.front());
 		}
-		else if (ep.address() != m_ip)
+		else if (std::count(m_ips.begin(), m_ips.end(), ep.address()) == 0)
 		{
 			// you can only bind to the IP assigned to this node.
 			// TODO: support loopback
@@ -150,11 +167,12 @@ namespace sim { namespace asio {
 	ip::udp::endpoint io_service::bind_udp_socket(ip::udp::socket* socket
 		, ip::udp::endpoint ep, boost::system::error_code& ec)
 	{
+		assert(!m_ips.empty() && "you cannot use an internal io_service (one without an IP address) for creating and binding sockets");
 		if (ep.address() == ip::address())
 		{
-			ep.address(m_ip);
+			ep.address(m_ips.front());
 		}
-		else if (ep.address() != m_ip)
+		else if (std::count(m_ips.begin(), m_ips.end(), ep.address()) == 0)
 		{
 			// you can only bind to the IP assigned to this node.
 			// TODO: support loopback
