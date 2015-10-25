@@ -248,7 +248,8 @@ namespace sim
 		, ip::udp::endpoint const& ep)
 	{
 		udp_socket_iter_t i = m_udp_sockets.find(ep);
-		if (i == m_udp_sockets.end()) route();
+		if (i == m_udp_sockets.end())
+			return route();
 
 		ip::udp::endpoint src = socket.local_endpoint();
 		route network_route = m_config.channel_route(src.address(), ep.address());
