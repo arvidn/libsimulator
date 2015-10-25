@@ -1152,7 +1152,7 @@ namespace sim
 	{
 		route ret = m_io_service.get_incoming_route(m_bound_to.address());
 		assert(m_forwarder);
-		ret.append(m_forwarder);
+		ret.append(std::static_pointer_cast<sim::sink>(m_forwarder));
 		return ret;
 	}
 
