@@ -46,6 +46,9 @@ namespace ip {
 			m_queue.empty() ? chrono::high_resolution_clock::now() :
 			m_queue.front().completion_time;
 
+		assert(!m_ios.get_ips().empty() && "internal io service objects can only "
+			"be used for timers");
+
 		const chrono::high_resolution_clock::time_point completion_time =
 			start_time
 			+ m_ios.sim().config().hostname_lookup(m_ios.get_ips().front(), q.host_name()
@@ -80,6 +83,8 @@ namespace ip {
 		m_queue.erase(m_queue.begin());
 
 		v.handler(v.err, v.iter);
+
+		if (m_queue.empty()) return;
 
 		m_timer.expires_at(m_queue.front().completion_time);
 		m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
