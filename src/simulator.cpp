@@ -30,16 +30,6 @@ namespace sim {
 namespace asio {
 namespace ip {
 
-	// ----- resolver ------
-
-	udp::resolver::resolver(io_service& ios)
-		: boost::asio::ip::udp::resolver(ios.get_internal_service())
-	{}
-
-	tcp::resolver::resolver(io_service& ios)
-		: boost::asio::ip::tcp::resolver(ios.get_internal_service())
-	{}
-
 	default_config default_cfg;
 
 } // ip

@@ -55,6 +55,7 @@ SOURCES =
 	acceptor
 	default_config
 	http_server
+	resolver
 	;
 
 lib simulator
@@ -89,6 +90,7 @@ project
 	;
 
 test-suite simulator-tests :
+	[ run test/resolver.cpp ]
 	[ run test/multi_homed.cpp ]
 	[ run test/timer.cpp ]
 	[ run test/acceptor.cpp ]

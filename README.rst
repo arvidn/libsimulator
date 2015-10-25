@@ -37,9 +37,6 @@ The currently (partially) supported classes are:
 * asio::ip::tcp::socket
 * asio::ip::udp::socket
 * asio::io_service;
-
-Work in progress:
-
 * asio::ip::udp::resolver
 * asio::ip::tcp::resolver
 
@@ -136,7 +133,10 @@ The simulated network can be configured with per-node pair bandwidth, round-trip
 latency and queue sizes. This is controlled via a callback interface that
 libsimulator will ask for these properties when nodes get connected.
 
-*TODO: define configuration interface*
+The resolution of hostnames is also configurable by providing a callback on the
+configuration object along with the latency of individual lookups.
+
+*TODO: document configuration interface*
 
 history
 -------

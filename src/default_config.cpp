@@ -21,6 +21,9 @@ All rights reserved.
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
+using sim::asio::ip::address_v4;
+using sim::asio::ip::address_v6;
+using sim::asio::ip::address;
 using sim::chrono::milliseconds;
 using sim::chrono::duration_cast;
 
@@ -70,6 +73,23 @@ namespace sim {
 			std::ref(m_sim->get_io_service()), 200 * 1000
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem out")));
 		return route().append(it->second);
+	}
+
+	duration default_config::hostname_lookup(
+		asio::ip::address const& requestor
+		, std::string hostname
+		, std::vector<asio::ip::address>& result
+		, boost::system::error_code& ec)
+	{
+		if (hostname == "localhost")
+		{
+			result = { address_v6::from_string("::1")
+				, address_v4::from_string("127.0.0.1") };
+			return duration_cast<duration>(chrono::microseconds(1));
+		}
+
+		ec = boost::system::error_code(asio::error::host_not_found);
+		return duration_cast<duration>(chrono::milliseconds(100));
 	}
 }
 

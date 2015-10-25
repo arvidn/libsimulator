@@ -365,21 +365,148 @@ namespace sim
 
 	};
 
+	template<typename Protocol>
+	struct basic_endpoint : boost::asio::ip::basic_endpoint<Protocol>
+	{
+		basic_endpoint(ip::address const& addr, int port)
+			: boost::asio::ip::basic_endpoint<Protocol>(addr, port) {}
+		basic_endpoint() : boost::asio::ip::basic_endpoint<Protocol>() {}
+	};
+
+	template <typename Protocol>
+	struct basic_resolver_entry
+	{
+		typedef typename Protocol::endpoint endpoint_type;
+		typedef Protocol protocol_type;
+
+		basic_resolver_entry() {}
+		basic_resolver_entry(
+			const endpoint_type& ep
+			, std::string const& host
+			, std::string const& service)
+			: m_endpoint(ep)
+			, m_host_name(host)
+			, m_service(service)
+		{}
+
+		endpoint_type endpoint() const { return m_endpoint; }
+		std::string host_name() const { return m_host_name; }
+		operator endpoint_type() const { return m_endpoint; }
+		std::string service_name() const { return m_service; }
+
+	private:
+		endpoint_type m_endpoint;
+		std::string m_host_name;
+		std::string m_service;
+	};
+
+	template<typename Protocol>
+	struct basic_resolver;
+
+	template<typename Protocol>
+	struct basic_resolver_iterator
+	{
+		friend struct basic_resolver<Protocol>;
+
+		basic_resolver_iterator(): m_idx(-1) {}
+
+		typedef basic_resolver_entry<Protocol> value_type;
+		typedef value_type const& reference;
+
+		bool operator!=(basic_resolver_iterator const& rhs) const
+		{
+			return !this->operator==(rhs);
+		}
+
+		bool operator==(basic_resolver_iterator const& rhs) const
+		{
+			// if the indices are identical, the iterators are too.
+			// if they are different though, the iterators may still be identical,
+			// if it's the end iterator
+			if (m_idx == rhs.m_idx) return true;
+
+			const bool lhs_end = (m_idx == -1) || (m_idx == m_results.size());
+			const bool rhs_end = (rhs.m_idx == -1) || (rhs.m_idx == rhs.m_results.size());
+
+			return lhs_end == rhs_end;
+		}
+
+		value_type operator*() const { return m_results[m_idx]; }
+		value_type const* operator->() const { return &m_results[m_idx]; }
+
+		basic_resolver_iterator& operator++() { ++m_idx; return *this; }
+		basic_resolver_iterator operator++(int)
+		{
+			basic_resolver_iterator tmp(*this);
+			++m_idx;
+			return tmp;
+		}
+
+	private:
+
+		std::vector<value_type> m_results;
+		int m_idx;
+	};
+
+	template <typename Protocol>
+	struct basic_resolver_query
+	{
+		basic_resolver_query(std::string const& hostname, char const* service)
+			: m_hostname(hostname)
+			, m_service(service)
+		{}
+
+		std::string const& host_name() const { return m_hostname; }
+		std::string const& service_name() const { return m_service; }
+
+	private:
+		std::string m_hostname;
+		std::string m_service;
+	};
+
+	template<typename Protocol>
+	struct basic_resolver
+	{
+		basic_resolver(io_service& ios);
+
+		typedef Protocol protocol_type;
+		typedef basic_resolver_iterator<Protocol> iterator;
+		typedef basic_resolver_query<Protocol> query;
+
+		void cancel();
+
+		void async_resolve(basic_resolver_query<Protocol> q,
+			boost::function<void(boost::system::error_code const&,
+				basic_resolver_iterator<Protocol>)> handler);
+
+		//TODO: add remaining members
+
+	private:
+
+		void on_lookup(boost::system::error_code const& ec);
+
+		struct result_t
+		{
+			chrono::high_resolution_clock::time_point completion_time;
+			boost::system::error_code err;
+			basic_resolver_iterator<Protocol> iter;
+			boost::function<void(boost::system::error_code const&,
+				basic_resolver_iterator<Protocol>)> handler;
+		};
+
+		io_service& m_ios;
+		asio::high_resolution_timer m_timer;
+		using queue_t = std::vector<result_t>;
+
+		queue_t m_queue;
+	};
+
 	struct SIMULATOR_DECL udp
 	{
 		static udp v4() { return udp(AF_INET); }
 		static udp v6() { return udp(AF_INET6); }
 
-		struct endpoint : boost::asio::ip::udp::endpoint
-		{
-			// this constructor is temporary, until we support the resolver
-			endpoint(boost::asio::ip::udp::endpoint const& ep)
-				: boost::asio::ip::udp::endpoint(ep) {}
-			endpoint(boost::asio::ip::address const& addr, int port)
-				: boost::asio::ip::udp::endpoint(addr, port) {}
-			endpoint() : boost::asio::ip::udp::endpoint() {}
-			ip::udp protocol() const { return address().is_v4() ? v4() : v6(); }
-		};
+		typedef basic_endpoint<udp> endpoint;
 
 		struct SIMULATOR_DECL socket : socket_base<udp>, sink
 		{
@@ -623,9 +750,9 @@ namespace sim
 			bool m_is_v4;
 		};
 
-		struct SIMULATOR_DECL resolver : boost::asio::ip::udp::resolver
+		struct SIMULATOR_DECL resolver : basic_resolver<udp>
 		{
-			resolver(io_service& ios);
+			resolver(io_service& ios) : basic_resolver(ios) {}
 		};
 
 		friend bool operator==(udp const& lhs, udp const& rhs)
@@ -654,16 +781,7 @@ namespace sim
 
 		int family() const { return m_family; }
 
-		struct endpoint : boost::asio::ip::tcp::endpoint
-		{
-			// this constructor is temporary, until we support the resolver
-			endpoint(boost::asio::ip::tcp::endpoint const& ep)
-				: boost::asio::ip::tcp::endpoint(ep) {}
-			endpoint(boost::asio::ip::address const& addr, int port)
-				: boost::asio::ip::tcp::endpoint(addr, port) {}
-			endpoint() : boost::asio::ip::tcp::endpoint() {}
-			ip::tcp protocol() const { return address().is_v4() ? v4() : v6(); }
-		};
+		typedef basic_endpoint<tcp> endpoint;
 
 		struct SIMULATOR_DECL socket : socket_base<tcp>, sink
 		{
@@ -885,7 +1003,7 @@ namespace sim
 
 			// implements sink
 			virtual void incoming_packet(aux::packet p) override final;
-			virtual bool internal_is_listening();
+			virtual bool internal_is_listening() override final;
 
 		private:
 			// check the incoming connection queue to see if any connection in
@@ -917,9 +1035,9 @@ namespace sim
 			acceptor& operator=(acceptor const&);
 		};
 
-		struct SIMULATOR_DECL resolver : boost::asio::ip::tcp::resolver
+		struct SIMULATOR_DECL resolver : basic_resolver<tcp>
 		{
-			resolver(io_service& ios);
+			resolver(io_service& ios) : basic_resolver(ios) {}
 		};
 
 		friend bool operator==(tcp const& lhs, tcp const& rhs)
@@ -1074,19 +1192,36 @@ namespace sim
 		// established. For UDP sockets it's called for every burst of packets
 		// that are sent
 		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2) = 0;
+
+		// called for every hostname lookup made by the client. ``reqyestor`` is
+		// the node performing the lookup, ``hostname`` is the name being looked
+		// up. Resolve the name into addresses and fill in ``result`` or set
+		// ``ec`` if the hostname is not found or some other error occurs. The
+		// return value is the latency of the lookup. The client's callback won't
+		// be called until after waiting this long.
+		virtual chrono::high_resolution_clock::duration hostname_lookup(
+			asio::ip::address const& requestor
+			, std::string hostname
+			, std::vector<asio::ip::address>& result
+			, boost::system::error_code& ec) = 0;
 	};
 
 	struct SIMULATOR_DECL default_config : configuration
 	{
 		default_config() : m_sim(nullptr) {}
 
-		virtual void build(simulation& sim) override final;
+		virtual void build(simulation& sim) override;
 		virtual route channel_route(asio::ip::address src
-			, asio::ip::address dst) override final;
-		virtual route incoming_route(asio::ip::address ip) override final;
-		virtual route outgoing_route(asio::ip::address ip) override final;
+			, asio::ip::address dst) override;
+		virtual route incoming_route(asio::ip::address ip) override;
+		virtual route outgoing_route(asio::ip::address ip) override;
 		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2)
-			override final;
+			override;
+		virtual chrono::high_resolution_clock::duration hostname_lookup(
+			asio::ip::address const& requestor
+			, std::string hostname
+			, std::vector<asio::ip::address>& result
+			, boost::system::error_code& ec) override;
 
 	private:
 		std::shared_ptr<queue> m_network;
