@@ -54,6 +54,8 @@ void on_name_lookup(boost::system::error_code const& ec
 		++iter;
 		++expect_it;
 	}
+
+	assert(expect_it == expect.end());
 }
 
 void on_failed_name_lookup(boost::system::error_code const& ec

@@ -58,6 +58,7 @@ namespace ip {
 
 		int port = atoi(q.service_name().c_str());
 
+		iter.m_idx = 0;
 		for (auto const& ip : result)
 		{
 			iter.m_results.emplace_back(
