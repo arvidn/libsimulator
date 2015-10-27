@@ -97,11 +97,11 @@ namespace sim
 
 	void http_server::read()
 	{
-		if (m_bytes_used >= m_recv_buffer.size() / 2)
+		if (m_bytes_used >= int(m_recv_buffer.size()) / 2)
 		{
 			m_recv_buffer.resize((std::max)(500, m_bytes_used * 2));
 		}
-		assert(m_recv_buffer.size() > m_bytes_used);
+		assert(int(m_recv_buffer.size()) > m_bytes_used);
 		m_connection.async_read_some(asio::mutable_buffers_1(&m_recv_buffer[m_bytes_used]
 				, m_recv_buffer.size() - m_bytes_used)
 			, std::bind(&http_server::on_read, this, _1, _2));

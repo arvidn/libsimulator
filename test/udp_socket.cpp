@@ -47,7 +47,8 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 	num_received += bytes_transferred;
 
-	printf("[%4d] received %zu bytes from %s\n", millis, bytes_transferred
+	printf("[%4d] received %d bytes from %s\n", millis
+		, int(bytes_transferred)
 		, ep.address().to_string().c_str());
 
 	if (bytes_transferred == 100 * 10) return;
