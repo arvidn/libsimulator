@@ -57,9 +57,17 @@ namespace sim
 		, m_bytes_used(0)
 		, m_close(false)
 	{
-		m_listen_socket.open(tcp::v4());
-
-		m_listen_socket.bind(tcp::endpoint(address_v4(), listen_port));
+		address local_ip = ios.get_ips().front();
+		if (local_ip.is_v4())
+		{
+			m_listen_socket.open(tcp::v4());
+			m_listen_socket.bind(tcp::endpoint(address_v4::any(), listen_port));
+		}
+		else
+		{
+			m_listen_socket.open(tcp::v6());
+			m_listen_socket.bind(tcp::endpoint(address_v6::any(), listen_port));
+		}
 		m_listen_socket.listen();
 
 		m_listen_socket.async_accept(m_connection, m_ep
