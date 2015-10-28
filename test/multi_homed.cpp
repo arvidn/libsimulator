@@ -17,8 +17,9 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include "test.hpp"
 #include <functional>
+
+#include "catch.hpp"
 
 using namespace sim;
 using namespace sim::asio::ip;
@@ -27,11 +28,15 @@ using sim::simulation;
 using sim::default_config;
 using namespace std::placeholders;
 
+namespace {
+
 char receive_buf[1000];
 char send_buf[1000];
 
 int num_ipv6 = 0;
 int num_ipv4 = 0;
+
+}
 
 void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferred
 	, udp::socket& s)
@@ -58,7 +63,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 	}
 }
 
-int main()
+TEST_CASE("one node can have multiple addresses", "multi-homed")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -76,44 +81,44 @@ int main()
 
 	boost::system::error_code ec;
 	incoming_v4.open(udp::v4(), ec);
-	exit_on_error("open", ec);
+	REQUIRE(!ec);
 	incoming_v4.bind(udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), ec);
-	exit_on_error("bind", ec);
+	REQUIRE(!ec);
 	incoming_v4.async_receive(asio::mutable_buffers_1(receive_buf
 		, sizeof(receive_buf)), std::bind(&on_receive, _1, _2
 		, std::ref(incoming_v4)));
 
 	incoming_v6.open(udp::v6(), ec);
-	exit_on_error("open", ec);
+	REQUIRE(!ec);
 	incoming_v6.bind(udp::endpoint(address_v6::from_string("ff::dead:beef:1337"), 1337), ec);
-	exit_on_error("bind", ec);
+	REQUIRE(!ec);
 	incoming_v6.async_receive(asio::mutable_buffers_1(receive_buf
 		, sizeof(receive_buf)), std::bind(&on_receive, _1, _2
 		, std::ref(incoming_v6)));
 
 	outgoing.open(udp::v4(), ec);
-	exit_on_error("open", ec);
+	REQUIRE(!ec);
 
 	outgoing.io_control(udp::socket::non_blocking_io(true), ec);
-	exit_on_error("io_control non-blocking-io", ec);
+	REQUIRE(!ec);
 
 	// send a packet to the IPv4 address
 	outgoing.send_to(asio::mutable_buffers_1(send_buf, sizeof(send_buf))
 		, udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), 0, ec);
-	exit_on_error("send_to", ec);
+	REQUIRE(!ec);
 
 	// and a packet to the IPv6 address
 	outgoing.send_to(asio::mutable_buffers_1(send_buf, sizeof(send_buf))
 		, udp::endpoint(address_v6::from_string("ff::dead:beef:1337"), 1337), 0, ec);
-	exit_on_error("send_to", ec);
+	REQUIRE(!ec);
 
 	sim.run(ec);
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
-	assert(num_ipv4 == 1);
-	assert(num_ipv6 == 1);
+	CHECK(num_ipv4 == 1);
+	CHECK(num_ipv6 == 1);
 
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());

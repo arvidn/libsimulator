@@ -18,6 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include <functional>
+#include "catch.hpp"
 
 using namespace sim::asio;
 using namespace sim::chrono;
@@ -105,10 +106,10 @@ void incoming_connection(boost::system::error_code const& ec
 	printf("[%4d] received incoming connection from: %s:%d. local endpoint: %s:%d\n"
 		, millis, ep.address().to_string().c_str(), ep.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
-	assert(local_endpoint.port() == 1337);
-	assert(local_endpoint.address().to_string() == "40.30.20.10");
-	assert(remote_endpoint.port() != 0);
-	assert(remote_endpoint.address().to_string() == "10.20.30.40");
+	CHECK(local_endpoint.port() == 1337);
+	CHECK(local_endpoint.address().to_string() == "40.30.20.10");
+	CHECK(remote_endpoint.port() != 0);
+	CHECK(remote_endpoint.address().to_string() == "10.20.30.40");
 
 	sock.io_control(sim::asio::ip::tcp::socket::non_blocking_io(true), err);
 	if (err) printf("[%4d] ioctl failed: %s\n", millis, err.message().c_str());
@@ -138,17 +139,17 @@ void on_connected(boost::system::error_code const& ec
 		, remote_endpoint.address().to_string().c_str(), remote_endpoint.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
 
-	assert(remote_endpoint.port() == 1337);
-	assert(remote_endpoint.address().to_string() == "40.30.20.10");
-	assert(local_endpoint.port() != 0);
-	assert(local_endpoint.address().to_string() == "10.20.30.40");
+	CHECK(remote_endpoint.port() == 1337);
+	CHECK(remote_endpoint.address().to_string() == "40.30.20.10");
+	CHECK(local_endpoint.port() != 0);
+	CHECK(local_endpoint.address().to_string() == "10.20.30.40");
 
 	printf("sending %d bytes\n", int(sizeof(send_buffer)));
 	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
 		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
 
-int main()
+TEST_CASE("receive null_buffers", "null_buffers")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -191,7 +192,7 @@ int main()
 	printf("num_sent: %d num_received: %d\n"
 		, num_sent, num_received);
 
-	assert(num_received == num_sent);
-	assert(num_received == 1000000);
+	CHECK(num_received == num_sent);
+	CHECK(num_received == 1000000);
 }
 

@@ -19,6 +19,8 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include <functional>
 
+#include "catch.hpp"
+
 using namespace std::placeholders;
 using namespace sim;
 
@@ -36,7 +38,6 @@ void on_name_lookup(boost::system::error_code const& ec
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now()
 		.time_since_epoch()).count());
-	assert(millis == 50);
 
 	std::vector<address_v4> expect = {
 		address_v4::from_string("1.2.3.4")
@@ -67,7 +68,6 @@ void on_failed_name_lookup(boost::system::error_code const& ec
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now()
 		.time_since_epoch()).count());
-	assert(millis == 150);
 }
 
 struct sim_config : sim::default_config
@@ -93,29 +93,81 @@ struct sim_config : sim::default_config
 	}
 };
 
-int main()
-{
+TEST_CASE("resolve multiple IPv4 addresses", "resolver") {
 	sim_config cfg;
 	simulation sim(cfg);
+
+	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+	num_lookups = 0;
 
 	// the machine receiving packets has two IP addresses
 	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
-	asio::ip::tcp::resolver::query q1("test.com", "8080");
-	resolver.async_resolve(q1, std::bind(&on_name_lookup, _1, _2));
+	asio::ip::tcp::resolver::query q("test.com", "8080");
+	resolver.async_resolve(q, std::bind(&on_name_lookup, _1, _2));
 
+	boost::system::error_code ec;
+	sim.run(ec);
+
+	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
+
+	CHECK(millis == 50);
+	CHECK(num_lookups == 1);
+
+	printf("[%4d] simulation::run() returned: %s\n"
+		, millis, ec.message().c_str());
+}
+
+TEST_CASE("resolve non-existent hostname", "resolver") {
+	sim_config cfg;
+	simulation sim(cfg);
+
+	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+	num_lookups = 0;
+
+	// the machine receiving packets has two IP addresses
+	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+
+	asio::ip::tcp::resolver resolver(ios);
+	asio::ip::tcp::resolver::query q("non-existent.com", "8080");
+	resolver.async_resolve(q, std::bind(&on_failed_name_lookup, _1, _2));
+
+	boost::system::error_code ec;
+	sim.run(ec);
+
+	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
+
+	CHECK(millis == 100);
+	CHECK(num_lookups == 1);
+
+	printf("[%4d] simulation::run() returned: %s\n"
+		, millis, ec.message().c_str());
+}
+
+TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
+	sim_config cfg;
+	simulation sim(cfg);
+
+	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+	num_lookups = 0;
+
+	// the machine receiving packets has two IP addresses
+	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+
+	asio::ip::tcp::resolver resolver(ios);
+	asio::ip::tcp::resolver::query q1("non-existent.com", "8080");
 	asio::ip::tcp::resolver::query q2("non-existent.com", "8080");
+	resolver.async_resolve(q1, std::bind(&on_failed_name_lookup, _1, _2));
 	resolver.async_resolve(q2, std::bind(&on_failed_name_lookup, _1, _2));
 
 	boost::system::error_code ec;
 	sim.run(ec);
 
-	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now()
-		.time_since_epoch()).count());
+	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
 
-	assert(millis == 150);
-	assert(num_lookups == 2);
+	CHECK(millis == 200);
+	CHECK(num_lookups == 2);
 
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());

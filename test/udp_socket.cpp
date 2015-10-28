@@ -17,8 +17,8 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
-#include "test.hpp"
 #include <functional>
+#include "catch.hpp"
 
 using namespace sim;
 using namespace sim::asio::ip;
@@ -26,6 +26,8 @@ using namespace sim::chrono;
 using sim::simulation;
 using sim::default_config;
 using namespace std::placeholders;
+
+namespace {
 
 char receive_buf[1000];
 char send_buf[1000];
@@ -58,7 +60,9 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 		, std::ref(s), std::ref(ep)));
 }
 
-int main()
+}
+
+TEST_CASE("send packet to udp socket", "udp_socket")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -70,12 +74,12 @@ int main()
 
 	boost::system::error_code ec;
 	incoming.open(udp::v4(), ec);
-	exit_on_error("open", ec);
+	REQUIRE(!ec);
 	incoming.bind(udp::endpoint(address(), 1337), ec);
-	exit_on_error("bind", ec);
+	REQUIRE(!ec);
 
 	outgoing.open(udp::v4(), ec);
-	exit_on_error("open", ec);
+	REQUIRE(!ec);
 
 	udp::endpoint remote_endpoint;
 	incoming.async_receive_from(asio::mutable_buffers_1(receive_buf,
@@ -83,13 +87,13 @@ int main()
 			, std::ref(incoming), std::ref(remote_endpoint)));
 
 	outgoing.io_control(udp::socket::non_blocking_io(true), ec);
-	exit_on_error("io_control non-blocking-io", ec);
+	REQUIRE(!ec);
 
 	for (int i = 1; i < 10; ++i)
 	{
 		num_sent += outgoing.send_to(asio::mutable_buffers_1(send_buf, 100 * i)
 			, udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), 0, ec);
-		exit_on_error("send_to", ec);
+		REQUIRE(!ec);
 	}
 
 	sim.run(ec);
@@ -97,8 +101,8 @@ int main()
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
-	assert(num_sent == num_received);
-	assert(num_sent == 100 * 45);
+	CHECK(num_sent == num_received);
+	CHECK(num_sent == 100 * 45);
 
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());

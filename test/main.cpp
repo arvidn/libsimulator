@@ -16,20 +16,7 @@ All rights reserved.
 
 */
 
-#include <boost/system/error_code.hpp>
-#include <stdio.h>
-#include "simulator/simulator.hpp"
+#define CATCH_CONFIG_MAIN
 
-inline void exit_on_error(char const* msg, boost::system::error_code const& ec)
-{
-	using namespace sim::chrono;
-
-	if (!ec) return;
-
-	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
-		.time_since_epoch()).count());
-
-	printf("[%4d] %s failed: %s\n", millis, msg, ec.message().c_str());
-	exit(1);
-}
+#include "catch.hpp"
 

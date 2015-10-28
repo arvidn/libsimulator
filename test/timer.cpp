@@ -19,8 +19,7 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include <functional>
 
-int counter = 0;
-int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
+#include "catch.hpp"
 
 using namespace sim::chrono;
 using namespace sim::asio;
@@ -28,13 +27,21 @@ using sim::simulation;
 using sim::default_config;
 using namespace std::placeholders;
 
+namespace {
+
+	int counter = 0;
+	const int expected_timestamps[] = {1000, 2000, 4000, 7000, 11000 };
+
+	high_resolution_clock::time_point start;
+}
+
 void print_time(high_resolution_timer& timer
 	, boost::system::error_code const& ec)
 {
 	using namespace sim::chrono;
 
-	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
-		.time_since_epoch()).count());
+	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now() - start).count());
+
 	printf("[%d] timer fired at: %d milliseconds. error: %s\n"
 		, counter
 		, millis
@@ -42,11 +49,11 @@ void print_time(high_resolution_timer& timer
 
 	if (ec)
 	{
-		assert(millis == 0);
+		CHECK(millis == 0);
 		return;
 	}
 
-	assert(millis == expected_timestamps[counter]);
+	CHECK(millis == expected_timestamps[counter]);
 
 	++counter;
 	if (counter < 5)
@@ -56,12 +63,14 @@ void print_time(high_resolution_timer& timer
 	}
 }
 
-int main()
+TEST_CASE("wait for timers", "timer")
 {
 	default_config cfg;
 	simulation sim(cfg);
 	io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
 	high_resolution_timer timer(ios);
+
+	start = high_resolution_clock::now();
 
 	timer.expires_from_now(seconds(10));
 	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
@@ -78,6 +87,6 @@ int main()
 		, int(duration_cast<milliseconds>(high_resolution_clock::now()
 				.time_since_epoch()).count()));
 
-	assert(counter == 5);
+	CHECK(counter == 5);
 }
 

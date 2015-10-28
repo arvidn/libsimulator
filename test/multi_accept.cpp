@@ -19,11 +19,20 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include <functional>
 
+#include "catch.hpp"
+
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
 using sim::default_config;
 using namespace std::placeholders;
+
+namespace {
+
+int num_incoming = 0;
+int num_connected = 0;
+
+int counter = 0;
 
 void incoming_connection(boost::system::error_code const& ec
 	, ip::tcp::socket& sock, ip::tcp::acceptor& listener)
@@ -37,14 +46,14 @@ void incoming_connection(boost::system::error_code const& ec
 		return;
 	}
 
+	++num_incoming;
+
 	printf("[%4d] received incoming connection\n", millis);
 	sock.close();
 
 	listener.async_accept(sock, std::bind(&incoming_connection
 		, _1, std::ref(sock), std::ref(listener)));
 }
-
-int counter = 0;
 
 void on_connected(boost::system::error_code const& ec
 	, ip::tcp::socket& sock)
@@ -56,6 +65,8 @@ void on_connected(boost::system::error_code const& ec
 		printf("[%4d] error while connecting: %s\n", millis, ec.message().c_str());
 		return;
 	}
+
+	++num_connected;
 
 	printf("[%4d] made outgoing connection\n", millis);
 	sock.close();
@@ -69,7 +80,9 @@ void on_connected(boost::system::error_code const& ec
 		, 1337), std::bind(&on_connected, _1, std::ref(sock)));
 }
 
-int main()
+}
+
+TEST_CASE("accept a connection multiple times on the same socket", "accept")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -101,6 +114,9 @@ int main()
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);
+
+	CHECK(num_incoming == 6);
+	CHECK(num_connected == 6);
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
