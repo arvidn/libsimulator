@@ -1,0 +1,42 @@
+language: cpp
+
+os:
+  - linux
+  - osx
+
+env:
+  - variant=debug
+  - variant=release
+
+# container-based builds
+sudo: false
+cache:
+  directories:
+    - $HOME/.ccache
+
+# sources  list: https://github.com/travis-ci/apt-source-whitelist/blob/master/ubuntu.json,
+# packages list: https://github.com/travis-ci/apt-package-whitelist/blob/master/ubuntu-precise
+addons:
+  apt:
+    sources:
+    - boost-latest
+    - ubuntu-toolchain-r-test
+    packages:
+    - libboost1.55-all-dev
+    - libboost1.55-tools-dev
+    - g++-4.8
+
+install:
+  - 'echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam'
+
+# osx builds need to disable the deprecated warning because of the openssl
+# shipping with the system having marked all functions as deprecated. Since
+# we're building with -Werror, we can't have those warnings
+  - 'echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" >> ~/user-config.jam'
+  - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build boost-python; fi
+  - ccache -V && ccache --show-stats && ccache --zero-stats
+
+script:
+  - bjam --hash -j3 warnings-as-errors=on variant=$variant -l900 $toolset $target
+  - ccache --show-stats
+
