@@ -263,6 +263,7 @@ namespace sim
 	void simulation::add_io_service(asio::io_service* ios)
 	{
 		bool added = m_nodes.insert(ios).second;
+		(void)added;
 		assert(added);
 	}
 

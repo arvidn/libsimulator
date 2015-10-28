@@ -37,6 +37,6 @@ install:
   - ccache -V && ccache --show-stats && ccache --zero-stats
 
 script:
-  - bjam --hash -j3 warnings-as-errors=on variant=$variant -l900 $toolset $target
+  - bjam --hash -j3 variant=$variant -l900 $toolset $target
   - ccache --show-stats
 

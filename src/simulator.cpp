@@ -236,6 +236,7 @@ namespace aux {
 		if (ep[0] == self) return 1;
 		if (ep[1] == self) return 0;
 		assert(false && "invalid socket");
+		return -1;
 	}
 
 	int channel::self_idx(asio::ip::tcp::endpoint self) const
@@ -243,6 +244,7 @@ namespace aux {
 		if (ep[0] == self) return 0;
 		if (ep[1] == self) return 1;
 		assert(false && "invalid socket");
+		return -1;
 	}
 
 } // aux
