@@ -27,12 +27,8 @@ addons:
     - g++-4.8
 
 install:
-  - 'echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam'
-
-# osx builds need to disable the deprecated warning because of the openssl
-# shipping with the system having marked all functions as deprecated. Since
-# we're building with -Werror, we can't have those warnings
-  - 'echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" >> ~/user-config.jam'
+  - if [ $TRAVIS_OS_NAME == "linux" ]; then 'echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam'; fi
+  - if [ $TRAVIS_OS_NAME == "osx" ]; then 'echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam'; fi
   - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build boost-python; fi
   - ccache -V && ccache --show-stats && ccache --zero-stats
 
