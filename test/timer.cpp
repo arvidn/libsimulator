@@ -82,7 +82,7 @@ TEST_CASE("wait for timers", "timer")
 	boost::system::error_code ec;
 	sim.run(ec);
 
-	printf("io_service::run() returned: %s at: %d\n"
+	printf("sim::run() returned: %s at: %d\n"
 		, ec.message().c_str()
 		, int(duration_cast<milliseconds>(high_resolution_clock::now()
 				.time_since_epoch()).count()));

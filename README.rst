@@ -39,7 +39,7 @@ The currently (partially) supported classes are:
   boost.asio types)
 * asio::ip::tcp::socket
 * asio::ip::udp::socket
-* asio::io_service;
+* asio::io_service
 * asio::ip::udp::resolver
 * asio::ip::tcp::resolver
 
@@ -102,16 +102,18 @@ Here's a simple example illustrating the asio timer::
 	{
 		using namespace sim::chrono;
 
-		sim::asio::io_service ios;
+		default_config cfg;
+		simulation sim(cfg);
+		io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
 		sim::asio::high_resolution_timer timer(ios);
 
 		timer.expires_from_now(seconds(1));
 		timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 		boost::system::error_code ec;
-		ios.run(ec);
+		sim.run(ec);
 
-		printf("io_service::run() returned: %s at: %d\n"
+		printf("sim::run() returned: %s at: %d\n"
 			, ec.message().c_str()
 			, int(duration_cast<milliseconds>(high_resolution_clock::now()
 					.time_since_epoch()).count()));
@@ -139,7 +141,55 @@ libsimulator will ask for these properties when nodes get connected.
 The resolution of hostnames is also configurable by providing a callback on the
 configuration object along with the latency of individual lookups.
 
-*TODO: document configuration interface*
+To configure the network for the simulation, pass in a reference to an object
+implementing the ``sim::configuration`` interface::
+
+	struct configuration
+	{
+		// build the network
+		virtual void build(simulation& sim) = 0;
+
+		// return the hops on the network packets from src to dst need to traverse
+		virtual route channel_route(asio::ip::address src
+			, asio::ip::address dst) = 0;
+
+		// return the hops an incoming packet to ep need to traverse before
+		// reaching the socket (for instance a NAT)
+		virtual route incoming_route(asio::ip::address ip) = 0;
+
+		// return the hops an outgoing packet from ep need to traverse before
+		// reaching the network (for instance a DSL modem)
+		virtual route outgoing_route(asio::ip::address ip) = 0;
+
+		// return the path MTU between the two IP addresses
+		// For TCP sockets, this will be called once when the connection is
+		// established. For UDP sockets it's called for every burst of packets
+		// that are sent
+		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2) = 0;
+
+		// called for every hostname lookup made by the client. ``reqyestor`` is
+		// the node performing the lookup, ``hostname`` is the name being looked
+		// up. Resolve the name into addresses and fill in ``result`` or set
+		// ``ec`` if the hostname is not found or some other error occurs. The
+		// return value is the latency of the lookup. The client's callback won't
+		// be called until after waiting this long.
+		virtual chrono::high_resolution_clock::duration hostname_lookup(
+			asio::ip::address const& requestor
+			, std::string hostname
+			, std::vector<asio::ip::address>& result
+			, boost::system::error_code& ec) = 0;
+	};
+
+``build()`` is called right after the simulation is constructed. It gives the
+configuration object an opportunity to construct the core queues, since they
+need access to the simulator.
+
+``channel_route()`` is expected to return a *route* of network hops from the
+source IP to the destination IP. A route is a series of ``sink`` objects. The
+typical sink is a ``sim::queue``, which is a network node with a specific rate
+limit, propagation delay and queue size.
+
+*TODO: finish document configuration interface*
 
 history
 -------
