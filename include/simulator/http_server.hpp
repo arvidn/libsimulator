@@ -21,18 +21,27 @@ All rights reserved.
 namespace sim
 {
 
+	// builds an HTTP response buffer
 	std::string SIMULATOR_DECL send_response(int code, char const* status_message
 		, int len = 0, char const** extra_header = NULL);
+
 
 // This is a very simple http server that only supports a single concurrent
 // connection
 struct SIMULATOR_DECL http_server
 {
-	http_server(asio::io_service& ios, int listen_port);
+	enum flags_t
+	{
+		keep_alive = 1
+	};
+
+	http_server(asio::io_service& ios, int listen_port
+		, int flags = http_server::keep_alive);
 
 	void stop();
 
-	typedef std::function<std::string (std::string, std::string)> handler_t;
+	using handler_t = std::function<std::string (std::string, std::string
+		, std::map<std::string, std::string>&)>;
 	void register_handler(std::string path, handler_t const& h);
 
 private:
@@ -40,7 +49,8 @@ private:
 	void on_accept(boost::system::error_code const& ec);
 	void read();
 	void on_read(boost::system::error_code const& ec, size_t bytes_transferred);
-	void on_write(boost::system::error_code const& ec, size_t bytes_transferred);
+	void on_write(boost::system::error_code const& ec, size_t bytes_transferred
+		, bool close);
 	void close_connection();
 
 	asio::io_service& m_ios;
@@ -63,6 +73,8 @@ private:
 
 	// set to true when shutting down
 	bool m_close;
+
+	int m_flags;
 };
 
 }

@@ -129,7 +129,11 @@ namespace ip {
 		{
 			int remote = m_channel->remote_idx(m_bound_to);
 			route hops = m_channel->hops[remote];
-			if (!hops.empty())
+
+			// if m_connect_handler is still set, it means the connection hasn't
+			// been established yet, and this channel points to the acceptor
+			// socket, not another open TCP connection.
+			if (!hops.empty() && !m_connect_handler)
 			{
 				aux::packet p;
 				p.type = aux::packet::error;

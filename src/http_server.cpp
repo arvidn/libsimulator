@@ -31,6 +31,35 @@ namespace sim
 {
 	using namespace aux;
 
+	namespace
+	{
+		std::string trim(std::string s)
+		{
+			if (s.empty()) return s;
+
+			int start = 0;
+			int end = s.size();
+			while (strchr(" \r\n\t", s[start]) != NULL && start < end)
+			{
+				++start;
+			}
+
+			while (strchr(" \r\n\t", s[end-1]) != NULL && end > start)
+			{
+				--end;
+			}
+			return s.substr(start, end - start);
+		}
+
+		std::string lower_case(std::string s)
+		{
+			std::string ret;
+			std::transform(s.begin(), s.end(), std::back_inserter(ret)
+				, [](char c) { return tolower(c); } );
+			return ret;
+		}
+	}
+
 	std::string send_response(int code, char const* status_message
 		, int len, char const** extra_header)
 	{
@@ -50,12 +79,13 @@ namespace sim
 		return std::string(msg, pkt_len);
 	}
 
-	http_server::http_server(io_service& ios, int listen_port)
+	http_server::http_server(io_service& ios, int listen_port, int flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_connection(ios)
 		, m_bytes_used(0)
 		, m_close(false)
+		, m_flags(flags)
 	{
 		address local_ip = ios.get_ips().front();
 		if (local_ip.is_v4())
@@ -150,6 +180,34 @@ namespace sim
 		printf("http_server: incoming request: %s %s [%s]\n"
 			, method.c_str(), path.c_str(), req.c_str());
 
+		std::map<std::string, std::string> headers;
+
+		char const* header = strstr(space2, "\r\n");
+		while (header != end_of_request)
+		{
+			if (header == NULL)
+			{
+				printf("http_server: failed to parse request:\n%s\n"
+					, m_recv_buffer.c_str());
+				close_connection();
+				return;
+			}
+			char const* next = strstr(header + 2, "\r\n");
+			char const* value = strchr(header, ':');
+			if (value == NULL || next == NULL || value > next)
+			{
+				printf("http_server: failed to parse request:\n%s\n"
+					, m_recv_buffer.c_str());
+				close_connection();
+				return;
+			}
+
+			headers[lower_case(trim(std::string(header, value)))]
+				= trim(std::string(value+1, next));
+
+			header = next;
+		}
+
 		auto it = m_handlers.find(path);
 		if (it == m_handlers.end())
 		{
@@ -158,17 +216,20 @@ namespace sim
 		}
 		else
 		{
-			m_send_buffer = it->second(method, req);
+			m_send_buffer = it->second(method, req, headers);
 		}
 
 		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
 
+		bool close = lower_case(headers["connection"]) == "close";
+
 		async_write(m_connection, asio::const_buffers_1(m_send_buffer.data()
 			, m_send_buffer.size()), std::bind(&http_server::on_write
-			, this, _1, _2));
+			, this, _1, _2, close));
 	}
 
-	void http_server::on_write(error_code const& ec, size_t bytes_transferred)
+	void http_server::on_write(error_code const& ec, size_t bytes_transferred
+		, bool close)
 	{
 		if (ec)
 		{
@@ -178,8 +239,15 @@ namespace sim
 			return;
 		}
 
-		// try to read another request out of the buffer
-		m_ios.post(std::bind(&http_server::on_read, this, error_code(), 0));
+		if (!close && (m_flags & keep_alive))
+		{
+			// try to read another request out of the buffer
+			m_ios.post(std::bind(&http_server::on_read, this, error_code(), 0));
+		}
+		else
+		{
+			close_connection();
+		}
 	}
 
 	void http_server::stop()
