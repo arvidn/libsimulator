@@ -58,6 +58,37 @@ namespace sim
 				, [](char c) { return tolower(c); } );
 			return ret;
 		}
+
+		std::string normalize(std::string s)
+		{
+			std::vector<std::string> elements;
+			char const* start = s.c_str();
+			if (*start == '/') ++start;
+			char const* slash = strchr(start, '/');
+			while (slash != NULL)
+			{
+				std::string element(start, slash - start);
+				if (element != "..")
+				{
+					elements.push_back(element);
+				} else if (!elements.empty())
+				{
+					elements.erase(elements.end()-1);
+				}
+				start = slash + 1;
+				slash = strchr(start, '/');
+			}
+			elements.push_back(start);
+
+			std::string ret;
+			for (auto const& e : elements)
+			{
+				ret += '/';
+				ret += e;
+			}
+
+			return ret;
+		}
 	}
 
 	std::string send_response(int code, char const* status_message
@@ -176,7 +207,7 @@ namespace sim
 		}
 		std::string method(m_recv_buffer.c_str(), space);
 		std::string req(space+1, space2);
-		std::string path(req.substr(0, req.find_first_of('?')));
+		std::string path(normalize(req.substr(0, req.find_first_of('?'))));
 		printf("http_server: incoming request: %s %s [%s]\n"
 			, method.c_str(), path.c_str(), req.c_str());
 

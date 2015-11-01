@@ -294,16 +294,28 @@ namespace ip {
 
 		assert(h);
 		assert(!m_connect_handler);
-		m_connect_handler = h;
 
 		// find remote socket
 		boost::system::error_code ec;
 		if (m_bound_to.address() == ip::address())
 		{
+			// TODO: if we're on a multi-homed node, we should bind to the address
+			// family corresponding to target. We probably need to pass down target
+			// to the io_service bind_socket call.
 			ip::tcp::endpoint addr = m_io_service.bind_socket(this
 				, ip::tcp::endpoint(), ec);
-			if (ec) return;
+			if (ec)
+			{
+				m_io_service.post(std::bind(h, ec));
+				return;
+			}
 			m_bound_to = addr;
+		}
+		if (m_bound_to.address().is_v4() != target.address().is_v4())
+		{
+			m_io_service.post(std::bind(h,
+					boost::system::error_code(error::address_family_not_supported)));
+			return;
 		}
 		m_channel = m_io_service.internal_connect(this, target, ec);
 		m_mss = m_io_service.get_path_mtu(m_bound_to.address(), target.address());
@@ -313,10 +325,11 @@ namespace ip {
 			m_channel.reset();
 			// TODO: ask the policy object what the round-trip to this endpoint is
 			m_connect_timer.expires_from_now(chrono::milliseconds(50));
-			m_connect_timer.async_wait(std::bind(m_connect_handler, ec));
-			m_connect_handler = 0;
+			m_connect_timer.async_wait(std::bind(h, ec));
 			return;
 		}
+
+		m_connect_handler = h;
 
 		// the acceptor socket will call internal_connect_complete once the
 		// connection is established
