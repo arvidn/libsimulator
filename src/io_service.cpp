@@ -190,9 +190,33 @@ namespace sim { namespace asio {
 		, ip::udp::endpoint ep, boost::system::error_code& ec)
 	{
 		assert(!m_ips.empty() && "you cannot use an internal io_service (one without an IP address) for creating and binding sockets");
-		if (ep.address() == ip::address())
+		if (ep.address() == ip::address_v4::any())
 		{
-			ep.address(m_ips.front());
+			auto it = std::find_if(m_ips.begin(), m_ips.end()
+				, [](ip::address const& ip) { return ip.is_v4(); });
+			if (it == m_ips.end())
+			{
+				ec.assign(boost::system::errc::address_not_available
+						  , boost::system::generic_category());
+				return ip::udp::endpoint();
+			}
+			// TODO: pick the first local endpoint for now. In the future we may
+			// want have a bias toward
+			ep.address(*it);
+		}
+		else if (ep.address() == ip::address_v6::any())
+		{
+			auto it = std::find_if(m_ips.begin(), m_ips.end()
+				, [](ip::address const& ip) { return ip.is_v6(); });
+			if (it == m_ips.end())
+			{
+				ec.assign(boost::system::errc::address_not_available
+						  , boost::system::generic_category());
+				return ip::udp::endpoint();
+			}
+			// TODO: pick the first local endpoint for now. In the future we may
+			// want have a bias toward
+			ep.address(*it);
 		}
 		else if (std::count(m_ips.begin(), m_ips.end(), ep.address()) == 0)
 		{
