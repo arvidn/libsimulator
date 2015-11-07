@@ -2,6 +2,7 @@ version: 1.0.{build}
 skip_tags: true
 clone_depth: 1
 install:
+- set BUILD_DIR=%CD%
 - set BOOST_ROOT=c:\Libraries\boost
 - set BOOST_BUILD_PATH=%BOOST_ROOT%\tools\build
 - echo %BOOST_ROOT%
@@ -10,6 +11,9 @@ install:
 - set PATH=%PATH%;c:\Mingw\bin
 - g++ --version
 - copy user-config.jam %HOMEDRIVE%%HOMEPATH%\user-config.jam
+- cd %BOOST_BUILD_PATH%\src\engine
+- build.bat >nul
+- cd %BUILD_DIR%
 environment:
   matrix:
   - compiler: msvc-12.0
