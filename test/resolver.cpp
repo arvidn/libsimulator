@@ -100,7 +100,6 @@ TEST_CASE("resolve multiple IPv4 addresses", "resolver") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	// the machine receiving packets has two IP addresses
 	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
@@ -126,7 +125,6 @@ TEST_CASE("resolve non-existent hostname", "resolver") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	// the machine receiving packets has two IP addresses
 	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
@@ -152,7 +150,6 @@ TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	// the machine receiving packets has two IP addresses
 	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
@@ -168,6 +165,47 @@ TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
 
 	CHECK(millis == 200);
 	CHECK(num_lookups == 2);
+
+	printf("[%4d] simulation::run() returned: %s\n"
+		, millis, ec.message().c_str());
+}
+
+TEST_CASE("resolve an IP address", "resolver") {
+	sim_config cfg;
+	simulation sim(cfg);
+
+	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
+	num_lookups = 0;
+
+	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+
+	asio::ip::tcp::resolver resolver(ios);
+	asio::ip::tcp::resolver::query q("10.10.10.10", "8080");
+	resolver.async_resolve(q, [](boost::system::error_code const& ec, asio::ip::tcp::resolver::iterator iter)
+	{
+		++num_lookups;
+		std::vector<address_v4> expect = { address_v4::from_string("10.10.10.10") };
+
+		auto expect_it = expect.begin();
+		while (iter != asio::ip::tcp::resolver::iterator())
+		{
+			assert(iter->endpoint().address() == *expect_it);
+			assert(iter->endpoint().port() == 8080);
+
+			++iter;
+			++expect_it;
+		}
+
+		assert(expect_it == expect.end());
+	});
+
+	boost::system::error_code ec;
+	sim.run(ec);
+
+	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
+
+	CHECK(millis == 0);
+	CHECK(num_lookups == 1);
 
 	printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());

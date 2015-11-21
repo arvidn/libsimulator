@@ -55,6 +55,7 @@ SOURCES =
 	acceptor
 	default_config
 	http_server
+	socks_server
 	resolver
 	;
 

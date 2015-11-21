@@ -49,6 +49,27 @@ namespace ip {
 		assert(!m_ios.get_ips().empty() && "internal io service objects can only "
 			"be used for timers");
 
+		// if the hostname is an IP address, resolve it immediately
+		asio::ip::address addr = asio::ip::address_v4::from_string(q.host_name(), ec);
+		if (ec) addr = asio::ip::address_v6::from_string(q.host_name(), ec);
+		if (!ec)
+		{
+			const chrono::high_resolution_clock::time_point t = chrono::high_resolution_clock::now()
+				+ chrono::microseconds(1);
+			basic_resolver_iterator<Protocol> iter;
+			int port = atoi(q.service_name().c_str());
+			iter.m_idx = 0;
+			iter.m_results.emplace_back(
+				typename Protocol::endpoint(addr, port)
+				, q.host_name()
+				, q.service_name());
+			m_queue.insert(m_queue.begin(), {t, ec, iter, handler });
+			m_timer.expires_at(m_queue.front().completion_time);
+			m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
+			return;
+		}
+		ec.clear();
+
 		const chrono::high_resolution_clock::time_point completion_time =
 			start_time
 			+ m_ios.sim().config().hostname_lookup(m_ios.get_ips().front(), q.host_name()
