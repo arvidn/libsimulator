@@ -339,7 +339,7 @@ namespace sim
 
 		if (ec)
 		{
-			m_in_buffer[1] = m_version == 4 ? 93 : 4; // host unreachable
+			m_in_buffer[1] = m_version == 4 ? 91 : 5; // connection refused
 			printf("socks_server: failed to connect to target server: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 
