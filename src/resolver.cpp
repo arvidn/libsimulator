@@ -63,7 +63,8 @@ namespace ip {
 				typename Protocol::endpoint(addr, port)
 				, q.host_name()
 				, q.service_name());
-			m_queue.insert(m_queue.begin(), {t, ec, iter, handler });
+			result_t res = {t, ec, iter, handler };
+			m_queue.insert(m_queue.begin(), res);
 			m_timer.expires_at(m_queue.front().completion_time);
 			m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
 			return;
