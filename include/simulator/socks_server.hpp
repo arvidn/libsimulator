@@ -43,6 +43,9 @@ private:
 	void close_connection();
 
 	void on_connected(boost::system::error_code const& ec);
+	void on_request_domain_name(boost::system::error_code const& ec, size_t bytes_transferred);
+	void on_request_domain_lookup(boost::system::error_code const& ec
+		, asio::ip::tcp::resolver::iterator iter);
 	void open_forward_connection(asio::ip::tcp::endpoint target);
 	void on_server_receive(boost::system::error_code const& ec
 		, std::size_t bytes_transferred);

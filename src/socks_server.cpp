@@ -207,7 +207,6 @@ namespace sim
 				return;
 			}
 			asio::ip::tcp::endpoint target(asio::ip::address_v4(addr), port);
-
 			open_forward_connection(target);
 
 			return;
@@ -256,12 +255,11 @@ namespace sim
 				port |= m_out_buffer[9] & 0xff;
 
 				asio::ip::tcp::endpoint target(asio::ip::address_v4(addr), port);
-
 				open_forward_connection(target);
 
 				break;
 			}
-			case 3: // domain name
+			case 3: { // domain name
 
 // +----+-----+-------+------+-----+----------+----------+
 // |VER | CMD |  RSV  | ATYP | LEN | BND.ADDR | BND.PORT |
@@ -269,6 +267,15 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | 1   | Variable |    2     |
 // +----+-----+-------+------+-----+----------+----------+
 
+				const int len = boost::uint8_t(m_out_buffer[4]);
+				// we already read an address of length 4, assuming it was an IPv4
+				// address. Now, with a domain name, one of those bytes was the
+				// length-prefix, but we still read 3 bytes already.
+				const int additional_bytes = len - 3;
+				asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[10], additional_bytes)
+					, std::bind(&socks_server::on_request_domain_name, this, _1, _2));
+				break;
+			}
 			case 4: // IPv6 address
 
 // +----+-----+-------+------+----------+----------+
@@ -277,9 +284,78 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | 16       |    2     |
 // +----+-----+-------+------+----------+----------+
 
-				printf("unsupported address type %d\n", atyp);
+				printf("ERROR: unsupported address type %d\n", atyp);
 				close_connection();
 		}
+	}
+
+	void socks_server::on_request_domain_name(error_code const& ec, size_t bytes_transferred)
+	{
+		if (ec)
+		{
+			printf("socks_server::on_request_domain_name: (%d) %s\n"
+				, ec.value(), ec.message().c_str());
+			close_connection();
+			return;
+		}
+
+		const int buffer_size = 10 + bytes_transferred;
+
+		boost::uint16_t port = m_out_buffer[buffer_size - 2] & 0xff;
+		port <<= 8;
+		port |= m_out_buffer[buffer_size - 1] & 0xff;
+
+		std::string hostname(&m_out_buffer[5], boost::uint8_t(m_out_buffer[4]));
+		printf("socks_server::on_request_domain_name: hostname: %s port: %d\n"
+			, hostname.c_str(), port);
+
+		asio::ip::tcp::resolver::query q(hostname, std::to_string(port).c_str());
+		m_resolver.async_resolve(q
+			, std::bind(&socks_server::on_request_domain_lookup, this, _1, _2));
+	}
+
+	void socks_server::on_request_domain_lookup(boost::system::error_code const& ec
+		, asio::ip::tcp::resolver::iterator iter)
+	{
+		if (ec || iter == asio::ip::tcp::resolver::iterator())
+		{
+			if (ec)
+			{
+				printf("socks_server::on_request_domain_lookup: (%d) %s\n"
+					, ec.value(), ec.message().c_str());
+			}
+			else
+			{
+				printf("socks_server::on_request_domain_lookup: empty response\n");
+			}
+
+// +----+-----+-------+------+----------+----------+
+// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+// +----+-----+-------+------+----------+----------+
+// | 1  |  1  | X'00' |  1   | Variable |    2     |
+// +----+-----+-------+------+----------+----------+
+
+			m_in_buffer[0] = m_version; // version
+			m_in_buffer[1] = 4; // response (host unreachable)
+			m_in_buffer[2] = 0; // reserved
+			m_in_buffer[3] = 1; // IPv4
+			memset(&m_in_buffer[4], 0, 4);
+			m_in_buffer[8] = 0; // port
+			m_in_buffer[9] = 0;
+
+			asio::async_write(m_client_connection
+				, asio::const_buffers_1(&m_in_buffer[0], 10)
+				, [=](boost::system::error_code const& ec, size_t)
+				{
+					this->close_connection();
+				});
+			return;
+		}
+
+		printf("socks_server::on_request_domain_lookup: connecting to: %s port: %d\n"
+			, iter->endpoint().address().to_string().c_str()
+			, iter->endpoint().port());
+		open_forward_connection(iter->endpoint());
 	}
 
 	void socks_server::open_forward_connection(asio::ip::tcp::endpoint target)
