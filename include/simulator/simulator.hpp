@@ -1223,7 +1223,7 @@ namespace sim
 			, std::vector<asio::ip::address>& result
 			, boost::system::error_code& ec) override;
 
-	private:
+	protected:
 		std::shared_ptr<queue> m_network;
 		std::map<asio::ip::address, std::shared_ptr<queue>> m_incoming;
 		std::map<asio::ip::address, std::shared_ptr<queue>> m_outgoing;
