@@ -171,7 +171,7 @@ namespace sim
 
 		if (version != m_version)
 		{
-			printf("socks_server::on_request1: unexpected socks protocol version: %d expected: %d"
+			printf("socks_server::on_request1: unexpected socks protocol version: %d expected: %d\n"
 				, int(m_out_buffer[0]), m_version);
 			close_connection();
 			return;
@@ -181,9 +181,10 @@ namespace sim
 		{
 			if (m_out_buffer[1] != 1)
 			{
-				printf("socks_server::on_request1: unexpected socks command: %d"
+				printf("socks_server::on_request1: unexpected socks command: %d\n"
 					, int(m_out_buffer[1]));
 				close_connection();
+				return;
 			}
 
 			boost::uint16_t port = m_out_buffer[2] & 0xff;
@@ -202,7 +203,7 @@ namespace sim
 			{
 				// in this case, we would have to read one byte at a time until we
 				// get to the null terminator.
-				printf("socks_server::on_request1: username in SOCKS4 mode not supported");
+				printf("socks_server::on_request1: username in SOCKS4 mode not supported\n");
 				close_connection();
 				return;
 			}
@@ -212,9 +213,17 @@ namespace sim
 			return;
 		}
 
+		if (m_out_buffer[1] != 1)
+		{
+			printf("socks_server::on_request1: unexpected command: %d\n"
+				, int(m_out_buffer[1]));
+			close_connection();
+			return;
+		}
+
 		if (m_out_buffer[2] != 0)
 		{
-			printf("socks_server::on_request1: reserved byte is non-zero: %d"
+			printf("socks_server::on_request1: reserved byte is non-zero: %d\n"
 				, int(m_out_buffer[2]));
 			close_connection();
 			return;
@@ -224,7 +233,7 @@ namespace sim
 
 		if (atyp != 1 && atyp != 3 && atyp != 4)
 		{
-			printf("socks_server::on_request1: unexpected address type in SOCKS request: %d"
+			printf("socks_server::on_request1: unexpected address type in SOCKS request: %d\n"
 				, atyp);
 			close_connection();
 			return;
@@ -360,6 +369,9 @@ namespace sim
 
 	void socks_server::open_forward_connection(asio::ip::tcp::endpoint target)
 	{
+		printf("socks_server::open_forward_connection: connecting to %s port %d\n"
+			, target.address().to_string().c_str(), target.port());
+
 		m_server_connection.open(target.protocol());
 		m_server_connection.async_connect(target
 			, std::bind(&socks_server::on_connected, this, _1));
