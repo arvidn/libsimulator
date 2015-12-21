@@ -31,64 +31,61 @@ namespace sim
 {
 	using namespace aux;
 
-	namespace
+	std::string trim(std::string s)
 	{
-		std::string trim(std::string s)
+		if (s.empty()) return s;
+
+		int start = 0;
+		int end = s.size();
+		while (strchr(" \r\n\t", s[start]) != NULL && start < end)
 		{
-			if (s.empty()) return s;
-
-			int start = 0;
-			int end = s.size();
-			while (strchr(" \r\n\t", s[start]) != NULL && start < end)
-			{
-				++start;
-			}
-
-			while (strchr(" \r\n\t", s[end-1]) != NULL && end > start)
-			{
-				--end;
-			}
-			return s.substr(start, end - start);
+			++start;
 		}
 
-		std::string lower_case(std::string s)
+		while (strchr(" \r\n\t", s[end-1]) != NULL && end > start)
 		{
-			std::string ret;
-			std::transform(s.begin(), s.end(), std::back_inserter(ret)
-				, [](char c) { return tolower(c); } );
-			return ret;
+			--end;
+		}
+		return s.substr(start, end - start);
+	}
+
+	std::string lower_case(std::string s)
+	{
+		std::string ret;
+		std::transform(s.begin(), s.end(), std::back_inserter(ret)
+			, [](char c) { return tolower(c); } );
+		return ret;
+	}
+
+	std::string normalize(std::string s)
+	{
+		std::vector<std::string> elements;
+		char const* start = s.c_str();
+		if (*start == '/') ++start;
+		char const* slash = strchr(start, '/');
+		while (slash != NULL)
+		{
+			std::string element(start, slash - start);
+			if (element != "..")
+			{
+				elements.push_back(element);
+			} else if (!elements.empty())
+			{
+				elements.erase(elements.end()-1);
+			}
+			start = slash + 1;
+			slash = strchr(start, '/');
+		}
+		elements.push_back(start);
+
+		std::string ret;
+		for (auto const& e : elements)
+		{
+			ret += '/';
+			ret += e;
 		}
 
-		std::string normalize(std::string s)
-		{
-			std::vector<std::string> elements;
-			char const* start = s.c_str();
-			if (*start == '/') ++start;
-			char const* slash = strchr(start, '/');
-			while (slash != NULL)
-			{
-				std::string element(start, slash - start);
-				if (element != "..")
-				{
-					elements.push_back(element);
-				} else if (!elements.empty())
-				{
-					elements.erase(elements.end()-1);
-				}
-				start = slash + 1;
-				slash = strchr(start, '/');
-			}
-			elements.push_back(start);
-
-			std::string ret;
-			for (auto const& e : elements)
-			{
-				ret += '/';
-				ret += e;
-			}
-
-			return ret;
-		}
+		return ret;
 	}
 
 	std::string send_response(int code, char const* status_message
@@ -168,7 +165,66 @@ namespace sim
 			, std::bind(&http_server::on_read, this, _1, _2));
 	}
 
-	void http_server::on_read(error_code const& ec, size_t bytes_transferred)
+	http_request parse_request(char const* start, int len)
+	{
+		http_request ret;
+
+		char const* const end_of_request = start + len;
+		char const* const space = strnstr(start, " ", len);
+		if (space == nullptr)
+		{
+			printf("http_server: failed to parse request:\n%s\n"
+				, std::string(start, len).c_str());
+			throw std::runtime_error("parse failed");
+		}
+
+		char const* const space2 = strnstr(space + 1, " ", len - (space - start + 1));
+		if (space2 == nullptr)
+		{
+			printf("http_server: failed to parse request:\n%s\n"
+				, std::string(start, len).c_str());
+			throw std::runtime_error("parse failed");
+		}
+		ret.method.assign(start, space);
+		ret.req.assign(space+1, space2);
+		ret.path.assign(normalize(ret.req.substr(0, ret.req.find_first_of('?'))));
+		printf("http_server: incoming request: %s %s [%s]\n"
+			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
+
+		char const* header = strnstr(space2, "\r\n", len - (space2 - start));
+		while (header != end_of_request - 4)
+		{
+			if (header == nullptr)
+			{
+				printf("http_server: failed to parse request:\n%s\n"
+					, std::string(start, len).c_str());
+				throw std::runtime_error("parse failed");
+			}
+			char const* const next = strnstr(header + 2, "\r\n", len - (header + 2 - start));
+			char const* const value = static_cast<char const*>(memchr(header, ':', len - (header - start)));
+			if (value == nullptr || next == nullptr || value > next)
+			{
+				printf("http_server: failed to parse request:\n%s\n"
+					, std::string(start, len).c_str());
+				throw std::runtime_error("parse failed");
+			}
+
+			ret.headers[lower_case(trim(std::string(header, value)))]
+				= trim(std::string(value+1, next));
+
+			header = next;
+		}
+		return ret;
+	}
+
+	int find_request_len(char const* buf, int len)
+	{
+		char const* end_of_request = strnstr(buf, "\r\n\r\n", len);
+		if (end_of_request == nullptr) return -1;
+		return end_of_request - buf + 4;
+	}
+
+	void http_server::on_read(error_code const& ec, size_t bytes_transferred) try
 	{
 		if (ec)
 		{
@@ -180,66 +236,16 @@ namespace sim
 
 		m_bytes_used += bytes_transferred;
 
-		char const* end_of_request = strstr(m_recv_buffer.c_str(), "\r\n\r\n");
-		if (end_of_request == NULL)
+		int const req_len = find_request_len(m_recv_buffer.data(), m_bytes_used);
+		if (req_len < 0)
 		{
 			read();
 			return;
 		}
-		const int req_len = end_of_request - m_recv_buffer.c_str() + 4;
 
-		char const* space = strstr(m_recv_buffer.c_str(), " ");
-		if (space == NULL)
-		{
-			printf("http_server: failed to parse request:\n%s\n"
-				, m_recv_buffer.c_str());
-			close_connection();
-			return;
-		}
+		http_request req = parse_request(m_recv_buffer.data(), req_len);
 
-		char const* space2 = strstr(space + 1, " ");
-		if (space2 == NULL)
-		{
-			printf("http_server: failed to parse request:\n%s\n"
-				, m_recv_buffer.c_str());
-			close_connection();
-			return;
-		}
-		std::string method(m_recv_buffer.c_str(), space);
-		std::string req(space+1, space2);
-		std::string path(normalize(req.substr(0, req.find_first_of('?'))));
-		printf("http_server: incoming request: %s %s [%s]\n"
-			, method.c_str(), path.c_str(), req.c_str());
-
-		std::map<std::string, std::string> headers;
-
-		char const* header = strstr(space2, "\r\n");
-		while (header != end_of_request)
-		{
-			if (header == NULL)
-			{
-				printf("http_server: failed to parse request:\n%s\n"
-					, m_recv_buffer.c_str());
-				close_connection();
-				return;
-			}
-			char const* next = strstr(header + 2, "\r\n");
-			char const* value = strchr(header, ':');
-			if (value == NULL || next == NULL || value > next)
-			{
-				printf("http_server: failed to parse request:\n%s\n"
-					, m_recv_buffer.c_str());
-				close_connection();
-				return;
-			}
-
-			headers[lower_case(trim(std::string(header, value)))]
-				= trim(std::string(value+1, next));
-
-			header = next;
-		}
-
-		auto it = m_handlers.find(path);
+		auto it = m_handlers.find(req.path);
 		if (it == m_handlers.end())
 		{
 			// no handler found, 404
@@ -247,16 +253,20 @@ namespace sim
 		}
 		else
 		{
-			m_send_buffer = it->second(method, req, headers);
+			m_send_buffer = it->second(req.method, req.req, req.headers);
 		}
 
 		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
 
-		bool close = lower_case(headers["connection"]) == "close";
+		bool close = lower_case(req.headers["connection"]) == "close";
 
 		async_write(m_connection, asio::const_buffers_1(m_send_buffer.data()
 			, m_send_buffer.size()), std::bind(&http_server::on_write
 			, this, _1, _2, close));
+	}
+	catch (std::exception& e)
+	{
+		close_connection();
 	}
 
 	void http_server::on_write(error_code const& ec, size_t bytes_transferred

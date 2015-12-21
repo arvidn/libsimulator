@@ -17,14 +17,33 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include <string>
 
 namespace sim
 {
+	std::string SIMULATOR_DECL trim(std::string s);
+
+	std::string SIMULATOR_DECL lower_case(std::string s);
+
+	std::string SIMULATOR_DECL normalize(std::string s);
+
+	// returns the index to the last byte of the request, or -1 if the buffer
+	// does not contain a full http request
+	int SIMULATOR_DECL find_request_len(char const* buf, int len);
+
+	struct http_request
+	{
+		std::string method;
+		std::string req;
+		std::string path;
+		std::map<std::string, std::string> headers;
+	};
+
+	http_request parse_request(char const* start, int len);
 
 	// builds an HTTP response buffer
 	std::string SIMULATOR_DECL send_response(int code, char const* status_message
 		, int len = 0, char const** extra_header = NULL);
-
 
 // This is a very simple http server that only supports a single concurrent
 // connection
