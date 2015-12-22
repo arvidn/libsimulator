@@ -137,7 +137,7 @@ namespace sim
 
 		std::string::size_type const path_start = req.req.find_first_of('/', 7);
 		if (path_start == std::string::npos) out_request += '/';
-		else out_request.append(req.req, path_start);
+		else out_request.append(req.req, path_start, std::string::npos);
 		out_request += " HTTP/1.1\r\n";
 
 		std::string::size_type const host_end = req.req.substr(0, path_start).find_last_of(':');

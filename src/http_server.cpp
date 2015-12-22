@@ -170,7 +170,7 @@ namespace sim
 		http_request ret;
 
 		char const* const end_of_request = start + len;
-		char const* const space = strnstr(start, " ", len);
+		char const* const space = static_cast<char const*>(memmem(start, len, " ", 1));
 		if (space == nullptr)
 		{
 			printf("http_server: failed to parse request:\n%s\n"
@@ -178,7 +178,7 @@ namespace sim
 			throw std::runtime_error("parse failed");
 		}
 
-		char const* const space2 = strnstr(space + 1, " ", len - (space - start + 1));
+		char const* const space2 = static_cast<char const*>(memmem(space + 1, len - (space - start + 1), " ", 1));
 		if (space2 == nullptr)
 		{
 			printf("http_server: failed to parse request:\n%s\n"
@@ -191,7 +191,7 @@ namespace sim
 		printf("http_server: incoming request: %s %s [%s]\n"
 			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
 
-		char const* header = strnstr(space2, "\r\n", len - (space2 - start));
+		char const* header = static_cast<char const*>(memmem(space2, len - (space2 - start), "\r\n", 2));
 		while (header != end_of_request - 4)
 		{
 			if (header == nullptr)
@@ -200,7 +200,7 @@ namespace sim
 					, std::string(start, len).c_str());
 				throw std::runtime_error("parse failed");
 			}
-			char const* const next = strnstr(header + 2, "\r\n", len - (header + 2 - start));
+			char const* const next = static_cast<char const*>(memmem(header + 2, len - (header + 2 - start), "\r\n", 2));
 			char const* const value = static_cast<char const*>(memchr(header, ':', len - (header - start)));
 			if (value == nullptr || next == nullptr || value > next)
 			{
@@ -219,7 +219,7 @@ namespace sim
 
 	int find_request_len(char const* buf, int len)
 	{
-		char const* end_of_request = strnstr(buf, "\r\n\r\n", len);
+		char const* end_of_request = static_cast<char const*>(memmem(buf, len, "\r\n\r\n", 4));
 		if (end_of_request == nullptr) return -1;
 		return end_of_request - buf + 4;
 	}
