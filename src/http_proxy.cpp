@@ -33,7 +33,8 @@ namespace sim
 	using namespace aux;
 
 	http_proxy::http_proxy(io_service& ios, int listen_port)
-		: m_listen_socket(ios)
+		: m_resolver(ios)
+		, m_listen_socket(ios)
 		, m_client_connection(ios)
 		, m_server_connection(ios)
 		, m_writing_to_server(false)
@@ -139,12 +140,17 @@ namespace sim
 		else out_request.append(req.req, path_start);
 		out_request += " HTTP/1.1\r\n";
 
-		std::string::size_type const host_end = req.req.find_first_of(':', 7);
+		std::string::size_type const host_end = req.req.substr(0, path_start).find_last_of(':');
 
-		std::string host = req.req.substr(7, host_end != std::string::npos
+		std::string host = req.req.substr(7, host_end != std::string::npos && host_end > 7
 			? host_end - 7 : path_start - 7);
 
-		int port = host_end == std::string::npos ? 80
+		// if the hostname is an IPv6 address, strip the brackets around it to
+		// make it parse correctly
+		if (host.size() >= 2 && host.front() == '[' && host.back() == ']')
+			host = host.substr(1, host.size() - 2);
+
+		int port = host_end == std::string::npos && host_end > 7 ? 80
 			: atoi(req.req.substr(host_end + 1, path_start).c_str());
 
 		bool found_host = false;
@@ -181,9 +187,10 @@ namespace sim
 			tcp::endpoint target(address::from_string(host.c_str(), err), port);
 			if (err)
 			{
-				printf("failed to parse host IP address (hostnames not supported): "
-					"\"%s\": %s\n", host.c_str(), err.message().c_str());
-				throw std::runtime_error("hostname parse error");
+				asio::ip::tcp::resolver::query q(host, std::to_string(port).c_str());
+				m_resolver.async_resolve(q
+					, std::bind(&http_proxy::on_domain_lookup, this, _1, _2));
+				return;
 			}
 			open_forward_connection(target);
 			return;
@@ -195,6 +202,26 @@ namespace sim
 		write_server_send_buffer();
 	}
 
+	void http_proxy::on_domain_lookup(boost::system::error_code const& ec
+		, asio::ip::tcp::resolver::iterator iter)
+	{
+		if (ec || iter == asio::ip::tcp::resolver::iterator())
+		{
+			if (ec)
+			{
+				printf("http_proxy::on_domain_lookup: (%d) %s\n"
+					, ec.value(), ec.message().c_str());
+			}
+			else
+			{
+				printf("http_server::on_request_domain_lookup: empty response\n");
+			}
+			error(503, "Resource Temporarily Unavailable");
+			return;
+		}
+		open_forward_connection(iter->endpoint());
+	}
+
 	void http_proxy::open_forward_connection(asio::ip::tcp::endpoint target)
 	{
 		m_server_connection.open(target.protocol());
@@ -202,12 +229,22 @@ namespace sim
 			, std::bind(&http_proxy::on_connected, this, _1));
 	}
 
+	void http_proxy::error(int code, char const* message)
+	{
+		std::string send_buffer = send_response(code, message);
+		memcpy(m_in_buffer, send_buffer.data(), send_buffer.size());
+		asio::async_write(m_client_connection, asio::const_buffers_1(
+			&m_in_buffer[0], send_buffer.size())
+			, std::bind(&http_proxy::close_connection, this));
+	}
+
 	void http_proxy::on_connected(boost::system::error_code const& ec)
 	{
 		if (ec)
 		{
 			printf("connection failed: %s\n", ec.message().c_str());
-			close_connection();
+			m_server_connection.close();
+			error(503, "Service Temporarily Unavailable");
 			return;
 		}
 

@@ -39,6 +39,9 @@ private:
 	void open_forward_connection(asio::ip::tcp::endpoint target);
 	void on_connected(boost::system::error_code const& ec);
 
+	void on_domain_lookup(boost::system::error_code const& ec
+		, asio::ip::tcp::resolver::iterator iter);
+
 	void write_server_send_buffer();
 	void on_server_write(boost::system::error_code const& ec, size_t bytes_transferred);
 
@@ -46,8 +49,10 @@ private:
 		, std::size_t bytes_transferred);
 	void on_server_forward(boost::system::error_code const& ec, size_t bytes_transferred);
 
+	void error(int code, char const* message);
 	void close_connection();
 
+	asio::ip::tcp::resolver m_resolver;
 	asio::ip::tcp::acceptor m_listen_socket;
 
 	// this is the client connection, i.e. the client connecting to us, sending
