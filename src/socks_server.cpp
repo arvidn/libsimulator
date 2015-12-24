@@ -318,7 +318,9 @@ namespace sim
 		printf("socks_server::on_request_domain_name: hostname: %s port: %d\n"
 			, hostname.c_str(), port);
 
-		asio::ip::tcp::resolver::query q(hostname, std::to_string(port).c_str());
+		char port_str[10];
+		snprintf(port_str, sizeof(port_str), "%d", port);
+		asio::ip::tcp::resolver::query q(hostname, port_str);
 		m_resolver.async_resolve(q
 			, std::bind(&socks_server::on_request_domain_lookup, this, _1, _2));
 	}

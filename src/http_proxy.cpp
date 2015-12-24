@@ -187,7 +187,9 @@ namespace sim
 			tcp::endpoint target(address::from_string(host.c_str(), err), port);
 			if (err)
 			{
-				asio::ip::tcp::resolver::query q(host, std::to_string(port).c_str());
+				char port_str[10];
+				snprintf(port_str, sizeof(port_str), "%d", port);
+				asio::ip::tcp::resolver::query q(host, port_str);
 				m_resolver.async_resolve(q
 					, std::bind(&http_proxy::on_domain_lookup, this, _1, _2));
 				return;
