@@ -35,7 +35,7 @@ namespace sim
 		char const* find(char const* hay, int const hsize
 			, char const* needle, int const nsize)
 		{
-			for (int i = 0; i < hsize - nsize; ++i)
+			for (int i = 0; i < hsize - nsize + 1; ++i)
 			{
 				if (memcmp(hay + i, needle, nsize) == 0) return hay + i;
 			}
