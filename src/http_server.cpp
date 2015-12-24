@@ -31,6 +31,18 @@ namespace sim
 {
 	using namespace aux;
 
+	namespace {
+		char const* find(char const* hay, int const hsize
+			, char const* needle, int const nsize)
+		{
+			for (int i = 0; i < hsize - nsize; ++i)
+			{
+				if (memcmp(hay + i, needle, nsize) == 0) return hay + i;
+			}
+			return nullptr;
+		}
+	}
+
 	std::string trim(std::string s)
 	{
 		if (s.empty()) return s;
@@ -170,7 +182,7 @@ namespace sim
 		http_request ret;
 
 		char const* const end_of_request = start + len;
-		char const* const space = static_cast<char const*>(memmem(start, len, " ", 1));
+		char const* const space = find(start, len, " ", 1);
 		if (space == nullptr)
 		{
 			printf("http_server: failed to parse request:\n%s\n"
@@ -178,7 +190,7 @@ namespace sim
 			throw std::runtime_error("parse failed");
 		}
 
-		char const* const space2 = static_cast<char const*>(memmem(space + 1, len - (space - start + 1), " ", 1));
+		char const* const space2 = find(space + 1, len - (space - start + 1), " ", 1);
 		if (space2 == nullptr)
 		{
 			printf("http_server: failed to parse request:\n%s\n"
@@ -191,7 +203,7 @@ namespace sim
 		printf("http_server: incoming request: %s %s [%s]\n"
 			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
 
-		char const* header = static_cast<char const*>(memmem(space2, len - (space2 - start), "\r\n", 2));
+		char const* header = find(space2, len - (space2 - start), "\r\n", 2);
 		while (header != end_of_request - 4)
 		{
 			if (header == nullptr)
@@ -200,7 +212,7 @@ namespace sim
 					, std::string(start, len).c_str());
 				throw std::runtime_error("parse failed");
 			}
-			char const* const next = static_cast<char const*>(memmem(header + 2, len - (header + 2 - start), "\r\n", 2));
+			char const* const next = find(header + 2, len - (header + 2 - start), "\r\n", 2);
 			char const* const value = static_cast<char const*>(memchr(header, ':', len - (header - start)));
 			if (value == nullptr || next == nullptr || value > next)
 			{
@@ -219,7 +231,7 @@ namespace sim
 
 	int find_request_len(char const* buf, int len)
 	{
-		char const* end_of_request = static_cast<char const*>(memmem(buf, len, "\r\n\r\n", 4));
+		char const* end_of_request = find(buf, len, "\r\n\r\n", 4);
 		if (end_of_request == nullptr) return -1;
 		return end_of_request - buf + 4;
 	}
