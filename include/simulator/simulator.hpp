@@ -26,6 +26,7 @@ All rights reserved.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
+#include <deque>
 
 #if defined _MSC_VER && _MSC_VER < 1900
 #include <stdio.h>
@@ -105,19 +106,19 @@ namespace sim
 			hops.erase(hops.begin());
 			return ret;
 		}
-		void replace_last(std::shared_ptr<sink> s) { hops.back() = s; }
+		void replace_last(std::shared_ptr<sink> s) { hops.back() = std::move(s); }
 		void prepend(route const& r)
 		{ hops.insert(hops.begin(), r.hops.begin(), r.hops.end()); }
-		void prepend(std::shared_ptr<sink> s) { hops.insert(hops.begin(), s); }
+		void prepend(std::shared_ptr<sink> s) { hops.insert(hops.begin(), std::move(s)); }
 		route& append(route const& r)
 		{ hops.insert(hops.end(), r.hops.begin(), r.hops.end()); return *this; }
-		route& append(std::shared_ptr<sink> s) { hops.push_back(s); return *this; }
+		route& append(std::shared_ptr<sink> s) { hops.push_back(std::move(s)); return *this; }
 		bool empty() const { return hops.empty(); }
 		std::shared_ptr<sink> last() const
 		{ return hops.back(); }
 
 	private:
-		std::vector<std::shared_ptr<sink>> hops;
+		std::deque<std::shared_ptr<sink>> hops;
 	};
 
 	void forward_packet(aux::packet p);
@@ -1370,7 +1371,7 @@ namespace sim
 
 			// this function must be called with this packet in case the packet is
 			// dropped.
-			boost::function<void(aux::packet)> drop_fun;
+			std::unique_ptr<std::function<void(aux::packet)>> drop_fun;
 		};
 
 		struct SIMULATOR_DECL sink_forwarder : sink
@@ -1457,7 +1458,7 @@ namespace sim
 		std::string m_node_name;
 
 		// this is the queue of packets and the time each packet was enqueued
-		std::vector<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
+		std::deque<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
 		asio::high_resolution_timer m_forward_timer;
 
 		chrono::high_resolution_clock::time_point m_last_forward;

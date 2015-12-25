@@ -404,7 +404,7 @@ namespace ip {
 		if (m_queue_size + packet_size > 256 * 1024) return;
 
 		m_queue_size += p.buffer.size();
-		m_incoming_queue.push_back(p);
+		m_incoming_queue.push_back(std::move(p));
 
 		maybe_wakeup_reader();
 	}

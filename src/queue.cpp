@@ -77,14 +77,14 @@ namespace sim
 		{
 			// if any hop on the network drops a packet, it has to return it to the
 			// sender.
-			boost::function<void(aux::packet)> drop_fun = p.drop_fun;
-			if (drop_fun) drop_fun(std::move(p));
+			std::unique_ptr<std::function<void(aux::packet)>> drop_fun = std::move(p.drop_fun);
+			if (drop_fun) (*drop_fun)(std::move(p));
 			return;
 		}
 
 		time_point now = chrono::high_resolution_clock::now();
 
-		m_queue.push_back(std::make_pair(now + m_forwarding_latency, p));
+		m_queue.emplace_back(now + m_forwarding_latency, std::move(p));
 		m_queue_size += packet_size;
 		if (m_queue.size() > 1) return;
 
@@ -126,10 +126,10 @@ namespace sim
 
 	void queue::next_packet_sent()
 	{
-		aux::packet p = m_queue.front().second;
+		aux::packet p = std::move(m_queue.front().second);
+		m_queue.erase(m_queue.begin());
 		const int packet_size = p.buffer.size() + p.overhead;
 		m_queue_size -= packet_size;
-		m_queue.erase(m_queue.begin());
 
 		forward_packet(std::move(p));
 

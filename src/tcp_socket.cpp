@@ -435,7 +435,7 @@ namespace ip {
 				p.overhead = 40;
 				p.hops = hops;
 				p.seq_nr = m_next_outgoing_seq++;
-				p.drop_fun = std::bind(&tcp::socket::packet_dropped, this, _1);
+				p.drop_fun.reset(new std::function<void(sim::aux::packet)>(std::bind(&tcp::socket::packet_dropped, this, _1)));
 
 				send_packet(std::move(p));
 				buf += packet_size;
