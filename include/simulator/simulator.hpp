@@ -1330,6 +1330,11 @@ namespace sim
 				, seq_nr{0}
 			{}
 
+			packet(packet const&) = delete;
+			packet& operator=(packet const&) = delete;
+			packet(packet&&) = default;
+			packet& operator=(packet&&) = default;
+
 			// to keep things simple, don't drop ACKs or errors
 			bool ok_to_drop() const
 			{
