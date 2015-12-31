@@ -71,6 +71,12 @@ inline int snprintf(char* buf, int len, char const* fmt, ...)
 #define SIMULATOR_DECL
 #endif
 
+#if !defined _MSC_VER || _MSC_VER > 1900
+#define LIBSIMULATOR_USE_MOVE 1
+#else
+#define LIBSIMULATOR_USE_MOVE 0
+#endif
+
 namespace sim
 {
 	namespace aux
@@ -1330,10 +1336,12 @@ namespace sim
 				, seq_nr{0}
 			{}
 
+#if LIBSIMULATOR_USE_MOVE
 			packet(packet const&) = delete;
 			packet& operator=(packet const&) = delete;
 			packet(packet&&) = default;
 			packet& operator=(packet&&) = default;
+#endif
 
 			// to keep things simple, don't drop ACKs or errors
 			bool ok_to_drop() const
@@ -1376,7 +1384,11 @@ namespace sim
 
 			// this function must be called with this packet in case the packet is
 			// dropped.
+#if LIBSIMULATOR_USE_MOVE
 			std::unique_ptr<std::function<void(aux::packet)>> drop_fun;
+#else
+			std::shared_ptr<std::function<void(aux::packet)>> drop_fun;
+#endif
 		};
 
 		struct SIMULATOR_DECL sink_forwarder : sink
