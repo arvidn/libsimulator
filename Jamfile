@@ -76,12 +76,15 @@ lib simulator
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
 
+	<toolset>gcc:<cxxflags>-std=c++11
+
 	: # default build
 
 	: # usage requirements
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
+	<toolset>gcc:<cxxflags>-std=c++11
 	;
 
 project
