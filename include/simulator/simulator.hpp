@@ -531,8 +531,10 @@ namespace sim
 
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
+#if LIBSIMULATOR_USE_MOVE
 			socket(socket&&) = default;
 			socket& operator=(socket&&) = default;
+#endif
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
