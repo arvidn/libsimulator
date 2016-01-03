@@ -77,13 +77,8 @@ namespace sim
 		{
 			// if any hop on the network drops a packet, it has to return it to the
 			// sender.
-#if LIBSIMULATOR_USE_MOVE
-			std::unique_ptr<std::function<void(aux::packet)>> drop_fun = std::move(p.drop_fun);
+			auto drop_fun = std::move(p.drop_fun);
 			if (drop_fun) (*drop_fun)(std::move(p));
-#else
-			std::shared_ptr<std::function<void(aux::packet)>> drop_fun = std::move(p.drop_fun);
-			if (drop_fun) (*drop_fun)(std::move(p));
-#endif
 			return;
 		}
 

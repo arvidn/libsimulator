@@ -222,7 +222,7 @@ namespace ip {
 		}
 
 		aux::packet& p = m_incoming_queue.front();
-		if (sender) *sender = p.from;
+		if (sender) *sender = *p.from;
 
 		int read = 0;
 		typedef std::vector<boost::asio::mutable_buffer> buffers_t;
@@ -378,7 +378,7 @@ namespace ip {
 		aux::packet p;
 		p.overhead = 28;
 		p.type = aux::packet::payload;
-		p.from = m_bound_to;
+		*p.from = m_bound_to;
 		p.hops = hops;
 		for (std::vector<asio::const_buffer>::const_iterator i = b.begin()
 			, end(b.end()); i != end; ++i)

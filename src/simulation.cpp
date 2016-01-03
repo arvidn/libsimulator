@@ -233,7 +233,7 @@ namespace sim
 		aux::packet p;
 		p.type = aux::packet::syn;
 		p.overhead = 28;
-		p.from = asio::ip::udp::endpoint(from.address(), from.port());
+		*p.from = asio::ip::udp::endpoint(from.address(), from.port());
 		p.channel = c;
 		if (ec) return std::shared_ptr<aux::channel>();
 
