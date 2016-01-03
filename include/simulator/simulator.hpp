@@ -1349,13 +1349,6 @@ namespace sim
 				, seq_nr{0}
 			{}
 
-#if LIBSIMULATOR_USE_MOVE
-			packet(packet const&) = delete;
-			packet& operator=(packet const&) = delete;
-			packet(packet&&) noexcept = default;
-			packet& operator=(packet&&) noexcept = default;
-#endif
-
 			// to keep things simple, don't drop ACKs or errors
 			bool ok_to_drop() const
 			{
