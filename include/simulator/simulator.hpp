@@ -257,7 +257,6 @@ namespace sim
 		{
 		}
 
-
 		// io_control
 		struct non_blocking_io
 		{
@@ -329,9 +328,15 @@ namespace sim
 		boost::system::error_code io_control(IoControl const&
 			, boost::system::error_code& ec) { return ec; }
 
+		template <class IoControl>
+		void io_control(IoControl const&) {}
+
 		boost::system::error_code io_control(non_blocking_io const& ioc
 			, boost::system::error_code& ec)
 		{ m_non_blocking = ioc.non_blocking; return ec; }
+
+		void io_control(non_blocking_io const& ioc)
+		{ m_non_blocking = ioc.non_blocking; }
 
 		bool is_open() const
 		{
@@ -523,6 +528,11 @@ namespace sim
 
 			socket(io_service& ios);
 			~socket();
+
+			socket(socket const&) = delete;
+			socket& operator=(socket const&) = delete;
+			socket(socket&&) = default;
+			socket& operator=(socket&&) = default;
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
@@ -1332,6 +1342,7 @@ namespace sim
 		{
 			packet()
 				: type(uninitialized)
+				, from(new asio::ip::udp::endpoint)
 				, overhead{20}
 				, seq_nr{0}
 			{}
@@ -1339,8 +1350,8 @@ namespace sim
 #if LIBSIMULATOR_USE_MOVE
 			packet(packet const&) = delete;
 			packet& operator=(packet const&) = delete;
-			packet(packet&&) = default;
-			packet& operator=(packet&&) = default;
+			packet(packet&&) noexcept = default;
+			packet& operator=(packet&&) noexcept = default;
 #endif
 
 			// to keep things simple, don't drop ACKs or errors
@@ -1365,7 +1376,9 @@ namespace sim
 			std::vector<boost::uint8_t> buffer;
 
 			// used for UDP packets
-			asio::ip::udp::endpoint from;
+			// this is a unique_ptr just to make this type movable. the endpoint
+			// itself isn't
+			std::unique_ptr<asio::ip::udp::endpoint> from;
 
 			// the number of bytes of overhead for this packet. The total packet
 			// size is the number of bytes in the buffer + this number

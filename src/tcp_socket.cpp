@@ -138,7 +138,7 @@ namespace ip {
 				aux::packet p;
 				p.type = aux::packet::error;
 				p.ec = asio::error::eof;
-				p.from = asio::ip::udp::endpoint(
+				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.overhead = 40;
 				p.hops = hops;
@@ -430,7 +430,7 @@ namespace ip {
 				aux::packet p;
 				p.type = aux::packet::payload;
 				p.buffer.assign(buf, buf + packet_size);
-				p.from = asio::ip::udp::endpoint(
+				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.overhead = 40;
 				p.hops = hops;

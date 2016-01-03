@@ -190,7 +190,7 @@ namespace ip {
 				, end(m_incoming_queue.end()); i != end; ++i)
 			{
 				aux::packet p;
-				p.from = asio::ip::udp::endpoint(
+				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.type = aux::packet::error;
 				p.ec = boost::system::error_code(error::connection_reset);
@@ -230,7 +230,7 @@ namespace ip {
 
 		// notify the other end
 		aux::packet p;
-		p.from = asio::ip::udp::endpoint(
+		*p.from = asio::ip::udp::endpoint(
 			m_bound_to.address(), m_bound_to.port());
 		if (ec)
 		{
