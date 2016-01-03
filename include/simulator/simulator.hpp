@@ -1373,7 +1373,11 @@ namespace sim
 			// used for UDP packets
 			// this is a unique_ptr just to make this type movable. the endpoint
 			// itself isn't
+#if LIBSIMULATOR_USE_MOVE
 			std::unique_ptr<asio::ip::udp::endpoint> from;
+#else
+			std::shared_ptr<asio::ip::udp::endpoint> from;
+#endif
 
 			// the number of bytes of overhead for this packet. The total packet
 			// size is the number of bytes in the buffer + this number
