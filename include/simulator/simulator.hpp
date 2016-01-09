@@ -1095,12 +1095,14 @@ namespace sim
 		io_service();
 		~io_service();
 
+#if LIBSIMULATOR_USE_MOVE
 		// not copyable and non movable (it's not movable because we currently
 		// keep pointers to the io_service instances in the simulator object)
 		io_service(io_service const&) = delete;
 		io_service(io_service&&) = delete;
 		io_service& operator=(io_service const&) = delete;
 		io_service& operator=(io_service&&) = delete;
+#endif
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
