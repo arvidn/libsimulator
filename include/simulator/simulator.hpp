@@ -774,6 +774,8 @@ namespace sim
 			resolver(io_service& ios) : basic_resolver(ios) {}
 		};
 
+		int family() const { return m_family; }
+
 		friend bool operator==(udp const& lhs, udp const& rhs)
 		{ return lhs.m_family == rhs.m_family; }
 
