@@ -68,7 +68,12 @@ namespace sim
 				}
 			}
 
+//			fprintf(stderr, "run: last_executed: %d stopped: %d timer-queue: %d\n"
+//				, int(last_executed), m_stopped, int(m_timer_queue.size()));
 		} while (last_executed > 0 && !m_stopped);
+
+//		fprintf(stderr, "exiting simulation::run(): last_executed: %d stopped: %d timer-queue: %d ret: %d\n"
+//			, int(last_executed), m_stopped, int(m_timer_queue.size()), int(ret));
 		return ret;
 	}
 
