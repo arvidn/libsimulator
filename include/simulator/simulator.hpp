@@ -264,18 +264,20 @@ namespace sim
 			bool non_blocking;
 		};
 
+		// socket options
 		struct reuse_address
 		{
 			reuse_address(bool on): reuse(on) {}
+			int level(Protocol const&) const { return SOL_SOCKET; }
 			int value() const { return reuse; }
 			bool reuse;
 		};
 
-		// socket options
 		struct send_buffer_size
 		{
 			send_buffer_size() : size(0) {}
 			send_buffer_size(int s): size(s) {}
+			int level(Protocol const&) const { return SOL_SOCKET; }
 			int value() const { return size; }
 			int size;
 		};
@@ -284,6 +286,7 @@ namespace sim
 		{
 			receive_buffer_size() : size(0) {}
 			receive_buffer_size(int s): size(s) {}
+			int level(Protocol const&) const { return SOL_SOCKET; }
 			int value() const { return size; }
 			int size;
 		};
