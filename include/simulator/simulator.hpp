@@ -240,12 +240,6 @@ namespace sim
 	namespace error = boost::asio::error;
 	typedef boost::asio::null_buffers null_buffers;
 
-	namespace ip {
-
-	typedef boost::asio::ip::address address;
-	typedef boost::asio::ip::address_v4 address_v4;
-	typedef boost::asio::ip::address_v6 address_v6;
-
 	template <typename Protocol>
 	struct socket_base
 	{
@@ -258,35 +252,12 @@ namespace sim
 		}
 
 		// io_control
-		struct non_blocking_io
-		{
-			non_blocking_io(bool on): non_blocking(on) {}
-			bool non_blocking;
-		};
-
-		struct reuse_address
-		{
-			reuse_address(bool on): reuse(on) {}
-			int value() const { return reuse; }
-			bool reuse;
-		};
+		using non_blocking_io = boost::asio::socket_base::non_blocking_io;
+		using reuse_address = boost::asio::socket_base::reuse_address;
 
 		// socket options
-		struct send_buffer_size
-		{
-			send_buffer_size() : size(0) {}
-			send_buffer_size(int s): size(s) {}
-			int value() const { return size; }
-			int size;
-		};
-
-		struct receive_buffer_size
-		{
-			receive_buffer_size() : size(0) {}
-			receive_buffer_size(int s): size(s) {}
-			int value() const { return size; }
-			int size;
-		};
+		using send_buffer_size = boost::asio::socket_base::send_buffer_size;
+		using receive_buffer_size = boost::asio::socket_base::receive_buffer_size;
 
 		template <class Option>
 		boost::system::error_code set_option(Option const&
@@ -320,7 +291,7 @@ namespace sim
 		boost::system::error_code get_option(receive_buffer_size& op
 			, boost::system::error_code& ec)
 		{
-			op.size = m_max_receive_queue_size;
+			op = m_max_receive_queue_size;
 			return ec;
 		}
 
@@ -333,10 +304,10 @@ namespace sim
 
 		boost::system::error_code io_control(non_blocking_io const& ioc
 			, boost::system::error_code& ec)
-		{ m_non_blocking = ioc.non_blocking; return ec; }
+		{ m_non_blocking = ioc.get(); return ec; }
 
 		void io_control(non_blocking_io const& ioc)
-		{ m_non_blocking = ioc.non_blocking; }
+		{ m_non_blocking = ioc.get(); }
 
 		bool is_open() const
 		{
@@ -376,6 +347,12 @@ namespace sim
 		int m_max_receive_queue_size;
 
 	};
+
+	namespace ip {
+
+	using boost::asio::ip::address;
+	using boost::asio::ip::address_v4;
+	using boost::asio::ip::address_v6;
 
 	template<typename Protocol>
 	struct basic_endpoint : boost::asio::ip::basic_endpoint<Protocol>
@@ -1168,8 +1145,6 @@ namespace sim
 		bool m_stopped;
 	};
 
-	namespace ip {
-
 	template <typename Protocol>
 	route socket_base<Protocol>::get_incoming_route()
 	{
@@ -1183,8 +1158,6 @@ namespace sim
 	route socket_base<Protocol>::get_outgoing_route()
 	{
 		return route(m_io_service.get_outgoing_route(m_bound_to.address()));
-	}
-
 	}
 
 	} // asio
