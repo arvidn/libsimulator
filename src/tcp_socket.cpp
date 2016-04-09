@@ -499,9 +499,9 @@ namespace ip {
 				// read, deliver the error
 				if (total_received > 0) break;
 
-				m_incoming_queue.erase(m_incoming_queue.begin());
 				assert(p.ec);
 				ec = p.ec;
+				m_incoming_queue.erase(m_incoming_queue.begin());
 				m_channel.reset();
 				return 0;
 			}
