@@ -33,12 +33,8 @@ namespace sim
 
 	socks_server::socks_server(io_service& ios, int listen_port, int version)
 		: m_ios(ios)
-		, m_resolver(ios)
 		, m_listen_socket(ios)
-		, m_client_connection(ios)
-		, m_server_connection(ios)
-		, m_num_out_bytes(0)
-		, m_num_in_bytes(0)
+		, m_conn(std::make_shared<socks_connection>(m_ios, version))
 		, m_close(false)
 		, m_version(version)
 	{
@@ -55,7 +51,7 @@ namespace sim
 		}
 		m_listen_socket.listen();
 
-		m_listen_socket.async_accept(m_client_connection, m_ep
+		m_listen_socket.async_accept(m_conn->socket(), m_ep
 			, std::bind(&socks_server::on_accept, this, _1));
 	}
 
@@ -68,29 +64,61 @@ namespace sim
 		{
 			printf("socks_server::on_accept: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
-			close_connection();
 			return;
 		}
 
 		printf("socks_server accepted connection from: %s : %d\n",
 			m_ep.address().to_string().c_str(), m_ep.port());
 
+		m_conn->start();
+
+		// create a new connection to accept into
+		m_conn = std::make_shared<socks_connection>(m_ios, m_version);
+
+		// now we can accept another connection
+		m_listen_socket.async_accept(m_conn->socket(), m_ep
+			, std::bind(&socks_server::on_accept, this, _1));
+	}
+
+	void socks_server::stop()
+	{
+		m_close = true;
+		m_listen_socket.close();
+	}
+
+	socks_connection::socks_connection(asio::io_service& ios
+		, int version)
+		: m_ios(ios)
+		, m_resolver(m_ios)
+		, m_client_connection(ios)
+		, m_server_connection(m_ios)
+		, m_bind_socket(m_ios)
+		, m_num_out_bytes(0)
+		, m_num_in_bytes(0)
+		, m_close(false)
+		, m_version(version)
+		, m_command(0)
+	{
+	}
+
+	void socks_connection::start()
+	{
 		if (m_version == 4)
 		{
 			asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 9)
-				, std::bind(&socks_server::on_request1, this, _1, _2));
+				, std::bind(&socks_connection::on_request1, shared_from_this(), _1, _2));
 		} else {
 			// read protocol version and number of auth-methods
 			asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 2)
-				, std::bind(&socks_server::on_handshake1, this, _1, _2));
+				, std::bind(&socks_connection::on_handshake1, shared_from_this(), _1, _2));
 		}
 	}
 
-	void socks_server::on_handshake1(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_handshake1(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec || bytes_transferred != 2)
 		{
-			printf("socks_server::on_handshake1: (%d) %s\n"
+			printf("socks_connection::on_handshake1: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -98,7 +126,7 @@ namespace sim
 
 		if (m_out_buffer[0] != 4 && m_out_buffer[0] != 5)
 		{
-			printf("socks_server::on_handshake1: unexpected socks protocol version: %d"
+			printf("socks_connection::on_handshake1: unexpected socks protocol version: %d"
 				, int(m_out_buffer[0]));
 			close_connection();
 			return;
@@ -109,14 +137,15 @@ namespace sim
 		// read list of auth-methods
 		asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0],
 				num_methods)
-			, std::bind(&socks_server::on_handshake2, this, _1, _2));
+			, std::bind(&socks_connection::on_handshake2, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::on_handshake2(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_handshake2(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec)
 		{
-			printf("socks_server::on_handshake2: (%d) %s\n"
+			printf("socks_connection::on_handshake2: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -124,7 +153,7 @@ namespace sim
 
 		if (std::count(m_out_buffer, m_out_buffer + bytes_transferred, 0) == 0)
 		{
-			printf("socks_server: could not find auth-method 0 (no-auth) in socks handshake\n");
+			printf("socks_connection: could not find auth-method 0 (no-auth) in socks handshake\n");
 			close_connection();
 			return;
 		}
@@ -133,29 +162,31 @@ namespace sim
 		m_in_buffer[1] = 0; // auth-method (no-auth)
 
 		asio::async_write(m_client_connection, asio::const_buffers_1(&m_in_buffer[0], 2)
-			, std::bind(&socks_server::on_handshake3, this, _1, _2));
+			, std::bind(&socks_connection::on_handshake3, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::on_handshake3(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_handshake3(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec || bytes_transferred != 2)
 		{
-			printf("socks_server::on_handshake3: (%d) %s\n"
+			printf("socks_connection::on_handshake3: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
 		asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 10)
-			, std::bind(&socks_server::on_request1, this, _1, _2));
+			, std::bind(&socks_connection::on_request1, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::on_request1(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_request1(error_code const& ec, size_t bytes_transferred)
 	{
 		const int expected = m_version == 4 ? 9 : 10;
 		if (ec || bytes_transferred != expected)
 		{
-			printf("socks_server::on_request1: (%d) %s\n"
+			printf("socks_connection::on_request1: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -167,11 +198,13 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | Variable |    2     |
 // +----+-----+-------+------+----------+----------+
 
-		int version = m_out_buffer[0];
+		int const version = m_out_buffer[0];
+		int const command = m_out_buffer[1];
+		m_command = command;
 
 		if (version != m_version)
 		{
-			printf("socks_server::on_request1: unexpected socks protocol version: %d expected: %d\n"
+			printf("socks_connection::on_request1: unexpected socks protocol version: %d expected: %d\n"
 				, int(m_out_buffer[0]), m_version);
 			close_connection();
 			return;
@@ -179,10 +212,10 @@ namespace sim
 
 		if (m_version == 4)
 		{
-			if (m_out_buffer[1] != 1)
+			if (command != 1 && command != 2)
 			{
-				printf("socks_server::on_request1: unexpected socks command: %d\n"
-					, int(m_out_buffer[1]));
+				printf("socks_connection::on_request1: unexpected socks command: %d\n"
+					, command);
 				close_connection();
 				return;
 			}
@@ -203,27 +236,34 @@ namespace sim
 			{
 				// in this case, we would have to read one byte at a time until we
 				// get to the null terminator.
-				printf("socks_server::on_request1: username in SOCKS4 mode not supported\n");
+				printf("socks_connection::on_request1: username in SOCKS4 mode not supported\n");
 				close_connection();
 				return;
 			}
 			asio::ip::tcp::endpoint target(asio::ip::address_v4(addr), port);
-			open_forward_connection(target);
+			if (command == 1)
+			{
+				open_forward_connection(target);
+			}
+			else if (command == 2)
+			{
+				bind_connection(target);
+			}
 
 			return;
 		}
 
-		if (m_out_buffer[1] != 1)
+		if (command != 1 && command != 2)
 		{
-			printf("socks_server::on_request1: unexpected command: %d\n"
-				, int(m_out_buffer[1]));
+			printf("socks_connection::on_request1: unexpected command: %d\n"
+				, command);
 			close_connection();
 			return;
 		}
 
 		if (m_out_buffer[2] != 0)
 		{
-			printf("socks_server::on_request1: reserved byte is non-zero: %d\n"
+			printf("socks_connection::on_request1: reserved byte is non-zero: %d\n"
 				, int(m_out_buffer[2]));
 			close_connection();
 			return;
@@ -233,13 +273,14 @@ namespace sim
 
 		if (atyp != 1 && atyp != 3 && atyp != 4)
 		{
-			printf("socks_server::on_request1: unexpected address type in SOCKS request: %d\n"
+			printf("socks_connection::on_request1: unexpected address type in SOCKS request: %d\n"
 				, atyp);
 			close_connection();
 			return;
 		}
 
-		printf("socks_server: received request address type: %d\n", atyp);
+		printf("socks_connection: received %s request address type: %d\n"
+			, command == 1 ? "CONNECT" : "BIND", atyp);
 
 		switch (atyp)
 		{
@@ -264,7 +305,14 @@ namespace sim
 				port |= m_out_buffer[9] & 0xff;
 
 				asio::ip::tcp::endpoint target(asio::ip::address_v4(addr), port);
-				open_forward_connection(target);
+				if (command == 1)
+				{
+					open_forward_connection(target);
+				}
+				else if (command == 2)
+				{
+					bind_connection(target);
+				}
 
 				break;
 			}
@@ -276,13 +324,21 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | 1   | Variable |    2     |
 // +----+-----+-------+------+-----+----------+----------+
 
+				if (command == 2)
+				{
+					printf("ERROR: cannot BIND to hostname address (only IPv4 or IPv6 addresses)\n");
+					close_connection();
+					return;
+				}
+
 				const int len = boost::uint8_t(m_out_buffer[4]);
 				// we already read an address of length 4, assuming it was an IPv4
 				// address. Now, with a domain name, one of those bytes was the
 				// length-prefix, but we still read 3 bytes already.
 				const int additional_bytes = len - 3;
 				asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[10], additional_bytes)
-					, std::bind(&socks_server::on_request_domain_name, this, _1, _2));
+					, std::bind(&socks_connection::on_request_domain_name
+						, shared_from_this(), _1, _2));
 				break;
 			}
 			case 4: // IPv6 address
@@ -298,12 +354,12 @@ namespace sim
 		}
 	}
 
-	void socks_server::on_request_domain_name(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_request_domain_name(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec)
 		{
-			printf("socks_server::on_request_domain_name: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection::on_request_domain_name(%s): (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
@@ -315,29 +371,31 @@ namespace sim
 		port |= m_out_buffer[buffer_size - 1] & 0xff;
 
 		std::string hostname(&m_out_buffer[5], boost::uint8_t(m_out_buffer[4]));
-		printf("socks_server::on_request_domain_name: hostname: %s port: %d\n"
-			, hostname.c_str(), port);
+		printf("socks_connection::on_request_domain_name(%s): hostname: %s port: %d\n"
+			, command(), hostname.c_str(), port);
 
 		char port_str[10];
 		snprintf(port_str, sizeof(port_str), "%d", port);
 		asio::ip::tcp::resolver::query q(hostname, port_str);
 		m_resolver.async_resolve(q
-			, std::bind(&socks_server::on_request_domain_lookup, this, _1, _2));
+			, std::bind(&socks_connection::on_request_domain_lookup
+				, shared_from_this(), _1, _2));
 	}
 
-	void socks_server::on_request_domain_lookup(boost::system::error_code const& ec
+	void socks_connection::on_request_domain_lookup(boost::system::error_code const& ec
 		, asio::ip::tcp::resolver::iterator iter)
 	{
 		if (ec || iter == asio::ip::tcp::resolver::iterator())
 		{
 			if (ec)
 			{
-				printf("socks_server::on_request_domain_lookup: (%d) %s\n"
-					, ec.value(), ec.message().c_str());
+				printf("socks_connection::on_request_domain_lookup(%s): (%d) %s\n"
+					, command(), ec.value(), ec.message().c_str());
 			}
 			else
 			{
-				printf("socks_server::on_request_domain_lookup: empty response\n");
+				printf("socks_connection::on_request_domain_lookup(%s): empty response\n"
+					, command());
 			}
 
 // +----+-----+-------+------+----------+----------+
@@ -354,34 +412,106 @@ namespace sim
 			m_in_buffer[8] = 0; // port
 			m_in_buffer[9] = 0;
 
+			auto self = shared_from_this();
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], 10)
 				, [=](boost::system::error_code const& ec, size_t)
 				{
-					this->close_connection();
+					self->close_connection();
 				});
 			return;
 		}
 
-		printf("socks_server::on_request_domain_lookup: connecting to: %s port: %d\n"
+		printf("socks_connection::on_request_domain_lookup(%s): connecting to: %s port: %d\n"
+			, command()
 			, iter->endpoint().address().to_string().c_str()
 			, iter->endpoint().port());
 		open_forward_connection(iter->endpoint());
 	}
 
-	void socks_server::open_forward_connection(asio::ip::tcp::endpoint target)
+	void socks_connection::open_forward_connection(asio::ip::tcp::endpoint target)
 	{
-		printf("socks_server::open_forward_connection: connecting to %s port %d\n"
-			, target.address().to_string().c_str(), target.port());
+		printf("socks_connection::open_forward_connection(%s): connecting to %s port %d\n"
+			, command(), target.address().to_string().c_str(), target.port());
 
 		m_server_connection.open(target.protocol());
 		m_server_connection.async_connect(target
-			, std::bind(&socks_server::on_connected, this, _1));
+			, std::bind(&socks_connection::on_connected, shared_from_this()
+				, _1));
 	}
 
-	void socks_server::on_connected(boost::system::error_code const& ec)
+	void socks_connection::bind_connection(asio::ip::tcp::endpoint target)
 	{
+		printf("socks_connection::bind_connection(%s): binding to %s port %d\n"
+			, command(), target.address().to_string().c_str(), target.port());
 
+		error_code ec;
+		m_bind_socket.open(target.protocol(), ec);
+		if (ec)
+		{
+			printf("ERROR: open bind socket failed: (%d) %s\n", ec.value()
+				, ec.message().c_str());
+		}
+		else
+		{
+			m_bind_socket.bind(target, ec);
+		}
+
+		int const response = ec
+			? (m_version == 4 ? 91 : 1)
+			: (m_version == 4 ? 90 : 0);
+		int const len = format_response(
+			m_bind_socket.local_endpoint(), response);
+
+		if (ec)
+		{
+			printf("ERROR: binding socket to %s %d failed: (%d) %s\n"
+				, target.address().to_string().c_str()
+				, target.port()
+				, ec.value()
+				, ec.message().c_str());
+
+			auto self = shared_from_this();
+
+			asio::async_write(m_client_connection
+				, asio::const_buffers_1(&m_in_buffer[0], len)
+				, [=](boost::system::error_code const& ec, size_t)
+				{
+					self->close_connection();
+				});
+			return;
+		}
+
+		// send response
+		asio::async_write(m_client_connection
+			, asio::const_buffers_1(&m_in_buffer[0], len)
+			, std::bind(&socks_connection::start_accept, shared_from_this(), _1));
+	}
+
+	void socks_connection::start_accept(boost::system::error_code const& ec)
+	{
+		if (ec)
+		{
+			printf("socks_connection(%s): error writing to client: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
+			close_connection();
+			return;
+		}
+
+		m_bind_socket.listen();
+		m_bind_socket.async_accept(m_server_connection
+			, std::bind(&socks_connection::on_connected
+				, shared_from_this(), _1));
+
+		m_client_connection.async_read_some(
+			sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
+			, std::bind(&socks_connection::on_client_receive, shared_from_this()
+				, _1, _2));
+	}
+
+	int socks_connection::format_response(asio::ip::tcp::endpoint const& ep
+		, int response)
+	{
 		int i = 0;
 		if (m_version == 5)
 		{
@@ -392,81 +522,108 @@ namespace sim
 // +----+-----+-------+------+----------+----------+
 
 			m_in_buffer[i++] = m_version; // version
-			++i; // response
+			m_in_buffer[i++] = response; // response
 			m_in_buffer[i++] = 0; // reserved
-			asio::ip::tcp::endpoint local_ep = m_server_connection.local_endpoint();
-			if (local_ep.address().is_v4())
+			if (ep.address().is_v4())
 			{
 				m_in_buffer[i++] = 1; // IPv4
-				address_v4::bytes_type b = local_ep.address().to_v4().to_bytes();
+				address_v4::bytes_type b = ep.address().to_v4().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
 				i += b.size();
 			} else {
 				m_in_buffer[i++] = 4; // IPv6
-				address_v6::bytes_type b = local_ep.address().to_v6().to_bytes();
+				address_v6::bytes_type b = ep.address().to_v6().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
 				i += b.size();
 			}
 
-			m_in_buffer[i++] = local_ep.port() >> 8;
-			m_in_buffer[i++] = local_ep.port() & 0xff;
+			m_in_buffer[i++] = ep.port() >> 8;
+			m_in_buffer[i++] = ep.port() & 0xff;
 		}
 		else
 		{
 			m_in_buffer[i++] = 0; // response version
-			++i; // response
+			m_in_buffer[i++] = response; // return code
 
-			asio::ip::tcp::endpoint local_ep = m_server_connection.local_endpoint();
-			assert(local_ep.address().is_v4());
+			assert(ep.address().is_v4());
 
-			m_in_buffer[i++] = local_ep.port() >> 8;
-			m_in_buffer[i++] = local_ep.port() & 0xff;
+			m_in_buffer[i++] = ep.port() >> 8;
+			m_in_buffer[i++] = ep.port() & 0xff;
 
-			address_v4::bytes_type b = local_ep.address().to_v4().to_bytes();
+			address_v4::bytes_type b = ep.address().to_v4().to_bytes();
 			memcpy(&m_in_buffer[i], &b[0], b.size());
 			i += b.size();
 		}
+		return i;
+	}
+
+	void socks_connection::on_connected(boost::system::error_code const& ec)
+	{
+		printf("socks_connection(%s): on_connect: (%d) %s\n"
+			, command(), ec.value(), ec.message().c_str());
+
+		if (ec == asio::error::operation_aborted
+			|| ec == boost::system::errc::bad_file_descriptor)
+		{
+			return;
+		}
+
+		boost::system::error_code err;
+		asio::ip::tcp::endpoint const ep = m_server_connection.remote_endpoint(err);
+		if (!err)
+		{
+			printf("socks_connection(%s): remote_endpoint: %s %d\n"
+				, command(), ep.address().to_string().c_str(), ep.port());
+		}
+
+		int const response = ec
+			? (m_version == 4 ? 91 : 5)
+			: (m_version == 4 ? 90 : 0);
+		int const len = format_response(ep, response);
 
 		if (ec)
 		{
-			m_in_buffer[1] = m_version == 4 ? 91 : 5; // connection refused
-			printf("socks_server: failed to connect to target server: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection(%s): failed to connect to/accept from target server: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
+
+			auto self = shared_from_this();
 
 			asio::async_write(m_client_connection
-				, asio::const_buffers_1(&m_in_buffer[0], i)
+				, asio::const_buffers_1(&m_in_buffer[0], len)
 				, [=](boost::system::error_code const& ec, size_t)
 				{
-					this->close_connection();
+					self->close_connection();
 				});
 			return;
 		}
 
-		m_in_buffer[1] = m_version == 4 ? 90 : 0; // OK
+		auto self = shared_from_this();
 
 		asio::async_write(m_client_connection
-			, asio::const_buffers_1(&m_in_buffer[0], i)
+			, asio::const_buffers_1(&m_in_buffer[0], len)
 			, [=](boost::system::error_code const& ec, size_t)
 			{
 				if (ec)
 				{
-					printf("socks_server: error writing to client: (%d) %s\n"
-						, ec.value(), ec.message().c_str());
+					printf("socks_connection(%s): error writing to client: (%d) %s\n"
+						, command(), ec.value(), ec.message().c_str());
 					return;
 				}
 
 			// read from the client and from the server
-			m_server_connection.async_read_some(
+			self->m_server_connection.async_read_some(
 				sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
-				, std::bind(&socks_server::on_server_receive, this, _1, _2));
-			m_client_connection.async_read_some(
+				, std::bind(&socks_connection::on_server_receive, self
+					, _1, _2));
+			self->m_client_connection.async_read_some(
 				sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
-				, std::bind(&socks_server::on_client_receive, this, _1, _2));
+				, std::bind(&socks_connection::on_client_receive, self
+					, _1, _2));
 			});
 	}
 
 	// we received some data from the client, forward it to the server
-	void socks_server::on_client_receive(boost::system::error_code const& ec
+	void socks_connection::on_client_receive(boost::system::error_code const& ec
 		, std::size_t bytes_transferred)
 	{
 		// bad file descriptor means the socket has been closed. Whoever closed
@@ -478,91 +635,98 @@ namespace sim
 
 		if (ec)
 		{
-			printf("socks_server: error reading from client: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection (%s): error reading from client: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 		asio::async_write(m_server_connection, asio::const_buffers_1(&m_out_buffer[0], bytes_transferred)
-			, std::bind(&socks_server::on_client_forward, this, _1, _2));
+			, std::bind(&socks_connection::on_client_forward, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::on_client_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_client_forward(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec)
 		{
-			printf("socks_server: error writing to server: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection(%s): error writing to server: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
 		m_client_connection.async_read_some(
 			sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
-			, std::bind(&socks_server::on_client_receive, this, _1, _2));
+			, std::bind(&socks_connection::on_client_receive, shared_from_this()
+				, _1, _2));
 	}
 
 	// we received some data from the server, forward it to the server
-	void socks_server::on_server_receive(boost::system::error_code const& ec
+	void socks_connection::on_server_receive(boost::system::error_code const& ec
 		, std::size_t bytes_transferred)
 	{
 		if (ec)
 		{
-			printf("socks_server: error reading from server: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection(%s): error reading from server: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
 		asio::async_write(m_client_connection, asio::const_buffers_1(&m_in_buffer[0], bytes_transferred)
-			, std::bind(&socks_server::on_server_forward, this, _1, _2));
+			, std::bind(&socks_connection::on_server_forward, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::on_server_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_server_forward(error_code const& ec, size_t bytes_transferred)
 	{
 		if (ec)
 		{
-			printf("socks_server: error writing to client: (%d) %s\n"
-				, ec.value(), ec.message().c_str());
+			printf("socks_connection(%s): error writing to client: (%d) %s\n"
+				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
 		m_server_connection.async_read_some(
 			sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
-			, std::bind(&socks_server::on_server_receive, this, _1, _2));
+			, std::bind(&socks_connection::on_server_receive, shared_from_this()
+				, _1, _2));
 	}
 
-	void socks_server::stop()
+	void socks_connection::close_connection()
 	{
-		m_close = true;
-		m_listen_socket.close();
-	}
-
-	void socks_server::close_connection()
-	{
-		m_num_out_bytes = 0;
-		m_num_in_bytes = 0;
-
 		error_code err;
 		m_client_connection.close(err);
 		if (err)
 		{
-			printf("socks_server::close: failed to close client connection (%d) %s\n"
+			printf("socks_connection::close: failed to close client connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 		m_server_connection.close(err);
 		if (err)
 		{
-			printf("socks_server::close: failed to close server connection (%d) %s\n"
+			printf("socks_connection::close: failed to close server connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 
-		if (m_close) return;
+		m_bind_socket.close(err);
+		if (err)
+		{
+			printf("socks_connection::close: failed to close bind socket (%d) %s\n"
+				, err.value(), err.message().c_str());
+		}
+	}
 
-		// now we can accept another connection
-		m_listen_socket.async_accept(m_client_connection, m_ep
-			, std::bind(&socks_server::on_accept, this, _1));
+	char const* socks_connection::command() const
+	{
+		switch (m_command)
+		{
+			case 1: return "CONNECT";
+			case 2: return "BIND";
+			case 3: return "UDP_ASSOCIATE";
+			default: return "UNKNOWN";
+		}
 	}
 }
 

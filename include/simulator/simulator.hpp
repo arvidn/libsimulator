@@ -787,7 +787,15 @@ namespace sim
 			typedef ip::tcp protocol_type;
 			typedef socket lowest_layer_type;
 
-			socket(io_service& ios);
+			explicit socket(io_service& ios);
+// TODO: sockets are not movable right now unfortunately, because channels keep
+// pointers to the socke object to deliver new packets.
+/*
+#if LIBSIMULATOR_USE_MOVE
+			socket(socket&&) = default;
+			socket& operator=(socket&&) = default;
+#endif
+*/
 			~socket();
 
 			boost::system::error_code close();
