@@ -183,7 +183,7 @@ namespace sim
 
 	void socks_connection::on_request1(error_code const& ec, size_t bytes_transferred)
 	{
-		const int expected = m_version == 4 ? 9 : 10;
+		size_t const expected = m_version == 4 ? 9 : 10;
 		if (ec || bytes_transferred != expected)
 		{
 			printf("socks_connection::on_request1: (%d) %s\n"
