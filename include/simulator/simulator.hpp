@@ -1446,46 +1446,6 @@ namespace sim
 
 	} // aux
 
-	// this is a queue. It can be configured to contrain
-	struct SIMULATOR_DECL queue : sink
-	{
-		queue(asio::io_service& ios, int bandwidth
-			, chrono::high_resolution_clock::duration propagation_delay
-			, int max_queue_size, std::string name = "queue");
-
-		virtual void incoming_packet(aux::packet p) override final;
-
-		virtual std::string label() const override final;
-
-	private:
-
-		void begin_send_next_packet();
-		void next_packet_sent();
-
-		// the queue can't hold more than this number of bytes. Once it's full,
-		// any new packets arriving will be dropped (tail drop)
-		const int m_max_queue_size;
-
-		// the amount of time it takes to forward a packet. Every packet is
-		// delayed by at least this much before being forwarded
-		const chrono::high_resolution_clock::duration m_forwarding_latency;
-
-		// the number of bytes per second that can be sent. This includes the
-		// packet overhead
-		const int m_bandwidth;
-
-		// the number of bytes currently in the packet queue
-		int m_queue_size;
-
-		std::string m_node_name;
-
-		// this is the queue of packets and the time each packet was enqueued
-		std::deque<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
-		asio::high_resolution_timer m_forward_timer;
-
-		chrono::high_resolution_clock::time_point m_last_forward;
-	};
-
 	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
 }
 

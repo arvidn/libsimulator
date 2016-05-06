@@ -17,6 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/queue.hpp"
 #include <memory>
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
