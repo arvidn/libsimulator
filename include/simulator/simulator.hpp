@@ -27,6 +27,7 @@ All rights reserved.
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
 #include <deque>
+#include <mutex>
 
 #if defined _MSC_VER && _MSC_VER < 1900
 #include <stdio.h>
@@ -1304,6 +1305,7 @@ namespace sim
 		// all non-expired timers
 		typedef std::multiset<asio::high_resolution_timer*, timer_compare> timer_queue_t;
 		timer_queue_t m_timer_queue;
+		std::mutex m_timer_queue_mutex;
 		// underlying message queue
 		boost::asio::io_service m_service;
 
