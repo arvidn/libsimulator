@@ -95,13 +95,13 @@ namespace sim
 	void simulation::remove_timer(asio::high_resolution_timer* t)
 	{
 		std::lock_guard<std::mutex> l(m_timer_queue_mutex);
-		assert(!m_timer_queue.empty());
+		if (m_timer_queue.empty()) return;
 		timer_queue_t::iterator begin;
 		timer_queue_t::iterator end;
 		boost::tuples::tie(begin, end) = m_timer_queue.equal_range(t);
-		assert(begin != end);
+		if (begin == end) return;
 		begin = std::find(begin, end, t);
-		assert(begin != end);
+		if (begin == end) return;
 		m_timer_queue.erase(begin);
 	}
 
