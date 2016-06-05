@@ -51,6 +51,7 @@ namespace sim
 			chrono::high_resolution_clock::time_point now
 				= chrono::high_resolution_clock::now();
 
+			std::lock_guard<std::mutex> l(m_timer_queue_mutex);
 			if (!m_timer_queue.empty()) {
 				asio::high_resolution_timer* next_timer = *m_timer_queue.begin();
 				chrono::high_resolution_clock::fast_forward(next_timer->expires_at() - now);
@@ -87,18 +88,20 @@ namespace sim
 		{
 			fprintf(stderr, "WARNING: timer scheduled for current time!\n");
 		}
+		std::lock_guard<std::mutex> l(m_timer_queue_mutex);
 		m_timer_queue.insert(t);
 	}
 
 	void simulation::remove_timer(asio::high_resolution_timer* t)
 	{
-		assert(!m_timer_queue.empty());
+		std::lock_guard<std::mutex> l(m_timer_queue_mutex);
+		if (m_timer_queue.empty()) return;
 		timer_queue_t::iterator begin;
 		timer_queue_t::iterator end;
 		boost::tuples::tie(begin, end) = m_timer_queue.equal_range(t);
-		assert(begin != end);
+		if (begin == end) return;
 		begin = std::find(begin, end, t);
-		assert(begin != end);
+		if (begin == end) return;
 		m_timer_queue.erase(begin);
 	}
 
