@@ -415,8 +415,8 @@ namespace sim
 			// if it's the end iterator
 			if (m_idx == rhs.m_idx) return true;
 
-			const bool lhs_end = (m_idx == -1) || (m_idx == m_results.size());
-			const bool rhs_end = (rhs.m_idx == -1) || (rhs.m_idx == rhs.m_results.size());
+			bool const lhs_end = (m_idx == -1) || (m_idx == int(m_results.size()));
+			bool const rhs_end = (rhs.m_idx == -1) || (rhs.m_idx == int(rhs.m_results.size()));
 
 			return lhs_end == rhs_end;
 		}
