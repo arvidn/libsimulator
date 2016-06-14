@@ -59,12 +59,6 @@ All rights reserved.
 #define SIMULATOR_DECL
 #endif
 
-#if !defined _MSC_VER || _MSC_VER > 1900
-#define LIBSIMULATOR_USE_MOVE 1
-#else
-#define LIBSIMULATOR_USE_MOVE 0
-#endif
-
 #ifdef _MSC_VER
 #pragma warning(push)
 // warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
@@ -504,10 +498,8 @@ namespace sim
 
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
-#if LIBSIMULATOR_USE_MOVE
 			socket(socket&&) = default;
 			socket& operator=(socket&&) = default;
-#endif
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
@@ -785,13 +777,9 @@ namespace sim
 
 			explicit socket(io_service& ios);
 // TODO: sockets are not movable right now unfortunately, because channels keep
-// pointers to the socke object to deliver new packets.
-/*
-#if LIBSIMULATOR_USE_MOVE
-			socket(socket&&) = default;
-			socket& operator=(socket&&) = default;
-#endif
-*/
+// pointers to the socket object to deliver new packets.
+//			socket(socket&&) = default;
+//			socket& operator=(socket&&) = default;
 			~socket();
 
 			boost::system::error_code close();
@@ -1078,14 +1066,12 @@ namespace sim
 		io_service();
 		~io_service();
 
-#if LIBSIMULATOR_USE_MOVE
 		// not copyable and non movable (it's not movable because we currently
 		// keep pointers to the io_service instances in the simulator object)
 		io_service(io_service const&) = delete;
 		io_service(io_service&&) = delete;
 		io_service& operator=(io_service const&) = delete;
 		io_service& operator=(io_service&&) = delete;
-#endif
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -1330,12 +1316,10 @@ namespace sim
 			{}
 
 			// this is move-only
-#if LIBSIMULATOR_USE_MOVE
 			packet(packet const&) = delete;
 			packet& operator=(packet const&) = delete;
 			packet(packet&&) = default;
 			packet& operator=(packet&&) = default;
-#endif
 
 			// to keep things simple, don't drop ACKs or errors
 			bool ok_to_drop() const
@@ -1361,11 +1345,7 @@ namespace sim
 			// used for UDP packets
 			// this is a unique_ptr just to make this type movable. the endpoint
 			// itself isn't
-#if LIBSIMULATOR_USE_MOVE
 			std::unique_ptr<asio::ip::udp::endpoint> from;
-#else
-			std::shared_ptr<asio::ip::udp::endpoint> from;
-#endif
 
 			// the number of bytes of overhead for this packet. The total packet
 			// size is the number of bytes in the buffer + this number
@@ -1384,11 +1364,7 @@ namespace sim
 
 			// this function must be called with this packet in case the packet is
 			// dropped.
-#if LIBSIMULATOR_USE_MOVE
 			std::unique_ptr<std::function<void(aux::packet)>> drop_fun;
-#else
-			std::shared_ptr<std::function<void(aux::packet)>> drop_fun;
-#endif
 		};
 
 		struct SIMULATOR_DECL sink_forwarder : sink
