@@ -1438,5 +1438,8 @@ namespace sim
 	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
 }
 
+// https://support.microsoft.com/en-us/kb/168958
+template class SIMULATOR_DECL std::deque<std::shared_ptr<sim::sink>>;
+
 #endif // SIMULATOR_HPP_INCLUDED
 
