@@ -63,7 +63,7 @@ struct SIMULATOR_DECL http_server
 		keep_alive = 1
 	};
 
-	http_server(asio::io_service& ios, int listen_port
+	http_server(asio::io_service& ios, unsigned short listen_port
 		, int flags = http_server::keep_alive);
 
 	void stop();

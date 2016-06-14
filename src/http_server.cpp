@@ -120,7 +120,7 @@ namespace sim
 		return std::string(msg, pkt_len);
 	}
 
-	http_server::http_server(io_service& ios, int listen_port, int flags)
+	http_server::http_server(io_service& ios, unsigned short listen_port, int flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_connection(ios)

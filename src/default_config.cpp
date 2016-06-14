@@ -80,7 +80,7 @@ namespace sim {
 	}
 
 	duration default_config::hostname_lookup(
-		asio::ip::address const& requestor
+		asio::ip::address const& /* requestor */
 		, std::string hostname
 		, std::vector<asio::ip::address>& result
 		, boost::system::error_code& ec)

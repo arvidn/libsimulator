@@ -32,7 +32,7 @@ namespace sim
 {
 	using namespace aux;
 
-	socks_server::socks_server(io_service& ios, int listen_port, int version)
+	socks_server::socks_server(io_service& ios, unsigned short listen_port, int version)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_conn(std::make_shared<socks_connection>(m_ios, version))

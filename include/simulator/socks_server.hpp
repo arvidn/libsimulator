@@ -109,7 +109,7 @@ private:
 // concurrent connection
 struct SIMULATOR_DECL socks_server
 {
-	socks_server(asio::io_service& ios, int listen_port, int version = 5);
+	socks_server(asio::io_service& ios, unsigned short listen_port, int version = 5);
 
 	void stop();
 
