@@ -131,8 +131,8 @@ namespace ip {
 	}
 
 	// explicitly instantiate the functions
-	template struct SIMULATOR_DECL basic_resolver<udp>;
-	template struct SIMULATOR_DECL basic_resolver<tcp>;
+	template struct basic_resolver<udp>;
+	template struct basic_resolver<tcp>;
 }
 }
 }
