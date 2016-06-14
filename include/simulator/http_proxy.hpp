@@ -35,7 +35,7 @@ namespace sim
 // concurrent connection
 struct SIMULATOR_DECL http_proxy
 {
-	http_proxy(asio::io_service& ios, int listen_port);
+	http_proxy(asio::io_service& ios, unsigned short listen_port);
 
 	void stop();
 

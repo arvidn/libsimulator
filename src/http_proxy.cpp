@@ -33,7 +33,7 @@ namespace sim
 {
 	using namespace aux;
 
-	http_proxy::http_proxy(io_service& ios, int listen_port)
+	http_proxy::http_proxy(io_service& ios, unsigned short const listen_port)
 		: m_resolver(ios)
 		, m_listen_socket(ios)
 		, m_client_connection(ios)
@@ -153,8 +153,9 @@ namespace sim
 		if (host.size() >= 2 && host.front() == '[' && host.back() == ']')
 			host = host.substr(1, host.size() - 2);
 
-		int port = host_end == std::string::npos && host_end > 7 ? 80
+		int const port = host_end == std::string::npos && host_end > 7 ? 80
 			: atoi(req.req.substr(host_end + 1, path_start).c_str());
+		assert(port >= 0 && port < 0xffff);
 
 		bool found_host = false;
 		for (auto const& h : req.headers)
@@ -187,7 +188,8 @@ namespace sim
 		if (!m_server_connection.is_open())
 		{
 			boost::system::error_code err;
-			tcp::endpoint target(address::from_string(host.c_str(), err), port);
+			tcp::endpoint target(address::from_string(host.c_str(), err)
+				, static_cast<unsigned short>(port));
 			if (err)
 			{
 				char port_str[10];

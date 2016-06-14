@@ -58,7 +58,7 @@ namespace ip {
 				+ chrono::microseconds(1);
 			basic_resolver_iterator<Protocol> iter;
 			int const port = atoi(q.service_name().c_str());
-			assert(port >= 0 && port <= 0xffff)
+			assert(port >= 0 && port <= 0xffff);
 			iter.m_idx = 0;
 			iter.m_results.emplace_back(
 				typename Protocol::endpoint(addr, static_cast<unsigned short>(port))
@@ -80,7 +80,7 @@ namespace ip {
 		basic_resolver_iterator<Protocol> iter;
 
 		int const port = atoi(q.service_name().c_str());
-		assert(port >= 0 && port <= 0xffff)
+		assert(port >= 0 && port <= 0xffff);
 
 		iter.m_idx = 0;
 		for (auto const& ip : result)
