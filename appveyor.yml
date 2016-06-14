@@ -3,7 +3,7 @@ skip_tags: true
 clone_depth: 1
 install:
 - set BUILD_DIR=%CD%
-- set BOOST_ROOT=c:\Libraries\boost
+- set BOOST_ROOT=c:\Libraries\boost_1_59_0
 - set BOOST_BUILD_PATH=%BOOST_ROOT%\tools\build
 - echo %BOOST_ROOT%
 - echo %BOOST_BUILD_PATH%
