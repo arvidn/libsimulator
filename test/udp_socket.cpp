@@ -21,6 +21,11 @@ All rights reserved.
 #include <cstdio> // for printf
 #include "catch.hpp"
 
+#ifdef __GNUC__
+// for CATCH's CHECK macro
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 using namespace sim;
 using namespace sim::asio::ip;
 using namespace sim::chrono;

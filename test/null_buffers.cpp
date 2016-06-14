@@ -20,6 +20,11 @@ All rights reserved.
 #include <functional>
 #include "catch.hpp"
 
+#ifdef __GNUC__
+// for CATCH's CHECK macro
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
