@@ -93,6 +93,8 @@ lib simulator
 project
 	: requirements
 	<library>simulator
+	# disable auto-link
+	<define>BOOST_ALL_NO_LIB
 	: default-build
 	<link>static
 	;
