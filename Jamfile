@@ -94,6 +94,8 @@ project
 	<library>simulator
 	: default-build
 	<link>static
+	<warnings>on
+	<warnings-as-errors>off
 	;
 
 test-suite simulator-tests : [ run
