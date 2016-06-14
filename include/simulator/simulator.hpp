@@ -19,6 +19,8 @@ All rights reserved.
 #ifndef SIMULATOR_HPP_INCLUDED
 #define SIMULATOR_HPP_INCLUDED
 
+#include "simulator/push_warnings.hpp"
+
 #include <boost/config.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/basic_deadline_timer.hpp>
@@ -26,43 +28,28 @@ All rights reserved.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
-#include <deque>
-#include <mutex>
-
-#if defined _MSC_VER && _MSC_VER < 1900
-#include <stdio.h>
-#include <stdarg.h>
-
-namespace sim { namespace aux {
-inline int snprintf(char* buf, int len, char const* fmt, ...)
-{
-	va_list lp;
-	int ret;
-	va_start(lp, fmt);
-	ret = _vsnprintf(buf, len, fmt, lp);
-	va_end(lp);
-	if (ret < 0) { buf[len-1] = 0; ret = len-1; }
-	return ret;
-}
-}}
-#endif
-
-#if defined BOOST_ASIO_HAS_STD_CHRONO
-#include <chrono>
-#else
+#include <boost/system/error_code.hpp>
+#include <boost/function.hpp>
+#if !defined BOOST_ASIO_HAS_STD_CHRONO
 #include <boost/chrono/duration.hpp>
 #include <boost/chrono/time_point.hpp>
 #include <boost/ratio.hpp>
 #endif
 
-#include <boost/system/error_code.hpp>
-#include <boost/function.hpp>
+#include "simulator/pop_warnings.hpp"
+
+#include <deque>
+#include <mutex>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
 #include <vector>
 #include <functional>
+
+#if defined BOOST_ASIO_HAS_STD_CHRONO
+#include <chrono>
+#endif
 
 #ifdef SIMULATOR_BUILDING_SHARED
 #define SIMULATOR_DECL BOOST_SYMBOL_EXPORT

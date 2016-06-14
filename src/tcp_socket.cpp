@@ -19,8 +19,12 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include <functional>
 #include <cinttypes>
+#include <cstdio> // for printf
+
+#include "simulator/push_warnings.hpp"
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
+#include "simulator/pop_warnings.hpp"
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
@@ -79,7 +83,7 @@ namespace ip {
 		open(m_is_v4 ? tcp::v4() : tcp::v6(), ec);
 		if (ec)
 		{
-			printf("tcp::socket::internal_connect() error: (%d) %s\n"
+			std::printf("tcp::socket::internal_connect() error: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			return;
 		}
@@ -752,7 +756,7 @@ namespace ip {
 				{
 					if (p.seq_nr < m_next_incoming_seq)
 					{
-						printf("TCP: incoming sequence number lower (%" PRId64 ") "
+						std::printf("TCP: incoming sequence number lower (%" PRId64 ") "
 							"than expected: %" PRId64 "\n", p.seq_nr, m_next_incoming_seq);
 					}
 

@@ -18,6 +18,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include <functional>
+#include <cstdio> // for printf
 #include "catch.hpp"
 
 using namespace sim;
@@ -43,13 +44,13 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 	if (ec)
 	{
-		printf("[%4d] error while receiving: %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] error while receiving: %s\n", millis, ec.message().c_str());
 		return;
 	}
 
 	num_received += bytes_transferred;
 
-	printf("[%4d] received %d bytes from %s\n", millis
+	std::printf("[%4d] received %d bytes from %s\n", millis
 		, int(bytes_transferred)
 		, ep.address().to_string().c_str());
 
@@ -104,7 +105,7 @@ TEST_CASE("send packet to udp socket", "udp_socket")
 	CHECK(num_sent == num_received);
 	CHECK(num_sent == 100 * 45);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 

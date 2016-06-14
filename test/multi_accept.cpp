@@ -41,14 +41,14 @@ void incoming_connection(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] error while accepting connection: %s\n"
+		std::printf("[%4d] error while accepting connection: %s\n"
 			, millis, ec.message().c_str());
 		return;
 	}
 
 	++num_incoming;
 
-	printf("[%4d] received incoming connection\n", millis);
+	std::printf("[%4d] received incoming connection\n", millis);
 	sock.close();
 
 	listener.async_accept(sock, std::bind(&incoming_connection
@@ -62,20 +62,20 @@ void on_connected(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] error while connecting: %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] error while connecting: %s\n", millis, ec.message().c_str());
 		return;
 	}
 
 	++num_connected;
 
-	printf("[%4d] made outgoing connection\n", millis);
+	std::printf("[%4d] made outgoing connection\n", millis);
 	sock.close();
 
 	if (++counter > 5) return;
 
 	boost::system::error_code err;
 	sock.open(ip::tcp::v4(), err);
-	if (err) printf("[%4d] open failed: %s\n", millis, err.message().c_str());
+	if (err) std::printf("[%4d] open failed: %s\n", millis, err.message().c_str());
 	sock.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(sock)));
 }
@@ -95,21 +95,21 @@ TEST_CASE("accept a connection multiple times on the same socket", "accept")
 
 	boost::system::error_code ec;
 	listener.open(ip::tcp::v4(), ec);
-	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	if (ec) std::printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
 	listener.bind(ip::tcp::endpoint(ip::address(), 1337), ec);
-	if (ec) printf("[%4d] bind failed: %s\n", millis, ec.message().c_str());
+	if (ec) std::printf("[%4d] bind failed: %s\n", millis, ec.message().c_str());
 	listener.listen(10, ec);
-	if (ec) printf("[%4d] listen failed: %s\n", millis, ec.message().c_str());
+	if (ec) std::printf("[%4d] listen failed: %s\n", millis, ec.message().c_str());
 
 	ip::tcp::socket incoming(incoming_ios);
 	listener.async_accept(incoming
 		, std::bind(&incoming_connection, _1, std::ref(incoming)
 		, std::ref(listener)));
 
-	printf("[%4d] connecting\n", millis);
+	std::printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
-	if (ec) printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
+	if (ec) std::printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
 	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
@@ -121,7 +121,7 @@ TEST_CASE("accept a connection multiple times on the same socket", "accept")
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 

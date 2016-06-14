@@ -21,6 +21,7 @@ All rights reserved.
 #include "simulator/http_server.hpp" // for helper functions
 
 #include <functional>
+#include <cstdio> // for printf
 
 using namespace sim::asio;
 using namespace sim::asio::ip;
@@ -67,13 +68,13 @@ namespace sim
 
 		if (ec)
 		{
-			printf("http_proxy::on_accept: (%d) %s\n"
+			std::printf("http_proxy::on_accept: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
-		printf("http_proxy accepted connection from: %s : %d\n",
+		std::printf("http_proxy accepted connection from: %s : %d\n",
 			m_ep.address().to_string().c_str(), m_ep.port());
 
 		// read http request
@@ -86,7 +87,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("http_proxy::on_read_request: (%d) %s\n"
+			std::printf("http_proxy::on_read_request: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -130,7 +131,7 @@ namespace sim
 		out_request += ' ';
 		if (req.req.compare(0, 7, "http://") != 0)
 		{
-			printf("http_proxy::forward_request: expected full URL in request, got: %s\n"
+			std::printf("http_proxy::forward_request: expected full URL in request, got: %s\n"
 				, req.req.c_str());
 			throw std::runtime_error("invalid request");
 		}
@@ -173,7 +174,7 @@ namespace sim
 
 		if (m_num_server_out_bytes + out_request.size() > sizeof(m_server_out_buffer))
 		{
-			printf("Too many queued server requests: %d bytes\n"
+			std::printf("Too many queued server requests: %d bytes\n"
 				, int(m_num_server_out_bytes + out_request.size()));
 			throw std::runtime_error("pipeline too deep");
 		}
@@ -211,12 +212,12 @@ namespace sim
 		{
 			if (ec)
 			{
-				printf("http_proxy::on_domain_lookup: (%d) %s\n"
+				std::printf("http_proxy::on_domain_lookup: (%d) %s\n"
 					, ec.value(), ec.message().c_str());
 			}
 			else
 			{
-				printf("http_server::on_request_domain_lookup: empty response\n");
+				std::printf("http_server::on_request_domain_lookup: empty response\n");
 			}
 			error(503, "Resource Temporarily Unavailable");
 			return;
@@ -244,7 +245,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("connection failed: %s\n", ec.message().c_str());
+			std::printf("connection failed: %s\n", ec.message().c_str());
 			m_server_connection.close();
 			error(503, "Service Temporarily Unavailable");
 			return;
@@ -271,7 +272,7 @@ namespace sim
 		m_writing_to_server = false;
 		if (ec)
 		{
-			printf("http_proxy::on_server_write: (%d) %s\n"
+			std::printf("http_proxy::on_server_write: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -291,7 +292,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("http_proxy: error reading from server: (%d) %s\n"
+			std::printf("http_proxy: error reading from server: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -305,7 +306,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("http_proxy: error writing to client: (%d) %s\n"
+			std::printf("http_proxy: error writing to client: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -332,13 +333,13 @@ namespace sim
 		m_client_connection.close(err);
 		if (err)
 		{
-			printf("http_proxy::close: failed to close client connection (%d) %s\n"
+			std::printf("http_proxy::close: failed to close client connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 		m_server_connection.close(err);
 		if (err)
 		{
-			printf("http_proxy::close: failed to close server connection (%d) %s\n"
+			std::printf("http_proxy::close: failed to close server connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 

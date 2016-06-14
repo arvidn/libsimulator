@@ -16,7 +16,7 @@ install:
 - cd %BUILD_DIR%
 environment:
   matrix:
-  - compiler: msvc-12.0
+  - compiler: msvc-14.0
   - compiler: gcc
 build_script:
 - b2.exe --hash -j2 address-model=32 %compiler%

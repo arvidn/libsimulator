@@ -42,7 +42,7 @@ void print_time(high_resolution_timer& timer
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now() - start).count());
 
-	printf("[%d] timer fired at: %d milliseconds. error: %s\n"
+	std::printf("[%d] timer fired at: %d milliseconds. error: %s\n"
 		, counter
 		, millis
 		, ec.message().c_str());
@@ -82,7 +82,7 @@ TEST_CASE("wait for timers", "timer")
 	boost::system::error_code ec;
 	sim.run(ec);
 
-	printf("sim::run() returned: %s at: %d\n"
+	std::printf("sim::run() returned: %s at: %d\n"
 		, ec.message().c_str()
 		, int(duration_cast<milliseconds>(high_resolution_clock::now()
 				.time_since_epoch()).count()));

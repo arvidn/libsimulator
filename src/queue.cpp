@@ -18,6 +18,7 @@ All rights reserved.
 
 #include "simulator/queue.hpp"
 #include <functional>
+#include <cstdio> // for printf
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
