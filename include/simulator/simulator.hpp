@@ -353,7 +353,7 @@ namespace sim
 	template<typename Protocol>
 	struct basic_endpoint : boost::asio::ip::basic_endpoint<Protocol>
 	{
-		basic_endpoint(ip::address const& addr, int port)
+		basic_endpoint(ip::address const& addr, unsigned short port)
 			: boost::asio::ip::basic_endpoint<Protocol>(addr, port) {}
 		basic_endpoint() : boost::asio::ip::basic_endpoint<Protocol>() {}
 	};
@@ -450,7 +450,7 @@ namespace sim
 	};
 
 	template<typename Protocol>
-	struct basic_resolver
+	struct SIMULATOR_DECL basic_resolver
 	{
 		basic_resolver(io_service& ios);
 

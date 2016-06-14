@@ -279,10 +279,13 @@ namespace sim
 	}
 	catch (std::exception& e)
 	{
+		std::printf("http_server::on_read() failed: %s\n"
+			, e.what());
 		close_connection();
 	}
 
-	void http_server::on_write(error_code const& ec, size_t bytes_transferred
+	void http_server::on_write(error_code const& ec
+		, size_t /* bytes_transferred */
 		, bool close)
 	{
 		if (ec)

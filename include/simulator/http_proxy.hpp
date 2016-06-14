@@ -16,7 +16,16 @@ All rights reserved.
 
 */
 
+#ifndef HTTP_PROXY_HPP_INCLUDED
+#define HTTP_PROXY_HPP_INCLUDED
+
 #include "simulator/simulator.hpp"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
 
 namespace sim
 {
@@ -86,5 +95,9 @@ private:
 
 }
 
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
+#endif
 

@@ -405,7 +405,7 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | Variable |    2     |
 // +----+-----+-------+------+----------+----------+
 
-			m_in_buffer[0] = m_version; // version
+			m_in_buffer[0] = char(m_version); // version
 			m_in_buffer[1] = 4; // response (host unreachable)
 			m_in_buffer[2] = 0; // reserved
 			m_in_buffer[3] = 1; // IPv4
@@ -416,7 +416,7 @@ namespace sim
 			auto self = shared_from_this();
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], 10)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
@@ -476,7 +476,7 @@ namespace sim
 
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], len)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
@@ -522,8 +522,8 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | Variable |    2     |
 // +----+-----+-------+------+----------+----------+
 
-			m_in_buffer[i++] = m_version; // version
-			m_in_buffer[i++] = response; // response
+			m_in_buffer[i++] = char(m_version); // version
+			m_in_buffer[i++] = char(response); // response
 			m_in_buffer[i++] = 0; // reserved
 			if (ep.address().is_v4())
 			{
@@ -544,7 +544,7 @@ namespace sim
 		else
 		{
 			m_in_buffer[i++] = 0; // response version
-			m_in_buffer[i++] = response; // return code
+			m_in_buffer[i++] = char(response); // return code
 
 			assert(ep.address().is_v4());
 
@@ -591,7 +591,7 @@ namespace sim
 
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], len)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
@@ -646,7 +646,8 @@ namespace sim
 				, _1, _2));
 	}
 
-	void socks_connection::on_client_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_client_forward(error_code const& ec
+		, size_t /* bytes_transferred */)
 	{
 		if (ec)
 		{
@@ -679,7 +680,8 @@ namespace sim
 				, _1, _2));
 	}
 
-	void socks_connection::on_server_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_server_forward(error_code const& ec
+		, size_t /* bytes_transferred */)
 	{
 		if (ec)
 		{

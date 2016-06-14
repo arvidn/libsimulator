@@ -21,6 +21,12 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
+
 namespace sim
 {
 
@@ -65,6 +71,10 @@ namespace sim
 	};
 
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif
 

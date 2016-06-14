@@ -121,6 +121,8 @@ namespace sim
 	}
 	catch (std::runtime_error& e)
 	{
+		std::printf("http_proxy::on_read_request() failed: %s\n"
+			, e.what());
 		close_connection();
 	}
 
@@ -302,7 +304,8 @@ namespace sim
 			, std::bind(&http_proxy::on_server_forward, this, _1, _2));
 	}
 
-	void http_proxy::on_server_forward(error_code const& ec, size_t bytes_transferred)
+	void http_proxy::on_server_forward(error_code const& ec
+		, size_t /* bytes_transferred */)
 	{
 		if (ec)
 		{
