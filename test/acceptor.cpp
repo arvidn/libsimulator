@@ -21,6 +21,11 @@ All rights reserved.
 
 #include "catch.hpp"
 
+#ifdef __GNUC__
+// for CATCH's CHECK macro
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 using namespace sim::asio;
 using namespace sim::chrono;
 using sim::simulation;
@@ -40,14 +45,14 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] send error %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] send error %s\n", millis, ec.message().c_str());
 		return;
 	}
 
 	num_sent += bytes_transferred;
 
-	printf("[%4d] sent %d bytes\n", millis, int(bytes_transferred));
-	printf("closing\n");
+	std::printf("[%4d] sent %d bytes\n", millis, int(bytes_transferred));
+	std::printf("closing\n");
 	sock.close();
 }
 
@@ -58,13 +63,13 @@ void on_receive(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] receive error %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] receive error %s\n", millis, ec.message().c_str());
 		return;
 	}
 
 	num_received += bytes_transferred;
 
-	printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
+	std::printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
 
 	sock.async_read_some(sim::asio::mutable_buffers_1(recv_buffer, sizeof(recv_buffer))
 		, std::bind(&on_receive, _1, _2, std::ref(sock)));
@@ -77,7 +82,7 @@ void incoming_connection(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] error while accepting connection: %s\n"
+		std::printf("[%4d] error while accepting connection: %s\n"
 			, millis, ec.message().c_str());
 		return;
 	}
@@ -87,7 +92,7 @@ void incoming_connection(boost::system::error_code const& ec
 	REQUIRE(!ec);
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
 	REQUIRE(!ec);
-	printf("[%4d] received incoming connection from: %s:%d. local endpoint: %s:%d\n"
+	std::printf("[%4d] received incoming connection from: %s:%d. local endpoint: %s:%d\n"
 		, millis, ep.address().to_string().c_str(), ep.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
 	CHECK(local_endpoint.port() == 1337);
@@ -106,7 +111,7 @@ void on_connected(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 	if (ec)
 	{
-		printf("[%4d] error while connecting: %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] error while connecting: %s\n", millis, ec.message().c_str());
 		return;
 	}
 
@@ -116,7 +121,7 @@ void on_connected(boost::system::error_code const& ec
 	ip::tcp::endpoint local_endpoint = sock.local_endpoint(err);
 	REQUIRE(!ec);
 
-	printf("[%4d] made outgoing connection to: %s:%d. local endpoint: %s:%d\n"
+	std::printf("[%4d] made outgoing connection to: %s:%d. local endpoint: %s:%d\n"
 		, millis
 		, remote_endpoint.address().to_string().c_str(), remote_endpoint.port()
 		, local_endpoint.address().to_string().c_str(), local_endpoint.port());
@@ -126,7 +131,7 @@ void on_connected(boost::system::error_code const& ec
 	CHECK(local_endpoint.port() != 0);
 	CHECK(local_endpoint.address().to_string() == "10.20.30.40");
 
-	printf("sending %d bytes\n", int(sizeof(send_buffer)));
+	std::printf("sending %d bytes\n", int(sizeof(send_buffer)));
 	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
 		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
@@ -160,7 +165,7 @@ TEST_CASE("accept incoming connection on acceptor socket", "acceptor")
 
 	dump_network_graph(sim, "accept.dot");
 
-	printf("[%4d] connecting\n", millis);
+	std::printf("[%4d] connecting\n", millis);
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	REQUIRE(!ec);
@@ -171,7 +176,7 @@ TEST_CASE("accept incoming connection on acceptor socket", "acceptor")
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 
 	CHECK(num_received == num_sent);

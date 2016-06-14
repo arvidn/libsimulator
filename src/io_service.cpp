@@ -85,7 +85,7 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	std::size_t io_service::run(boost::system::error_code& ec)
+	std::size_t io_service::run(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
@@ -97,7 +97,7 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	std::size_t io_service::poll(boost::system::error_code& ec)
+	std::size_t io_service::poll(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
@@ -109,7 +109,7 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	std::size_t io_service::poll_one(boost::system::error_code& ec)
+	std::size_t io_service::poll_one(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
@@ -197,7 +197,7 @@ namespace sim { namespace asio {
 			if (it == m_ips.end())
 			{
 				ec.assign(boost::system::errc::address_not_available
-						  , boost::system::generic_category());
+					, boost::system::generic_category());
 				return ip::udp::endpoint();
 			}
 			// TODO: pick the first local endpoint for now. In the future we may

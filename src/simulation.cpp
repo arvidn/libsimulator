@@ -17,8 +17,13 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+
+#include "simulator/push_warnings.hpp"
 #include <boost/make_shared.hpp>
 #include <boost/tuple/tuple.hpp>
+#include "simulator/pop_warnings.hpp"
+
+#include <cstdio> // for printf
 
 using namespace sim::asio;
 
@@ -69,11 +74,11 @@ namespace sim
 				}
 			}
 
-//			fprintf(stderr, "run: last_executed: %d stopped: %d timer-queue: %d\n"
+//			std::fprintf(stderr, "run: last_executed: %d stopped: %d timer-queue: %d\n"
 //				, int(last_executed), m_stopped, int(m_timer_queue.size()));
 		} while (last_executed > 0 && !m_stopped);
 
-//		fprintf(stderr, "exiting simulation::run(): last_executed: %d stopped: %d timer-queue: %d ret: %d\n"
+//		std::fprintf(stderr, "exiting simulation::run(): last_executed: %d stopped: %d timer-queue: %d ret: %d\n"
 //			, int(last_executed), m_stopped, int(m_timer_queue.size()), int(ret));
 		return ret;
 	}
@@ -86,7 +91,7 @@ namespace sim
 	{
 		if (t->expires_at() == sim::chrono::high_resolution_clock::now())
 		{
-			fprintf(stderr, "WARNING: timer scheduled for current time!\n");
+			std::fprintf(stderr, "WARNING: timer scheduled for current time!\n");
 		}
 		std::lock_guard<std::mutex> l(m_timer_queue_mutex);
 		m_timer_queue.insert(t);

@@ -39,8 +39,9 @@ namespace sim {
 		m_sim = &sim;
 	}
 
-	route default_config::channel_route(asio::ip::address src
-		, asio::ip::address dst)
+	route default_config::channel_route(
+		asio::ip::address /* src */
+		, asio::ip::address /* dst */)
 	{
 		return route().append(m_network);
 	}
@@ -57,7 +58,9 @@ namespace sim {
 		return route().append(it->second);
 	}
 
-	int default_config::path_mtu(asio::ip::address ip1, asio::ip::address ip2)
+	int default_config::path_mtu(
+		asio::ip::address /* ip1 */
+		, asio::ip::address /* ip2 */)
 	{
 		return 1475;
 	}
@@ -77,7 +80,7 @@ namespace sim {
 	}
 
 	duration default_config::hostname_lookup(
-		asio::ip::address const& requestor
+		asio::ip::address const& /* requestor */
 		, std::string hostname
 		, std::vector<asio::ip::address>& result
 		, boost::system::error_code& ec)

@@ -19,8 +19,11 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 
 #include <functional>
+
+#include "simulator/push_warnings.hpp"
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
+#include "simulator/pop_warnings.hpp"
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
@@ -199,7 +202,7 @@ namespace ip {
 	std::size_t udp::socket::receive_from_impl(
 		std::vector<asio::mutable_buffer> const& bufs
 		, udp::endpoint* sender
-		, socket_base::message_flags flags
+		, socket_base::message_flags /* flags */
 		, boost::system::error_code& ec)
 	{
 		assert(!bufs.empty());
@@ -276,7 +279,7 @@ namespace ip {
 	void udp::socket::async_receive_from_impl(
 		std::vector<asio::mutable_buffer> const& bufs
 		, udp::endpoint* sender
-		, socket_base::message_flags flags
+		, socket_base::message_flags /* flags */
 		, boost::function<void(boost::system::error_code const&
 			, std::size_t)> const& handler)
 	{
@@ -312,7 +315,7 @@ namespace ip {
 	}
 
 	std::size_t udp::socket::send_to_impl(std::vector<asio::const_buffer> const& b
-		, udp::endpoint const& dst, message_flags flags
+		, udp::endpoint const& dst, message_flags /* flags */
 		, boost::system::error_code& ec)
 	{
 		assert(m_non_blocking && "blocking operations not supported");
@@ -321,7 +324,7 @@ namespace ip {
 		{
 			// the socket was not bound, bind to anything
 			bind(udp::endpoint(), ec);
-			if (ec) return -1;
+			if (ec) return 0;
 		}
 
 		ec.clear();
@@ -334,7 +337,7 @@ namespace ip {
 		if (ret == 0)
 		{
 			ec = boost::system::error_code(error::invalid_argument);
-			return -1;
+			return 0;
 		}
 
 		time_point now = chrono::high_resolution_clock::now();

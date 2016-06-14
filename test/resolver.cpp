@@ -21,6 +21,11 @@ All rights reserved.
 
 #include "catch.hpp"
 
+#ifdef __GNUC__
+// for CATCH's CHECK macro
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 using namespace std::placeholders;
 using namespace sim;
 
@@ -114,7 +119,7 @@ TEST_CASE("resolve multiple IPv4 addresses", "resolver") {
 	CHECK(millis == 50);
 	CHECK(num_lookups == 1);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 
@@ -139,7 +144,7 @@ TEST_CASE("resolve non-existent hostname", "resolver") {
 	CHECK(millis == 100);
 	CHECK(num_lookups == 1);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 
@@ -166,7 +171,7 @@ TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
 	CHECK(millis == 200);
 	CHECK(num_lookups == 2);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 
@@ -207,7 +212,7 @@ TEST_CASE("resolve an IP address", "resolver") {
 	CHECK(millis == 0);
 	CHECK(num_lookups == 1);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 

@@ -72,6 +72,7 @@ lib simulator
 	<target-os>windows:<library>wsock32
 
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
+	<define>_CRT_SECURE_NO_WARNINGS
 
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
@@ -79,6 +80,8 @@ lib simulator
 	<toolset>gcc:<cxxflags>-std=c++11
 
 	: # default build
+	<warnings>all
+	<warnings-as-errors>on
 
 	: # usage requirements
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
@@ -90,6 +93,8 @@ lib simulator
 project
 	: requirements
 	<library>simulator
+	# disable auto-link
+	<define>BOOST_ALL_NO_LIB
 	: default-build
 	<link>static
 	;

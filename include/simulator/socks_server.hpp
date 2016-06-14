@@ -16,7 +16,16 @@ All rights reserved.
 
 */
 
+#ifndef SOCKS_SERVER_HPP_INCLUDED
+#define SOCKS_SERVER_HPP_INCLUDED
+
 #include "simulator/simulator.hpp"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
 
 namespace sim
 {
@@ -100,7 +109,7 @@ private:
 // concurrent connection
 struct SIMULATOR_DECL socks_server
 {
-	socks_server(asio::io_service& ios, int listen_port, int version = 5);
+	socks_server(asio::io_service& ios, unsigned short listen_port, int version = 5);
 
 	void stop();
 
@@ -125,5 +134,9 @@ private:
 
 }
 
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
+#endif
 

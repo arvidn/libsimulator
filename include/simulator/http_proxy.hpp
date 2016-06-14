@@ -16,7 +16,16 @@ All rights reserved.
 
 */
 
+#ifndef HTTP_PROXY_HPP_INCLUDED
+#define HTTP_PROXY_HPP_INCLUDED
+
 #include "simulator/simulator.hpp"
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
 
 namespace sim
 {
@@ -26,7 +35,7 @@ namespace sim
 // concurrent connection
 struct SIMULATOR_DECL http_proxy
 {
-	http_proxy(asio::io_service& ios, int listen_port);
+	http_proxy(asio::io_service& ios, unsigned short listen_port);
 
 	void stop();
 
@@ -86,5 +95,9 @@ private:
 
 }
 
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
+#endif
 

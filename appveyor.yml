@@ -3,7 +3,7 @@ skip_tags: true
 clone_depth: 1
 install:
 - set BUILD_DIR=%CD%
-- set BOOST_ROOT=c:\Libraries\boost
+- set BOOST_ROOT=c:\Libraries\boost_1_59_0
 - set BOOST_BUILD_PATH=%BOOST_ROOT%\tools\build
 - echo %BOOST_ROOT%
 - echo %BOOST_BUILD_PATH%
@@ -16,7 +16,7 @@ install:
 - cd %BUILD_DIR%
 environment:
   matrix:
-  - compiler: msvc-12.0
+  - compiler: msvc-14.0
   - compiler: gcc
 build_script:
 - b2.exe --hash -j2 address-model=32 %compiler%

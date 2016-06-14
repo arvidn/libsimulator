@@ -20,6 +20,7 @@ All rights reserved.
 #include "simulator/http_server.hpp"
 
 #include <functional>
+#include <cstdio> // for printf
 
 using namespace sim::asio;
 using namespace sim::asio::ip;
@@ -119,7 +120,7 @@ namespace sim
 		return std::string(msg, pkt_len);
 	}
 
-	http_server::http_server(io_service& ios, int listen_port, int flags)
+	http_server::http_server(io_service& ios, unsigned short listen_port, int flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_connection(ios)
@@ -148,13 +149,13 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("http_server::on_accept: (%d) %s\n"
+			std::printf("http_server::on_accept: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
 		}
 
-		printf("http_server accepted connection from: %s : %d\n",
+		std::printf("http_server accepted connection from: %s : %d\n",
 			m_ep.address().to_string().c_str(), m_ep.port());
 
 		read();
@@ -185,7 +186,7 @@ namespace sim
 		char const* const space = find(start, len, " ", 1);
 		if (space == nullptr)
 		{
-			printf("http_server: failed to parse request:\n%s\n"
+			std::printf("http_server: failed to parse request:\n%s\n"
 				, std::string(start, len).c_str());
 			throw std::runtime_error("parse failed");
 		}
@@ -193,14 +194,14 @@ namespace sim
 		char const* const space2 = find(space + 1, len - (space - start + 1), " ", 1);
 		if (space2 == nullptr)
 		{
-			printf("http_server: failed to parse request:\n%s\n"
+			std::printf("http_server: failed to parse request:\n%s\n"
 				, std::string(start, len).c_str());
 			throw std::runtime_error("parse failed");
 		}
 		ret.method.assign(start, space);
 		ret.req.assign(space+1, space2);
 		ret.path.assign(normalize(ret.req.substr(0, ret.req.find_first_of('?'))));
-		printf("http_server: incoming request: %s %s [%s]\n"
+		std::printf("http_server: incoming request: %s %s [%s]\n"
 			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
 
 		char const* header = find(space2, len - (space2 - start), "\r\n", 2);
@@ -208,7 +209,7 @@ namespace sim
 		{
 			if (header == nullptr)
 			{
-				printf("http_server: failed to parse request:\n%s\n"
+				std::printf("http_server: failed to parse request:\n%s\n"
 					, std::string(start, len).c_str());
 				throw std::runtime_error("parse failed");
 			}
@@ -216,7 +217,7 @@ namespace sim
 			char const* const value = static_cast<char const*>(memchr(header, ':', len - (header - start)));
 			if (value == nullptr || next == nullptr || value > next)
 			{
-				printf("http_server: failed to parse request:\n%s\n"
+				std::printf("http_server: failed to parse request:\n%s\n"
 					, std::string(start, len).c_str());
 				throw std::runtime_error("parse failed");
 			}
@@ -240,7 +241,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("http_server::on_read: (%d) %s\n"
+			std::printf("http_server::on_read: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -278,15 +279,18 @@ namespace sim
 	}
 	catch (std::exception& e)
 	{
+		std::printf("http_server::on_read() failed: %s\n"
+			, e.what());
 		close_connection();
 	}
 
-	void http_server::on_write(error_code const& ec, size_t bytes_transferred
+	void http_server::on_write(error_code const& ec
+		, size_t /* bytes_transferred */
 		, bool close)
 	{
 		if (ec)
 		{
-			printf("http_server::on_write: (%d) %s\n"
+			std::printf("http_server::on_write: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -318,7 +322,7 @@ namespace sim
 		m_connection.close(err);
 		if (err)
 		{
-			printf("http_server::close: failed to close connection (%d) %s\n"
+			std::printf("http_server::close: failed to close connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 			return;
 		}

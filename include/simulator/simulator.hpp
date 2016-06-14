@@ -19,6 +19,8 @@ All rights reserved.
 #ifndef SIMULATOR_HPP_INCLUDED
 #define SIMULATOR_HPP_INCLUDED
 
+#include "simulator/push_warnings.hpp"
+
 #include <boost/config.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/basic_deadline_timer.hpp>
@@ -26,43 +28,28 @@ All rights reserved.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
-#include <deque>
-#include <mutex>
-
-#if defined _MSC_VER && _MSC_VER < 1900
-#include <stdio.h>
-#include <stdarg.h>
-
-namespace sim { namespace aux {
-inline int snprintf(char* buf, int len, char const* fmt, ...)
-{
-	va_list lp;
-	int ret;
-	va_start(lp, fmt);
-	ret = _vsnprintf(buf, len, fmt, lp);
-	va_end(lp);
-	if (ret < 0) { buf[len-1] = 0; ret = len-1; }
-	return ret;
-}
-}}
-#endif
-
-#if defined BOOST_ASIO_HAS_STD_CHRONO
-#include <chrono>
-#else
+#include <boost/system/error_code.hpp>
+#include <boost/function.hpp>
+#if !defined BOOST_ASIO_HAS_STD_CHRONO
 #include <boost/chrono/duration.hpp>
 #include <boost/chrono/time_point.hpp>
 #include <boost/ratio.hpp>
 #endif
 
-#include <boost/system/error_code.hpp>
-#include <boost/function.hpp>
+#include "simulator/pop_warnings.hpp"
+
+#include <deque>
+#include <mutex>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
 #include <vector>
 #include <functional>
+
+#if defined BOOST_ASIO_HAS_STD_CHRONO
+#include <chrono>
+#endif
 
 #ifdef SIMULATOR_BUILDING_SHARED
 #define SIMULATOR_DECL BOOST_SYMBOL_EXPORT
@@ -76,6 +63,14 @@ inline int snprintf(char* buf, int len, char const* fmt, ...)
 #define LIBSIMULATOR_USE_MOVE 1
 #else
 #define LIBSIMULATOR_USE_MOVE 0
+#endif
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+// warning C4661: X: no suitable definition provided for explicit template instantiation request
+#pragma warning( disable : 4661)
 #endif
 
 namespace sim
@@ -159,15 +154,15 @@ namespace sim
 	// std.chrono / boost.chrono compatible high_resolution_clock using a simulated time
 	struct SIMULATOR_DECL high_resolution_clock
 	{
-		typedef boost::int64_t rep;
+		using rep = boost::int64_t;
 #if defined BOOST_ASIO_HAS_STD_CHRONO
-		typedef std::nano period;
-		typedef std::chrono::time_point<high_resolution_clock, nanoseconds> time_point;
-		typedef std::chrono::duration<boost::int64_t, std::nano> duration;
+		using period = std::nano;
+		using time_point = std::chrono::time_point<high_resolution_clock, nanoseconds>;
+		using duration = std::chrono::duration<boost::int64_t, std::nano>;
 #else
-		typedef boost::nano period;
-		typedef time_point<high_resolution_clock, nanoseconds> time_point;
-		typedef duration<boost::int64_t, boost::nano> duration;
+		using period = boost::nano;
+		using time_point = time_point<high_resolution_clock, nanoseconds>;
+		using duration = duration<boost::int64_t, boost::nano>;
 #endif
 		static const bool is_steady = true;
 		static time_point now();
@@ -195,8 +190,8 @@ namespace sim
 	{
 		friend struct sim::simulation;
 
-		typedef chrono::high_resolution_clock::time_point time_type;
-		typedef chrono::high_resolution_clock::duration duration_type;
+		using time_type = chrono::high_resolution_clock::time_point;
+		using duration_type = chrono::high_resolution_clock::duration;
 
 		explicit high_resolution_timer(io_service& io_service);
 		high_resolution_timer(io_service& io_service,
@@ -236,10 +231,10 @@ namespace sim
 		bool m_expired;
 	};
 
-	typedef high_resolution_timer waitable_timer;
+	using waitable_timer = high_resolution_timer;
 
 	namespace error = boost::asio::error;
-	typedef boost::asio::null_buffers null_buffers;
+	using null_buffers = boost::asio::null_buffers;
 
 	template <typename Protocol>
 	struct socket_base
@@ -317,7 +312,7 @@ namespace sim
 
 		io_service& get_io_service() const { return m_io_service; }
 
-		typedef int message_flags;
+		using message_flags = int;
 
 		// internal interface
 
@@ -358,7 +353,7 @@ namespace sim
 	template<typename Protocol>
 	struct basic_endpoint : boost::asio::ip::basic_endpoint<Protocol>
 	{
-		basic_endpoint(ip::address const& addr, int port)
+		basic_endpoint(ip::address const& addr, unsigned short port)
 			: boost::asio::ip::basic_endpoint<Protocol>(addr, port) {}
 		basic_endpoint() : boost::asio::ip::basic_endpoint<Protocol>() {}
 	};
@@ -366,12 +361,12 @@ namespace sim
 	template <typename Protocol>
 	struct basic_resolver_entry
 	{
-		typedef typename Protocol::endpoint endpoint_type;
-		typedef Protocol protocol_type;
+		using endpoint_type = typename Protocol::endpoint;
+		using protocol_type = Protocol;
 
 		basic_resolver_entry() {}
 		basic_resolver_entry(
-			const endpoint_type& ep
+			endpoint_type const& ep
 			, std::string const& host
 			, std::string const& service)
 			: m_endpoint(ep)
@@ -400,8 +395,8 @@ namespace sim
 
 		basic_resolver_iterator(): m_idx(-1) {}
 
-		typedef basic_resolver_entry<Protocol> value_type;
-		typedef value_type const& reference;
+		using value_type = basic_resolver_entry<Protocol>;
+		using reference = value_type const&;
 
 		bool operator!=(basic_resolver_iterator const& rhs) const
 		{
@@ -455,13 +450,13 @@ namespace sim
 	};
 
 	template<typename Protocol>
-	struct basic_resolver
+	struct SIMULATOR_DECL basic_resolver
 	{
 		basic_resolver(io_service& ios);
 
-		typedef Protocol protocol_type;
-		typedef basic_resolver_iterator<Protocol> iterator;
-		typedef basic_resolver_query<Protocol> query;
+		using protocol_type = Protocol;
+		using iterator = basic_resolver_iterator<Protocol>;
+		using query = basic_resolver_query<Protocol>;
 
 		void cancel();
 
@@ -496,13 +491,13 @@ namespace sim
 		static udp v4() { return udp(AF_INET); }
 		static udp v6() { return udp(AF_INET6); }
 
-		typedef basic_endpoint<udp> endpoint;
+		using endpoint = basic_endpoint<udp>;
 
 		struct SIMULATOR_DECL socket : socket_base<udp>, sink
 		{
-			typedef ip::udp::endpoint endpoint_type;
-			typedef ip::udp protocol_type;
-			typedef socket lowest_layer_type;
+			using endpoint_type = ip::udp::endpoint;
+			using protocol_type = ip::udp;
+			using lowest_layer_type = socket;
 
 			socket(io_service& ios);
 			~socket();
@@ -780,13 +775,13 @@ namespace sim
 
 		int family() const { return m_family; }
 
-		typedef basic_endpoint<tcp> endpoint;
+		using endpoint = basic_endpoint<tcp>;
 
 		struct SIMULATOR_DECL socket : socket_base<tcp>, sink
 		{
-			typedef ip::tcp::endpoint endpoint_type;
-			typedef ip::tcp protocol_type;
-			typedef socket lowest_layer_type;
+			using endpoint_type = ip::tcp::endpoint;
+			using protocol_type = ip::tcp;
+			using lowest_layer_type = socket;
 
 			explicit socket(io_service& ios);
 // TODO: sockets are not movable right now unfortunately, because channels keep
@@ -1028,7 +1023,7 @@ namespace sim
 			// these are incoming connection attempts. Both half-open and
 			// completely connected. When accepting a connection, this queue is
 			// checked first before waiting for a connection attempt.
-			typedef std::vector<std::shared_ptr<aux::channel> > incoming_conns_t;
+			using incoming_conns_t = std::vector<std::shared_ptr<aux::channel> >;
 			incoming_conns_t m_incoming_queue;
 
 			// the socket to accept a connection into
@@ -1303,7 +1298,7 @@ namespace sim
 		std::unordered_set<asio::io_service*> m_nodes;
 
 		// all non-expired timers
-		typedef std::multiset<asio::high_resolution_timer*, timer_compare> timer_queue_t;
+		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
 		timer_queue_t m_timer_queue;
 		std::mutex m_timer_queue_mutex;
 		// underlying message queue
@@ -1312,14 +1307,12 @@ namespace sim
 		// used for internal timers
 		asio::io_service m_internal_ios;
 
-		typedef std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>
-			listen_sockets_t;
-		typedef listen_sockets_t::iterator listen_socket_iter_t;
+		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
+		using listen_socket_iter_t = listen_sockets_t::iterator;
 		listen_sockets_t m_listen_sockets;
 
-		typedef std::map<asio::ip::udp::endpoint, asio::ip::udp::socket*>
-			udp_sockets_t;
-		typedef udp_sockets_t::iterator udp_socket_iter_t;
+		using udp_sockets_t = std::map<asio::ip::udp::endpoint, asio::ip::udp::socket*>;
+		using udp_socket_iter_t = udp_sockets_t::iterator;
 		udp_sockets_t m_udp_sockets;
 
 		bool m_stopped;
@@ -1450,6 +1443,10 @@ namespace sim
 
 	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // SIMULATOR_HPP_INCLUDED
 

@@ -128,7 +128,7 @@ namespace sim
 		wait(ec);
 	}
 
-	void high_resolution_timer::wait(boost::system::error_code& ec)
+	void high_resolution_timer::wait(boost::system::error_code&)
 	{
 		assert(false);
 		time_type now = chrono::high_resolution_clock::now();

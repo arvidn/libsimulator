@@ -20,6 +20,7 @@ All rights reserved.
 #include "simulator/socks_server.hpp"
 
 #include <functional>
+#include <cstdio> // for printf
 
 using namespace sim::asio;
 using namespace sim::asio::ip;
@@ -31,7 +32,7 @@ namespace sim
 {
 	using namespace aux;
 
-	socks_server::socks_server(io_service& ios, int listen_port, int version)
+	socks_server::socks_server(io_service& ios, unsigned short listen_port, int version)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_conn(std::make_shared<socks_connection>(m_ios, version))
@@ -62,12 +63,12 @@ namespace sim
 
 		if (ec)
 		{
-			printf("socks_server::on_accept: (%d) %s\n"
+			std::printf("socks_server::on_accept: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			return;
 		}
 
-		printf("socks_server accepted connection from: %s : %d\n",
+		std::printf("socks_server accepted connection from: %s : %d\n",
 			m_ep.address().to_string().c_str(), m_ep.port());
 
 		m_conn->start();
@@ -118,7 +119,7 @@ namespace sim
 	{
 		if (ec || bytes_transferred != 2)
 		{
-			printf("socks_connection::on_handshake1: (%d) %s\n"
+			std::printf("socks_connection::on_handshake1: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -126,7 +127,7 @@ namespace sim
 
 		if (m_out_buffer[0] != 4 && m_out_buffer[0] != 5)
 		{
-			printf("socks_connection::on_handshake1: unexpected socks protocol version: %d"
+			std::printf("socks_connection::on_handshake1: unexpected socks protocol version: %d"
 				, int(m_out_buffer[0]));
 			close_connection();
 			return;
@@ -145,7 +146,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("socks_connection::on_handshake2: (%d) %s\n"
+			std::printf("socks_connection::on_handshake2: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -153,7 +154,7 @@ namespace sim
 
 		if (std::count(m_out_buffer, m_out_buffer + bytes_transferred, 0) == 0)
 		{
-			printf("socks_connection: could not find auth-method 0 (no-auth) in socks handshake\n");
+			std::printf("socks_connection: could not find auth-method 0 (no-auth) in socks handshake\n");
 			close_connection();
 			return;
 		}
@@ -170,7 +171,7 @@ namespace sim
 	{
 		if (ec || bytes_transferred != 2)
 		{
-			printf("socks_connection::on_handshake3: (%d) %s\n"
+			std::printf("socks_connection::on_handshake3: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -186,7 +187,7 @@ namespace sim
 		size_t const expected = m_version == 4 ? 9 : 10;
 		if (ec || bytes_transferred != expected)
 		{
-			printf("socks_connection::on_request1: (%d) %s\n"
+			std::printf("socks_connection::on_request1: (%d) %s\n"
 				, ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -204,7 +205,7 @@ namespace sim
 
 		if (version != m_version)
 		{
-			printf("socks_connection::on_request1: unexpected socks protocol version: %d expected: %d\n"
+			std::printf("socks_connection::on_request1: unexpected socks protocol version: %d expected: %d\n"
 				, int(m_out_buffer[0]), m_version);
 			close_connection();
 			return;
@@ -214,7 +215,7 @@ namespace sim
 		{
 			if (command != 1 && command != 2)
 			{
-				printf("socks_connection::on_request1: unexpected socks command: %d\n"
+				std::printf("socks_connection::on_request1: unexpected socks command: %d\n"
 					, command);
 				close_connection();
 				return;
@@ -236,7 +237,7 @@ namespace sim
 			{
 				// in this case, we would have to read one byte at a time until we
 				// get to the null terminator.
-				printf("socks_connection::on_request1: username in SOCKS4 mode not supported\n");
+				std::printf("socks_connection::on_request1: username in SOCKS4 mode not supported\n");
 				close_connection();
 				return;
 			}
@@ -255,7 +256,7 @@ namespace sim
 
 		if (command != 1 && command != 2)
 		{
-			printf("socks_connection::on_request1: unexpected command: %d\n"
+			std::printf("socks_connection::on_request1: unexpected command: %d\n"
 				, command);
 			close_connection();
 			return;
@@ -263,7 +264,7 @@ namespace sim
 
 		if (m_out_buffer[2] != 0)
 		{
-			printf("socks_connection::on_request1: reserved byte is non-zero: %d\n"
+			std::printf("socks_connection::on_request1: reserved byte is non-zero: %d\n"
 				, int(m_out_buffer[2]));
 			close_connection();
 			return;
@@ -273,13 +274,13 @@ namespace sim
 
 		if (atyp != 1 && atyp != 3 && atyp != 4)
 		{
-			printf("socks_connection::on_request1: unexpected address type in SOCKS request: %d\n"
+			std::printf("socks_connection::on_request1: unexpected address type in SOCKS request: %d\n"
 				, atyp);
 			close_connection();
 			return;
 		}
 
-		printf("socks_connection: received %s request address type: %d\n"
+		std::printf("socks_connection: received %s request address type: %d\n"
 			, command == 1 ? "CONNECT" : "BIND", atyp);
 
 		switch (atyp)
@@ -326,7 +327,7 @@ namespace sim
 
 				if (command == 2)
 				{
-					printf("ERROR: cannot BIND to hostname address (only IPv4 or IPv6 addresses)\n");
+					std::printf("ERROR: cannot BIND to hostname address (only IPv4 or IPv6 addresses)\n");
 					close_connection();
 					return;
 				}
@@ -349,7 +350,7 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | 16       |    2     |
 // +----+-----+-------+------+----------+----------+
 
-				printf("ERROR: unsupported address type %d\n", atyp);
+				std::printf("ERROR: unsupported address type %d\n", atyp);
 				close_connection();
 		}
 	}
@@ -358,7 +359,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("socks_connection::on_request_domain_name(%s): (%d) %s\n"
+			std::printf("socks_connection::on_request_domain_name(%s): (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -371,7 +372,7 @@ namespace sim
 		port |= m_out_buffer[buffer_size - 1] & 0xff;
 
 		std::string hostname(&m_out_buffer[5], boost::uint8_t(m_out_buffer[4]));
-		printf("socks_connection::on_request_domain_name(%s): hostname: %s port: %d\n"
+		std::printf("socks_connection::on_request_domain_name(%s): hostname: %s port: %d\n"
 			, command(), hostname.c_str(), port);
 
 		char port_str[10];
@@ -389,12 +390,12 @@ namespace sim
 		{
 			if (ec)
 			{
-				printf("socks_connection::on_request_domain_lookup(%s): (%d) %s\n"
+				std::printf("socks_connection::on_request_domain_lookup(%s): (%d) %s\n"
 					, command(), ec.value(), ec.message().c_str());
 			}
 			else
 			{
-				printf("socks_connection::on_request_domain_lookup(%s): empty response\n"
+				std::printf("socks_connection::on_request_domain_lookup(%s): empty response\n"
 					, command());
 			}
 
@@ -404,7 +405,7 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | Variable |    2     |
 // +----+-----+-------+------+----------+----------+
 
-			m_in_buffer[0] = m_version; // version
+			m_in_buffer[0] = char(m_version); // version
 			m_in_buffer[1] = 4; // response (host unreachable)
 			m_in_buffer[2] = 0; // reserved
 			m_in_buffer[3] = 1; // IPv4
@@ -415,14 +416,14 @@ namespace sim
 			auto self = shared_from_this();
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], 10)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
 			return;
 		}
 
-		printf("socks_connection::on_request_domain_lookup(%s): connecting to: %s port: %d\n"
+		std::printf("socks_connection::on_request_domain_lookup(%s): connecting to: %s port: %d\n"
 			, command()
 			, iter->endpoint().address().to_string().c_str()
 			, iter->endpoint().port());
@@ -431,7 +432,7 @@ namespace sim
 
 	void socks_connection::open_forward_connection(asio::ip::tcp::endpoint target)
 	{
-		printf("socks_connection::open_forward_connection(%s): connecting to %s port %d\n"
+		std::printf("socks_connection::open_forward_connection(%s): connecting to %s port %d\n"
 			, command(), target.address().to_string().c_str(), target.port());
 
 		m_server_connection.open(target.protocol());
@@ -442,14 +443,14 @@ namespace sim
 
 	void socks_connection::bind_connection(asio::ip::tcp::endpoint target)
 	{
-		printf("socks_connection::bind_connection(%s): binding to %s port %d\n"
+		std::printf("socks_connection::bind_connection(%s): binding to %s port %d\n"
 			, command(), target.address().to_string().c_str(), target.port());
 
 		error_code ec;
 		m_bind_socket.open(target.protocol(), ec);
 		if (ec)
 		{
-			printf("ERROR: open bind socket failed: (%d) %s\n", ec.value()
+			std::printf("ERROR: open bind socket failed: (%d) %s\n", ec.value()
 				, ec.message().c_str());
 		}
 		else
@@ -465,7 +466,7 @@ namespace sim
 
 		if (ec)
 		{
-			printf("ERROR: binding socket to %s %d failed: (%d) %s\n"
+			std::printf("ERROR: binding socket to %s %d failed: (%d) %s\n"
 				, target.address().to_string().c_str()
 				, target.port()
 				, ec.value()
@@ -475,7 +476,7 @@ namespace sim
 
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], len)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
@@ -492,7 +493,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("socks_connection(%s): error writing to client: (%d) %s\n"
+			std::printf("socks_connection(%s): error writing to client: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -521,8 +522,8 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | Variable |    2     |
 // +----+-----+-------+------+----------+----------+
 
-			m_in_buffer[i++] = m_version; // version
-			m_in_buffer[i++] = response; // response
+			m_in_buffer[i++] = char(m_version); // version
+			m_in_buffer[i++] = char(response); // response
 			m_in_buffer[i++] = 0; // reserved
 			if (ep.address().is_v4())
 			{
@@ -543,7 +544,7 @@ namespace sim
 		else
 		{
 			m_in_buffer[i++] = 0; // response version
-			m_in_buffer[i++] = response; // return code
+			m_in_buffer[i++] = char(response); // return code
 
 			assert(ep.address().is_v4());
 
@@ -559,7 +560,7 @@ namespace sim
 
 	void socks_connection::on_connected(boost::system::error_code const& ec)
 	{
-		printf("socks_connection(%s): on_connect: (%d) %s\n"
+		std::printf("socks_connection(%s): on_connect: (%d) %s\n"
 			, command(), ec.value(), ec.message().c_str());
 
 		if (ec == asio::error::operation_aborted
@@ -572,7 +573,7 @@ namespace sim
 		asio::ip::tcp::endpoint const ep = m_server_connection.remote_endpoint(err);
 		if (!err)
 		{
-			printf("socks_connection(%s): remote_endpoint: %s %d\n"
+			std::printf("socks_connection(%s): remote_endpoint: %s %d\n"
 				, command(), ep.address().to_string().c_str(), ep.port());
 		}
 
@@ -583,14 +584,14 @@ namespace sim
 
 		if (ec)
 		{
-			printf("socks_connection(%s): failed to connect to/accept from target server: (%d) %s\n"
+			std::printf("socks_connection(%s): failed to connect to/accept from target server: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 
 			auto self = shared_from_this();
 
 			asio::async_write(m_client_connection
 				, asio::const_buffers_1(&m_in_buffer[0], len)
-				, [=](boost::system::error_code const& ec, size_t)
+				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
 				});
@@ -605,7 +606,7 @@ namespace sim
 			{
 				if (ec)
 				{
-					printf("socks_connection(%s): error writing to client: (%d) %s\n"
+					std::printf("socks_connection(%s): error writing to client: (%d) %s\n"
 						, command(), ec.value(), ec.message().c_str());
 					return;
 				}
@@ -635,7 +636,7 @@ namespace sim
 
 		if (ec)
 		{
-			printf("socks_connection (%s): error reading from client: (%d) %s\n"
+			std::printf("socks_connection (%s): error reading from client: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -645,11 +646,12 @@ namespace sim
 				, _1, _2));
 	}
 
-	void socks_connection::on_client_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_client_forward(error_code const& ec
+		, size_t /* bytes_transferred */)
 	{
 		if (ec)
 		{
-			printf("socks_connection(%s): error writing to server: (%d) %s\n"
+			std::printf("socks_connection(%s): error writing to server: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -667,7 +669,7 @@ namespace sim
 	{
 		if (ec)
 		{
-			printf("socks_connection(%s): error reading from server: (%d) %s\n"
+			std::printf("socks_connection(%s): error reading from server: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -678,11 +680,12 @@ namespace sim
 				, _1, _2));
 	}
 
-	void socks_connection::on_server_forward(error_code const& ec, size_t bytes_transferred)
+	void socks_connection::on_server_forward(error_code const& ec
+		, size_t /* bytes_transferred */)
 	{
 		if (ec)
 		{
-			printf("socks_connection(%s): error writing to client: (%d) %s\n"
+			std::printf("socks_connection(%s): error writing to client: (%d) %s\n"
 				, command(), ec.value(), ec.message().c_str());
 			close_connection();
 			return;
@@ -700,20 +703,20 @@ namespace sim
 		m_client_connection.close(err);
 		if (err)
 		{
-			printf("socks_connection::close: failed to close client connection (%d) %s\n"
+			std::printf("socks_connection::close: failed to close client connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 		m_server_connection.close(err);
 		if (err)
 		{
-			printf("socks_connection::close: failed to close server connection (%d) %s\n"
+			std::printf("socks_connection::close: failed to close server connection (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 
 		m_bind_socket.close(err);
 		if (err)
 		{
-			printf("socks_connection::close: failed to close bind socket (%d) %s\n"
+			std::printf("socks_connection::close: failed to close bind socket (%d) %s\n"
 				, err.value(), err.message().c_str());
 		}
 	}

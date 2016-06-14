@@ -57,10 +57,11 @@ namespace ip {
 			const chrono::high_resolution_clock::time_point t = chrono::high_resolution_clock::now()
 				+ chrono::microseconds(1);
 			basic_resolver_iterator<Protocol> iter;
-			int port = atoi(q.service_name().c_str());
+			int const port = atoi(q.service_name().c_str());
+			assert(port >= 0 && port <= 0xffff);
 			iter.m_idx = 0;
 			iter.m_results.emplace_back(
-				typename Protocol::endpoint(addr, port)
+				typename Protocol::endpoint(addr, static_cast<unsigned short>(port))
 				, q.host_name()
 				, q.service_name());
 			result_t res = {t, ec, iter, handler };
@@ -78,13 +79,14 @@ namespace ip {
 
 		basic_resolver_iterator<Protocol> iter;
 
-		int port = atoi(q.service_name().c_str());
+		int const port = atoi(q.service_name().c_str());
+		assert(port >= 0 && port <= 0xffff);
 
 		iter.m_idx = 0;
 		for (auto const& ip : result)
 		{
 			iter.m_results.emplace_back(
-				typename Protocol::endpoint(ip, port)
+				typename Protocol::endpoint(ip, static_cast<unsigned short>(port))
 				, q.host_name()
 				, q.service_name());
 		}

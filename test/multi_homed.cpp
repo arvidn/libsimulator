@@ -21,6 +21,11 @@ All rights reserved.
 
 #include "catch.hpp"
 
+#ifdef __GNUC__
+// for CATCH's CHECK macro
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+
 using namespace sim;
 using namespace sim::asio::ip;
 using namespace sim::chrono;
@@ -46,11 +51,11 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 	if (ec)
 	{
-		printf("[%4d] error while receiving: %s\n", millis, ec.message().c_str());
+		std::printf("[%4d] error while receiving: %s\n", millis, ec.message().c_str());
 		return;
 	}
 
-	printf("[%4d] received packet on %s\n", millis,
+	std::printf("[%4d] received packet on %s\n", millis,
 		s.local_endpoint().address().to_string().c_str());
 
 	if (s.local_endpoint().address().is_v4())
@@ -120,7 +125,7 @@ TEST_CASE("one node can have multiple addresses", "multi-homed")
 	CHECK(num_ipv4 == 1);
 	CHECK(num_ipv6 == 1);
 
-	printf("[%4d] simulation::run() returned: %s\n"
+	std::printf("[%4d] simulation::run() returned: %s\n"
 		, millis, ec.message().c_str());
 }
 

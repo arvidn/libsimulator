@@ -16,8 +16,17 @@ All rights reserved.
 
 */
 
+#ifndef HTTP_SERVER_HPP_INCLUDED
+#define HTTP_SERVER_HPP_INCLUDED
+
 #include "simulator/simulator.hpp"
 #include <string>
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
 
 namespace sim
 {
@@ -54,7 +63,7 @@ struct SIMULATOR_DECL http_server
 		keep_alive = 1
 	};
 
-	http_server(asio::io_service& ios, int listen_port
+	http_server(asio::io_service& ios, unsigned short listen_port
 		, int flags = http_server::keep_alive);
 
 	void stop();
@@ -98,4 +107,9 @@ private:
 
 }
 
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
+#endif
 

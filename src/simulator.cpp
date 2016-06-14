@@ -21,7 +21,11 @@ All rights reserved.
 #include <functional>
 #include <unordered_set>
 #include <set>
+#include <cstdio> // for printf
+
+#include "simulator/push_warnings.hpp"
 #include <boost/system/error_code.hpp>
+#include "simulator/pop_warnings.hpp"
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
@@ -176,56 +180,56 @@ void dump_network_graph(simulation const& s, std::string filename)
 
 	FILE* f = fopen(filename.c_str(), "w+");
 
-	fprintf(f, "digraph network {\n"
+	std::fprintf(f, "digraph network {\n"
 		"concentrate=true;\n"
 		"overlap=scale;\n"
 		"splines=true;\n");
 
-	fprintf(f, "\n// nodes\n\n");
+	std::fprintf(f, "\n// nodes\n\n");
 
 	for (auto n : nodes)
 	{
 		std::string attributes = n->attributes();
-		fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"red\"%s%s];\n"
-			, n.get()
+		std::fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"red\"%s%s];\n"
+			, static_cast<void*>(n.get())
 			, escape_label(n->label()).c_str()
 			, attributes.empty() ? "" : ", "
 			, attributes.c_str());
 	}
 
-	fprintf(f, "\n// local networks\n\n");
+	std::fprintf(f, "\n// local networks\n\n");
 
 	int idx = 0;
 	for (auto ln : local_nodes)
 	{
-		fprintf(f, "subgraph cluster_%d {\n", idx++);
+		std::fprintf(f, "subgraph cluster_%d {\n", idx++);
 
 		for (auto n : ln)
 		{
 			std::string attributes = n->attributes();
-			fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"green\"%s%s];\n"
-				, n.get()
+			std::fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"green\"%s%s];\n"
+				, static_cast<void*>(n.get())
 				, escape_label(n->label()).c_str()
 				, attributes.empty() ? "" : ", "
 				, attributes.c_str());
 		}
 
-		fprintf(f, "}\n");
+		std::fprintf(f, "}\n");
 	}
 
-	fprintf(f, "\n// edges\n\n");
+	std::fprintf(f, "\n// edges\n\n");
 
 	while (!edges.empty())
 	{
 		auto edge = *edges.begin();
 		edges.erase(edges.begin());
 
-		fprintf(f, "\"%p\" -> \"%p\"\n"
-			, edge.first.get()
-			, edge.second.get());
+		std::fprintf(f, "\"%p\" -> \"%p\"\n"
+			, static_cast<void*>(edge.first.get())
+			, static_cast<void*>(edge.second.get()));
 	}
 
-	fprintf(f, "}\n");
+	std::fprintf(f, "}\n");
 	fclose(f);
 }
 
