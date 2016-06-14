@@ -72,6 +72,7 @@ lib simulator
 	<target-os>windows:<library>wsock32
 
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
+	<define>_CRT_SECURE_NO_WARNINGS
 
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
