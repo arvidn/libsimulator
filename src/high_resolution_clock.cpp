@@ -19,7 +19,9 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 
 #include <functional>
+#include "simulator/push_warnings.hpp"
 #include <boost/system/error_code.hpp>
+#include "simulator/pop_warnings.hpp"
 
 namespace sim { namespace chrono {
 	namespace {

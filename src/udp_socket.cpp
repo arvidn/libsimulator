@@ -19,8 +19,11 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 
 #include <functional>
+
+#include "simulator/push_warnings.hpp"
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
+#include "simulator/pop_warnings.hpp"
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
