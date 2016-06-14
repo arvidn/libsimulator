@@ -65,6 +65,12 @@ All rights reserved.
 #define LIBSIMULATOR_USE_MOVE 0
 #endif
 
+#ifdef _MSC_VER
+#pragma warning(push)
+// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
+#pragma warning( disable : 4251)
+#endif
+
 namespace sim
 {
 	namespace aux
@@ -1438,8 +1444,9 @@ namespace sim
 	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
 }
 
-// https://support.microsoft.com/en-us/kb/168958
-template class SIMULATOR_DECL std::deque<std::shared_ptr<sim::sink>>;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // SIMULATOR_HPP_INCLUDED
 
