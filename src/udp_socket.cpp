@@ -228,13 +228,11 @@ namespace ip {
 		if (sender) *sender = *p.from;
 
 		int read = 0;
-		typedef std::vector<boost::asio::mutable_buffer> buffers_t;
-		for (buffers_t::const_iterator i = bufs.begin(), end(bufs.end());
-			i != end; ++i)
+		for (auto const& buf : bufs)
 		{
-			char* ptr = asio::buffer_cast<char*>(*i);
-			int len = asio::buffer_size(*i);
-			int to_copy = (std::min)(int(p.buffer.size()), len);
+			char* ptr = asio::buffer_cast<char*>(buf);
+			int const len = int(asio::buffer_size(buf));
+			int const to_copy = (std::min)(int(p.buffer.size()), len);
 			memcpy(ptr, &p.buffer[0], to_copy);
 			read += to_copy;
 			p.buffer.erase(p.buffer.begin(), p.buffer.begin() + to_copy);
@@ -390,7 +388,7 @@ namespace ip {
 				, asio::buffer_cast<uint8_t const*>(*i) + asio::buffer_size(*i));
 		}
 
-		const int packet_size = p.buffer.size() + p.overhead;
+		int const packet_size = int(p.buffer.size() + p.overhead);
 		forward_packet(std::move(p));
 
 		m_next_send += chrono::duration_cast<duration>(chrono::nanoseconds(
@@ -401,12 +399,12 @@ namespace ip {
 
 	void udp::socket::incoming_packet(aux::packet p)
 	{
-		const int packet_size = p.buffer.size() + p.overhead;
+		int const packet_size = int(p.buffer.size() + p.overhead);
 
 		// silent drop. If the application isn't reading fast enough, drop packets
 		if (m_queue_size + packet_size > 256 * 1024) return;
 
-		m_queue_size += p.buffer.size();
+		m_queue_size += int(p.buffer.size());
 		m_incoming_queue.push_back(std::move(p));
 
 		maybe_wakeup_reader();
