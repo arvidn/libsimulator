@@ -592,7 +592,7 @@ namespace ip {
 		boost::system::error_code ec;
 		// null_buffers notifies the handler when data is available, without
 		// reading any
-		int bytes = available(ec);
+		int const bytes = int(available(ec));
 		if (ec)
 		{
 			m_io_service.post(std::bind(handler, ec, 0));

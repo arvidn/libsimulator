@@ -8,6 +8,10 @@ env:
   - variant=debug
   - variant=release
 
+branches:
+  only:
+    - master
+
 # container-based builds
 sudo: false
 cache:

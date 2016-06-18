@@ -93,7 +93,7 @@ namespace sim
 			return;
 		}
 
-		m_num_client_in_bytes += bytes_transferred;
+		m_num_client_in_bytes += int(bytes_transferred);
 
 		// scan for end of HTTP request
 		int req_len = find_request_len(m_client_in_buffer, m_num_client_in_bytes);
@@ -183,7 +183,7 @@ namespace sim
 		}
 		memmove(&m_server_out_buffer + m_num_server_out_bytes
 			, out_request.data(), out_request.size());
-		m_num_server_out_bytes += out_request.size();
+		m_num_server_out_bytes += int(out_request.size());
 
 		if (!m_server_connection.is_open())
 		{
@@ -284,7 +284,7 @@ namespace sim
 
 		memmove(&m_server_out_buffer[0], m_server_out_buffer + bytes_transferred
 			, m_num_server_out_bytes - bytes_transferred);
-		m_num_server_out_bytes -= bytes_transferred;
+		m_num_server_out_bytes -= int(bytes_transferred);
 
 		if (m_num_server_out_bytes > 0)
 			write_server_send_buffer();
