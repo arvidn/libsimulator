@@ -49,7 +49,7 @@ namespace sim
 		if (s.empty()) return s;
 
 		int start = 0;
-		int end = s.size();
+		int end = int(s.size());
 		while (strchr(" \r\n\t", s[start]) != NULL && start < end)
 		{
 			++start;
@@ -191,7 +191,8 @@ namespace sim
 			throw std::runtime_error("parse failed");
 		}
 
-		char const* const space2 = find(space + 1, len - (space - start + 1), " ", 1);
+		char const* const space2 = find(space + 1
+			, int(len - (space - start + 1)), " ", 1);
 		if (space2 == nullptr)
 		{
 			std::printf("http_server: failed to parse request:\n%s\n"
@@ -204,7 +205,7 @@ namespace sim
 		std::printf("http_server: incoming request: %s %s [%s]\n"
 			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
 
-		char const* header = find(space2, len - (space2 - start), "\r\n", 2);
+		char const* header = find(space2, int(len - (space2 - start)), "\r\n", 2);
 		while (header != end_of_request - 4)
 		{
 			if (header == nullptr)
@@ -213,7 +214,8 @@ namespace sim
 					, std::string(start, len).c_str());
 				throw std::runtime_error("parse failed");
 			}
-			char const* const next = find(header + 2, len - (header + 2 - start), "\r\n", 2);
+			char const* const next = find(header + 2
+				, int(len - (header + 2 - start)), "\r\n", 2);
 			char const* const value = static_cast<char const*>(memchr(header, ':', len - (header - start)));
 			if (value == nullptr || next == nullptr || value > next)
 			{
@@ -230,11 +232,11 @@ namespace sim
 		return ret;
 	}
 
-	int find_request_len(char const* buf, int len)
+	int find_request_len(char const* buf, int const len)
 	{
 		char const* end_of_request = find(buf, len, "\r\n\r\n", 4);
 		if (end_of_request == nullptr) return -1;
-		return end_of_request - buf + 4;
+		return int(end_of_request - buf + 4);
 	}
 
 	void http_server::on_read(error_code const& ec, size_t bytes_transferred) try
@@ -247,7 +249,7 @@ namespace sim
 			return;
 		}
 
-		m_bytes_used += bytes_transferred;
+		m_bytes_used += int(bytes_transferred);
 
 		int const req_len = find_request_len(m_recv_buffer.data(), m_bytes_used);
 		if (req_len < 0)

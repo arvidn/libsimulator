@@ -69,7 +69,7 @@ namespace sim
 
 	void queue::incoming_packet(aux::packet p)
 	{
-		const int packet_size = p.buffer.size() + p.overhead;
+		const int packet_size = int(p.buffer.size() + p.overhead);
 
 		// tail-drop
 		if (p.ok_to_drop()
@@ -115,7 +115,7 @@ namespace sim
 			/ double(m_bandwidth);
 
 		aux::packet const& p = m_queue.front().second;
-		const int packet_size = p.buffer.size() + p.overhead;
+		const int packet_size = int(p.buffer.size() + p.overhead);
 
 		m_last_forward += chrono::duration_cast<duration>(chrono::nanoseconds(
 			boost::int64_t(nanoseconds_per_byte * packet_size)));
@@ -129,7 +129,7 @@ namespace sim
 	{
 		aux::packet p = std::move(m_queue.front().second);
 		m_queue.erase(m_queue.begin());
-		const int packet_size = p.buffer.size() + p.overhead;
+		const int packet_size = int(p.buffer.size() + p.overhead);
 		m_queue_size -= packet_size;
 
 		forward_packet(std::move(p));

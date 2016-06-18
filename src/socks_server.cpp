@@ -365,7 +365,7 @@ namespace sim
 			return;
 		}
 
-		const int buffer_size = 10 + bytes_transferred;
+		int const buffer_size = int(10 + bytes_transferred);
 
 		boost::uint16_t port = m_out_buffer[buffer_size - 2] & 0xff;
 		port <<= 8;
@@ -530,12 +530,12 @@ namespace sim
 				m_in_buffer[i++] = 1; // IPv4
 				address_v4::bytes_type b = ep.address().to_v4().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
-				i += b.size();
+				i += int(b.size());
 			} else {
 				m_in_buffer[i++] = 4; // IPv6
 				address_v6::bytes_type b = ep.address().to_v6().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
-				i += b.size();
+				i += int(b.size());
 			}
 
 			m_in_buffer[i++] = ep.port() >> 8;
@@ -553,7 +553,7 @@ namespace sim
 
 			address_v4::bytes_type b = ep.address().to_v4().to_bytes();
 			memcpy(&m_in_buffer[i], &b[0], b.size());
-			i += b.size();
+			i += int(b.size());
 		}
 		return i;
 	}

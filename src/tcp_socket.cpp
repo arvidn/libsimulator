@@ -363,10 +363,10 @@ namespace ip {
 	{
 		int buf_size = 0;
 		for (int i = 0; i < int(bufs.size()); ++i)
-			buf_size += buffer_size(bufs[i]);
+			buf_size += int(buffer_size(bufs[i]));
 
 		boost::system::error_code ec;
-		std::size_t bytes_transferred = write_some_impl(bufs, ec);
+		std::size_t const bytes_transferred = write_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block))
 		{
 			m_send_handler = handler;
@@ -383,7 +383,7 @@ namespace ip {
 		}
 
 		m_io_service.post(std::bind(handler, boost::system::error_code()
-				, bytes_transferred));
+			, bytes_transferred));
 		m_send_handler = 0;
 		m_send_buffer.clear();
 	}
@@ -420,20 +420,19 @@ namespace ip {
 			return 0;
 		}
 
-		typedef std::vector<boost::asio::const_buffer> buffers_t;
 		std::size_t ret = 0;
 
-		for (buffers_t::const_iterator i = bufs.begin(), end(bufs.end()); i != end; ++i)
+		for (auto const& buf : bufs)
 		{
 			// split up in packets
-			int buf_size = buffer_size(*i);
-			uint8_t const* buf = boost::asio::buffer_cast<uint8_t const*>(*i);
+			int buf_size = int(buffer_size(buf));
+			std::uint8_t const* ptr = boost::asio::buffer_cast<std::uint8_t const*>(buf);
 			while (buf_size > 0)
 			{
 				int packet_size = (std::min)(buf_size, m_mss);
 				aux::packet p;
 				p.type = aux::packet::payload;
-				p.buffer.assign(buf, buf + packet_size);
+				p.buffer.assign(ptr, ptr + packet_size);
 				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.overhead = 40;
@@ -442,7 +441,7 @@ namespace ip {
 				p.drop_fun.reset(new std::function<void(sim::aux::packet)>(std::bind(&tcp::socket::packet_dropped, this, _1)));
 
 				send_packet(std::move(p));
-				buf += packet_size;
+				ptr += packet_size;
 				buf_size -= packet_size;
 				ret += packet_size;
 
@@ -515,8 +514,8 @@ namespace ip {
 				// both are vectors of buffers, so it can get a bit hairy
 				while (recv_iter != m_recv_buffer.end())
 				{
-					int buf_size = asio::buffer_size(*recv_iter);
-					int copy_size = (std::min)(int(p.buffer.size())
+					int const buf_size = int(asio::buffer_size(*recv_iter));
+					int const copy_size = (std::min)(int(p.buffer.size())
 						, buf_size - buf_offset);
 
 					memcpy(asio::buffer_cast<char*>(*recv_iter) + buf_offset
@@ -654,8 +653,8 @@ namespace ip {
 
 	void tcp::socket::send_packet(aux::packet p)
 	{
-		m_bytes_in_flight += p.buffer.size();
-		m_outstanding_packet_sizes[p.seq_nr] = p.buffer.size();
+		m_bytes_in_flight += int(p.buffer.size());
+		m_outstanding_packet_sizes[p.seq_nr] = int(p.buffer.size());
 
 		forward_packet(std::move(p));
 	}
