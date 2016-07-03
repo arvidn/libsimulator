@@ -1288,7 +1288,7 @@ namespace sim
 		struct timer_compare
 		{
 			bool operator()(asio::high_resolution_timer const* lhs
-				, asio::high_resolution_timer const* rhs)
+				, asio::high_resolution_timer const* rhs) const
 			{ return lhs->expires_at() < rhs->expires_at(); }
 		};
 
