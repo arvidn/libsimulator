@@ -105,7 +105,7 @@ namespace sim
 		, int len, char const** extra_header)
 	{
 		char msg[600];
-		int pkt_len = snprintf(msg, sizeof(msg), "HTTP/1.1 %d %s\r\n"
+		int pkt_len = std::snprintf(msg, sizeof(msg), "HTTP/1.1 %d %s\r\n"
 			"content-length: %d\r\n"
 			"%s"
 			"%s"

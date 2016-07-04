@@ -193,7 +193,7 @@ namespace sim
 			if (err)
 			{
 				char port_str[10];
-				snprintf(port_str, sizeof(port_str), "%d", port);
+				std::snprintf(port_str, sizeof(port_str), "%d", port);
 				asio::ip::tcp::resolver::query q(host, port_str);
 				m_resolver.async_resolve(q
 					, std::bind(&http_proxy::on_domain_lookup, this, _1, _2));

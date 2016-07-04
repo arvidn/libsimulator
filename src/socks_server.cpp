@@ -376,7 +376,7 @@ namespace sim
 			, command(), hostname.c_str(), port);
 
 		char port_str[10];
-		snprintf(port_str, sizeof(port_str), "%d", port);
+		std::snprintf(port_str, sizeof(port_str), "%d", port);
 		asio::ip::tcp::resolver::query q(hostname, port_str);
 		m_resolver.async_resolve(q
 			, std::bind(&socks_connection::on_request_domain_lookup
