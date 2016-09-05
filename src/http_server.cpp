@@ -192,7 +192,7 @@ namespace sim
 
 			return sim::send_response(range_req ? 206 : 200
 				, range_req ? "Partial Content" : "OK"
-				, end - start, range_req ? extra_headers : nullptr)
+				, int(end - start), range_req ? extra_headers : nullptr)
 				+ gen(start, end - start);
 		};
 	}
