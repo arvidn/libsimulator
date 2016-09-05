@@ -55,7 +55,7 @@ namespace sim { namespace asio {
 		assert(false);
 	}
 
-	int io_service::get_path_mtu(asio::ip::address source, asio::ip::address dest) const
+	int io_service::get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const
 	{
 		// TODO: it would be nice to actually traverse the virtual network nodes
 		// and ask for their MTU instead
@@ -181,7 +181,7 @@ namespace sim { namespace asio {
 	}
 
 	void io_service::unbind_socket(ip::tcp::socket* socket
-		, ip::tcp::endpoint ep)
+		, const ip::tcp::endpoint& ep)
 	{
 		m_sim.unbind_socket(socket, ep);
 	}
@@ -231,7 +231,7 @@ namespace sim { namespace asio {
 	}
 
 	void io_service::unbind_udp_socket(ip::udp::socket* socket
-		, ip::udp::endpoint ep)
+		, const ip::udp::endpoint& ep)
 	{
 		m_sim.unbind_udp_socket(socket, ep);
 	}

@@ -70,7 +70,7 @@ namespace sim
 		return ret;
 	}
 
-	std::string normalize(std::string s)
+	std::string normalize(const std::string& s)
 	{
 		std::vector<std::string> elements;
 		char const* start = s.c_str();
@@ -101,23 +101,24 @@ namespace sim
 		return ret;
 	}
 
+	// TODO: extra_header should be a std::vector
 	std::string send_response(int code, char const* status_message
 		, int len, char const** extra_header)
 	{
-		char msg[600];
-		int pkt_len = std::snprintf(msg, sizeof(msg), "HTTP/1.1 %d %s\r\n"
-			"content-length: %d\r\n"
-			"%s"
-			"%s"
-			"%s"
-			"%s"
-			"\r\n"
-			, code, status_message, len
-			, extra_header ? extra_header[0] : ""
-			, extra_header ? extra_header[1] : ""
-			, extra_header ? extra_header[2] : ""
-			, extra_header ? extra_header[3] : "");
-		return std::string(msg, pkt_len);
+		std::string ret = "HTTP/1.1 " + std::to_string(code) + " " + status_message + "\r\n";
+
+		ret += "content-length: " + std::to_string(len) + "\r\n";
+
+		if (extra_header)
+		{
+			ret += extra_header[0];
+			ret += extra_header[1];
+			ret += extra_header[2];
+			ret += extra_header[3];
+		}
+		ret += "\r\n";
+
+		return ret;
 	}
 
 	http_server::http_server(io_service& ios, unsigned short listen_port, int flags)
@@ -161,9 +162,49 @@ namespace sim
 		read();
 	}
 
-	void http_server::register_handler(std::string path, handler_t const& h)
+	void http_server::register_handler(std::string const& path, handler_t h)
 	{
-		m_handlers[path] = h;
+		m_handlers[path] = std::move(h);
+	}
+
+	void http_server::register_content(std::string const& path
+		, std::int64_t const size, generator_t gen)
+	{
+		m_handlers[path] = [gen,size](std::string, std::string, std::map<std::string, std::string>& hdr)
+		{
+			std::int64_t start = 0;
+			std::int64_t end = size;
+
+			auto it = hdr.find("range");
+			bool const range_req = it != hdr.end();
+			if (range_req)
+			{
+				std::string range = it->second;
+				// skip "bytes "
+				range = range.substr(range.find_first_of('=') + 1);
+				start = std::stoll(range.substr(0, range.find('-')));
+				end = std::stoll(range.substr(range.find_first_of('-') + 1)) + 1;
+			}
+
+			std::string header = "Content-Range: bytes " + std::to_string(start)
+				+ "-" + std::to_string(end-1) + "/" + std::to_string(end-start) + "\r\n";
+			char const* extra_headers[4] = { header.c_str(), "", "", ""};
+
+			return sim::send_response(range_req ? 206 : 200
+				, range_req ? "Partial Content" : "OK"
+				, end - start, range_req ? extra_headers : nullptr)
+				+ gen(start, end - start);
+		};
+	}
+
+	void http_server::register_redirect(std::string const& path, std::string const& target)
+	{
+		m_handlers[path] = [target](std::string, std::string, std::map<std::string, std::string>&)
+		{
+			std::string header = "Location: " + target + "\r\n";
+			char const* extra_headers[4] = { header.c_str(), "", "", ""};
+			return sim::send_response(301, "Moved Permanently", 0, extra_headers);
+		};
 	}
 
 	void http_server::read()

@@ -217,7 +217,7 @@ namespace sim
 		void wait();
 		void wait(boost::system::error_code& ec);
 
-		void async_wait(boost::function<void(boost::system::error_code)> handler);
+		void async_wait(const boost::function<void(boost::system::error_code)>& handler);
 
 		io_service& get_io_service() const { return m_io_service; }
 
@@ -993,10 +993,10 @@ namespace sim
 			void listen(int qs, boost::system::error_code& ec);
 
 			void async_accept(ip::tcp::socket& peer
-				, boost::function<void(boost::system::error_code const&)> h);
+				, const boost::function<void(boost::system::error_code const&)>& h);
 			void async_accept(ip::tcp::socket& peer
 				, ip::tcp::endpoint& peer_endpoint
-				, boost::function<void(boost::system::error_code const&)> h);
+				, const boost::function<void(boost::system::error_code const&)>& h);
 
 			boost::system::error_code close(boost::system::error_code& ec);
 			void close();
@@ -1112,12 +1112,12 @@ namespace sim
 		ip::tcp::endpoint bind_socket(ip::tcp::socket* socket, ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_socket(ip::tcp::socket* socket
-			, ip::tcp::endpoint ep);
+			, const ip::tcp::endpoint& ep);
 
 		ip::udp::endpoint bind_udp_socket(ip::udp::socket* socket, ip::udp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_udp_socket(ip::udp::socket* socket
-			, ip::udp::endpoint ep);
+			, const ip::udp::endpoint& ep);
 
 		std::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
 			, ip::tcp::endpoint const& target, boost::system::error_code& ec);
@@ -1131,7 +1131,7 @@ namespace sim
 		route const& get_incoming_route(ip::address ip) const
 		{ return m_incoming_route.find(ip)->second; }
 
-		int get_path_mtu(asio::ip::address source, asio::ip::address dest) const;
+		int get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const;
 		std::vector<ip::address> const& get_ips() const { return m_ips; }
 
 		sim::simulation& sim() { return m_sim; }
@@ -1263,13 +1263,13 @@ namespace sim
 			, asio::ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_socket(asio::ip::tcp::socket* socket
-			, asio::ip::tcp::endpoint ep);
+			, const asio::ip::tcp::endpoint& ep);
 
 		asio::ip::udp::endpoint bind_udp_socket(asio::ip::udp::socket* socket
 			, asio::ip::udp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_udp_socket(asio::ip::udp::socket* socket
-			, asio::ip::udp::endpoint ep);
+			, const asio::ip::udp::endpoint& ep);
 
 		std::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
 			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
@@ -1435,13 +1435,13 @@ namespace sim
 			// the endpoint of each end of the channel
 			asio::ip::tcp::endpoint ep[2];
 
-			int remote_idx(asio::ip::tcp::endpoint self) const;
-			int self_idx(asio::ip::tcp::endpoint self) const;
+			int remote_idx(const asio::ip::tcp::endpoint& self) const;
+			int self_idx(const asio::ip::tcp::endpoint& self) const;
 		};
 
 	} // aux
 
-	void SIMULATOR_DECL dump_network_graph(simulation const& s, std::string filename);
+	void SIMULATOR_DECL dump_network_graph(simulation const& s, const std::string& filename);
 }
 
 #ifdef _MSC_VER

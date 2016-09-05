@@ -34,7 +34,7 @@ namespace sim
 
 	std::string SIMULATOR_DECL lower_case(std::string s);
 
-	std::string SIMULATOR_DECL normalize(std::string s);
+	std::string SIMULATOR_DECL normalize(const std::string& s);
 
 	// returns the index to the last byte of the request, or -1 if the buffer
 	// does not contain a full http request
@@ -70,7 +70,12 @@ struct SIMULATOR_DECL http_server
 
 	using handler_t = std::function<std::string (std::string, std::string
 		, std::map<std::string, std::string>&)>;
-	void register_handler(std::string path, handler_t const& h);
+	using generator_t = std::function<std::string (std::int64_t, std::int64_t)>;
+
+	void register_handler(std::string const& path, handler_t h);
+	void register_content(std::string const& path
+		, std::int64_t const size, generator_t gen);
+	void register_redirect(std::string const& path, std::string const& target);
 
 private:
 

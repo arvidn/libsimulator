@@ -136,7 +136,7 @@ namespace sim
 		chrono::high_resolution_clock::fast_forward(m_expiration_time - now);
 	}
 
-	void high_resolution_timer::async_wait(boost::function<void(boost::system::error_code)> handler)
+	void high_resolution_timer::async_wait(const boost::function<void(boost::system::error_code)>& handler)
 	{
 		// TODO: support multiple handlers
 		assert(!m_handler);

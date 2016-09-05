@@ -100,7 +100,7 @@ namespace
 	}
 }
 
-void dump_network_graph(simulation const& s, std::string filename)
+void dump_network_graph(simulation const& s, const std::string& filename)
 {
 	// all edges (directed).
 	std::set<std::pair<std::shared_ptr<sink>, std::shared_ptr<sink>>> edges;
@@ -187,7 +187,7 @@ void dump_network_graph(simulation const& s, std::string filename)
 
 	std::fprintf(f, "\n// nodes\n\n");
 
-	for (auto n : nodes)
+	for (const auto& n : nodes)
 	{
 		std::string attributes = n->attributes();
 		std::fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"red\"%s%s];\n"
@@ -204,7 +204,7 @@ void dump_network_graph(simulation const& s, std::string filename)
 	{
 		std::fprintf(f, "subgraph cluster_%d {\n", idx++);
 
-		for (auto n : ln)
+		for (const auto& n : ln)
 		{
 			std::string attributes = n->attributes();
 			std::fprintf(f, " \"%p\" [label=\"%s\",style=\"filled\",color=\"green\"%s%s];\n"
@@ -235,7 +235,7 @@ void dump_network_graph(simulation const& s, std::string filename)
 
 namespace aux {
 
-	int channel::remote_idx(asio::ip::tcp::endpoint self) const
+	int channel::remote_idx(const asio::ip::tcp::endpoint& self) const
 	{
 		if (ep[0] == self) return 1;
 		if (ep[1] == self) return 0;
@@ -243,7 +243,7 @@ namespace aux {
 		return -1;
 	}
 
-	int channel::self_idx(asio::ip::tcp::endpoint self) const
+	int channel::self_idx(const asio::ip::tcp::endpoint& self) const
 	{
 		if (ep[0] == self) return 0;
 		if (ep[1] == self) return 1;

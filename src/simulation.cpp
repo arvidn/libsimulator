@@ -153,7 +153,7 @@ namespace sim
 	}
 
 	void simulation::unbind_socket(ip::tcp::socket* socket
-		, ip::tcp::endpoint ep)
+		, const ip::tcp::endpoint& ep)
 	{
 		listen_socket_iter_t i = m_listen_sockets.find(ep);
 		if (i == m_listen_sockets.end() || i->second != socket) return;
@@ -203,7 +203,7 @@ namespace sim
 	}
 
 	void simulation::unbind_udp_socket(ip::udp::socket* socket
-		, ip::udp::endpoint ep)
+		, const ip::udp::endpoint& ep)
 	{
 		udp_socket_iter_t i = m_udp_sockets.find(ep);
 		if (i == m_udp_sockets.end() || i->second != socket) return;

@@ -384,7 +384,7 @@ namespace sim
 	}
 
 	void socks_connection::on_request_domain_lookup(boost::system::error_code const& ec
-		, asio::ip::tcp::resolver::iterator iter)
+		, const asio::ip::tcp::resolver::iterator& iter)
 	{
 		if (ec || iter == asio::ip::tcp::resolver::iterator())
 		{
@@ -430,7 +430,7 @@ namespace sim
 		open_forward_connection(iter->endpoint());
 	}
 
-	void socks_connection::open_forward_connection(asio::ip::tcp::endpoint target)
+	void socks_connection::open_forward_connection(const asio::ip::tcp::endpoint& target)
 	{
 		std::printf("socks_connection::open_forward_connection(%s): connecting to %s port %d\n"
 			, command(), target.address().to_string().c_str(), target.port());
@@ -441,7 +441,7 @@ namespace sim
 				, _1));
 	}
 
-	void socks_connection::bind_connection(asio::ip::tcp::endpoint target)
+	void socks_connection::bind_connection(const asio::ip::tcp::endpoint& target)
 	{
 		std::printf("socks_connection::bind_connection(%s): binding to %s port %d\n"
 			, command(), target.address().to_string().c_str(), target.port());

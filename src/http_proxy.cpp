@@ -210,7 +210,7 @@ namespace sim
 	}
 
 	void http_proxy::on_domain_lookup(boost::system::error_code const& ec
-		, asio::ip::tcp::resolver::iterator iter)
+		, const asio::ip::tcp::resolver::iterator& iter)
 	{
 		if (ec || iter == asio::ip::tcp::resolver::iterator())
 		{
@@ -229,7 +229,7 @@ namespace sim
 		open_forward_connection(iter->endpoint());
 	}
 
-	void http_proxy::open_forward_connection(asio::ip::tcp::endpoint target)
+	void http_proxy::open_forward_connection(const asio::ip::tcp::endpoint& target)
 	{
 		m_server_connection.open(target.protocol());
 		m_server_connection.async_connect(target

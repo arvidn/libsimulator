@@ -45,11 +45,11 @@ private:
 	void on_read_request(boost::system::error_code const& ec, size_t bytes_transferred);
 
 	void forward_request(http_request const& req);
-	void open_forward_connection(asio::ip::tcp::endpoint target);
+	void open_forward_connection(const asio::ip::tcp::endpoint& target);
 	void on_connected(boost::system::error_code const& ec);
 
 	void on_domain_lookup(boost::system::error_code const& ec
-		, asio::ip::tcp::resolver::iterator iter);
+		, const asio::ip::tcp::resolver::iterator& iter);
 
 	void write_server_send_buffer();
 	void on_server_write(boost::system::error_code const& ec, size_t bytes_transferred);

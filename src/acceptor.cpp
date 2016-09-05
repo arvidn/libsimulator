@@ -101,7 +101,7 @@ namespace ip {
 	}
 
 	void tcp::acceptor::async_accept(ip::tcp::socket& peer
-		, boost::function<void(boost::system::error_code const&)> h)
+		, const boost::function<void(boost::system::error_code const&)>& h)
 	{
 		// TODO: assert that the io_service we use is the same as the one peer use
 		if (peer.is_open())
@@ -125,7 +125,7 @@ namespace ip {
 
 	void tcp::acceptor::async_accept(ip::tcp::socket& peer
 		, ip::tcp::endpoint& peer_endpoint
-		, boost::function<void(boost::system::error_code const&)> h)
+		, const boost::function<void(boost::system::error_code const&)>& h)
 	{
 		if (peer.is_open())
 		{
