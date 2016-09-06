@@ -313,6 +313,7 @@ namespace sim
 		}
 
 		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
+		m_bytes_used -= req_len;
 
 		bool close = lower_case(req.headers["connection"]) == "close";
 
