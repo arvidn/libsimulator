@@ -76,6 +76,7 @@ struct SIMULATOR_DECL http_server
 	void register_content(std::string const& path
 		, std::int64_t const size, generator_t gen);
 	void register_redirect(std::string const& path, std::string const& target);
+	void register_no_response_handler(std::string const& path);
 
 private:
 
