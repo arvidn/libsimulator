@@ -33,10 +33,12 @@ addons:
 install:
   - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam; fi'
   - 'if [ $TRAVIS_OS_NAME == "osx" ]; then echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam; fi'
-  - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build boost-python; fi
+  - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build; fi
   - ccache -V && ccache --show-stats && ccache --zero-stats
 
 script:
-  - bjam --hash -j3 variant=$variant -l900 warnings-as-errors=on $toolset $target
+# until we have a version of boost-build that's new enough, disable warnings
+# as errors
+  - bjam --hash -j3 variant=$variant -l900 warnings-as-errors=off $toolset $target
   - ccache --show-stats
 
