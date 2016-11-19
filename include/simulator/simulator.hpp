@@ -1297,16 +1297,6 @@ namespace sim
 		// these are the io services that represent nodes on the network
 		std::unordered_set<asio::io_service*> m_nodes;
 
-		// all non-expired timers
-		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
-		timer_queue_t m_timer_queue;
-		std::mutex m_timer_queue_mutex;
-		// underlying message queue
-		boost::asio::io_service m_service;
-
-		// used for internal timers
-		asio::io_service m_internal_ios;
-
 		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
 		using listen_socket_iter_t = listen_sockets_t::iterator;
 		listen_sockets_t m_listen_sockets;
@@ -1314,6 +1304,16 @@ namespace sim
 		using udp_sockets_t = std::map<asio::ip::udp::endpoint, asio::ip::udp::socket*>;
 		using udp_socket_iter_t = udp_sockets_t::iterator;
 		udp_sockets_t m_udp_sockets;
+
+		// all non-expired timers
+		std::mutex m_timer_queue_mutex;
+		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
+		timer_queue_t m_timer_queue;
+		// underlying message queue
+		boost::asio::io_service m_service;
+
+		// used for internal timers
+		asio::io_service m_internal_ios;
 
 		bool m_stopped;
 	};
