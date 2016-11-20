@@ -207,6 +207,13 @@ namespace sim
 		};
 	}
 
+	void http_server::register_no_response_handler(std::string const& path){
+		m_handlers[path] = [](std::string, std::string, std::map<std::string, std::string>&)
+		{
+			return "";
+		};
+	}
+
 	void http_server::read()
 	{
 		if (m_bytes_used >= int(m_recv_buffer.size()) / 2)
@@ -314,6 +321,10 @@ namespace sim
 
 		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
 		m_bytes_used -= req_len;
+
+		if (m_send_buffer.empty()) {
+			return;
+		}
 
 		bool close = lower_case(req.headers["connection"]) == "close";
 
