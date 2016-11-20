@@ -207,6 +207,10 @@ namespace sim
 		};
 	}
 
+	void http_server::register_stall_handler(std::string const& path){
+		m_stall_handlers.insert(path);
+	}
+
 	void http_server::read()
 	{
 		if (m_bytes_used >= int(m_recv_buffer.size()) / 2)
@@ -301,9 +305,16 @@ namespace sim
 
 		http_request req = parse_request(m_recv_buffer.data(), req_len);
 
+		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
+		m_bytes_used -= req_len;
+
 		auto it = m_handlers.find(req.path);
 		if (it == m_handlers.end())
 		{
+			if (m_stall_handlers.find(req.path) != m_stall_handlers.end())
+			{
+				return;
+			}
 			// no handler found, 404
 			m_send_buffer = send_response(404, "Not Found");
 		}
@@ -311,9 +322,6 @@ namespace sim
 		{
 			m_send_buffer = it->second(req.method, req.req, req.headers);
 		}
-
-		m_recv_buffer.erase(m_recv_buffer.begin(), m_recv_buffer.begin() + req_len);
-		m_bytes_used -= req_len;
 
 		bool close = lower_case(req.headers["connection"]) == "close";
 

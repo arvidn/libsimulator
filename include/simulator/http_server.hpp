@@ -76,6 +76,7 @@ struct SIMULATOR_DECL http_server
 	void register_content(std::string const& path
 		, std::int64_t const size, generator_t gen);
 	void register_redirect(std::string const& path, std::string const& target);
+	void register_stall_handler(std::string const& path);
 
 private:
 
@@ -94,6 +95,7 @@ private:
 	asio::ip::tcp::endpoint m_ep;
 
 	std::unordered_map<std::string, handler_t> m_handlers;
+	std::set<std::string> m_stall_handlers;
 
 	// read buffer, we receive bytes into this buffer for the connection
 	std::string m_recv_buffer;
