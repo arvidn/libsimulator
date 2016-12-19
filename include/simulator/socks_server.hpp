@@ -50,16 +50,20 @@ private:
 		, bool close);
 	void close_connection();
 
-	int format_response(asio::ip::tcp::endpoint const& ep, int response);
+	int format_response(asio::ip::address const& addr, int port, int response);
 
 	void on_connected(boost::system::error_code const& ec);
 	void on_request_domain_name(boost::system::error_code const& ec, size_t bytes_transferred);
 	void on_request_domain_lookup(boost::system::error_code const& ec
 		, const asio::ip::tcp::resolver::iterator& iter);
 
-	void open_forward_connection(const asio::ip::tcp::endpoint& target);
-	void bind_connection(const asio::ip::tcp::endpoint& target);
+	void open_forward_connection(asio::ip::tcp::endpoint const& target);
+	void bind_connection(asio::ip::tcp::endpoint const& target);
 	void start_accept(boost::system::error_code const& ec);
+
+	void udp_associate(asio::ip::tcp::endpoint const& target);
+	void on_read_udp(boost::system::error_code const& ec, std::size_t bytes_transferred);
+	void wait_for_eof(boost::system::error_code const& ec, std::size_t bytes_transferred);
 
 	void on_server_receive(boost::system::error_code const& ec
 		, std::size_t bytes_transferred);
@@ -85,6 +89,12 @@ private:
 	// to
 	asio::ip::tcp::socket m_server_connection;
 	asio::ip::tcp::acceptor m_bind_socket;
+
+	asio::ip::udp::socket m_udp_associate;
+	asio::ip::udp::endpoint m_udp_associate_ep;
+	asio::ip::udp::endpoint m_udp_from;
+
+	std::array<char, 1500> m_udp_buffer;
 
 	// receive buffer for data going out, i.e. client -> proxy (us) -> server
 	char m_out_buffer[65536];

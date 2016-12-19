@@ -94,6 +94,7 @@ namespace sim
 		, m_client_connection(ios)
 		, m_server_connection(m_ios)
 		, m_bind_socket(m_ios)
+		, m_udp_associate(m_ios)
 		, m_num_out_bytes(0)
 		, m_num_in_bytes(0)
 		, m_close(false)
@@ -254,7 +255,7 @@ namespace sim
 			return;
 		}
 
-		if (command != 1 && command != 2)
+		if (command != 1 && command != 2 && command != 3)
 		{
 			std::printf("socks_connection::on_request1: unexpected command: %d\n"
 				, command);
@@ -313,6 +314,14 @@ namespace sim
 				else if (command == 2)
 				{
 					bind_connection(target);
+				}
+				else if (command == 3)
+				{
+					if (target.address() == address())
+					{
+						target.address(m_client_connection.remote_endpoint().address());
+					}
+					udp_associate(target);
 				}
 
 				break;
@@ -461,8 +470,8 @@ namespace sim
 		int const response = ec
 			? (m_version == 4 ? 91 : 1)
 			: (m_version == 4 ? 90 : 0);
-		int const len = format_response(
-			m_bind_socket.local_endpoint(), response);
+		tcp::endpoint ep = m_bind_socket.local_endpoint();
+		int const len = format_response(ep.address(), ep.port(), response);
 
 		if (ec)
 		{
@@ -489,6 +498,157 @@ namespace sim
 			, std::bind(&socks_connection::start_accept, shared_from_this(), _1));
 	}
 
+	void socks_connection::udp_associate(const asio::ip::tcp::endpoint& target)
+	{
+		std::printf("socks_connection::udp_associate(%s): %s:%d\n"
+			, command(), target.address().to_string().c_str(), target.port());
+
+		m_udp_associate_ep.address(target.address());
+		m_udp_associate_ep.port(target.port());
+
+		error_code ec;
+		m_udp_associate.open(m_udp_associate_ep.protocol(), ec);
+		if (ec)
+		{
+			std::printf("ERROR: open UDP associate socket failed: (%d) %s\n", ec.value()
+				, ec.message().c_str());
+		}
+		else
+		{
+			m_udp_associate.bind(udp::endpoint(address_v4(), 0), ec);
+			if (ec)
+			{
+				std::printf("ERROR: binding socket failed: (%d) %s\n"
+					, ec.value(), ec.message().c_str());
+			}
+			else
+			{
+				m_udp_associate.io_control(udp::socket::non_blocking_io(true));
+				m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
+					, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, _1, _2));
+			}
+		}
+
+		int const response = ec ? 1 : 0;
+		udp::endpoint ep = m_udp_associate.local_endpoint();
+		int const len = format_response(ep.address(), ep.port(), response);
+
+		if (ec)
+		{
+			auto self = shared_from_this();
+
+			asio::async_write(m_client_connection
+				, asio::const_buffers_1(&m_in_buffer[0], len)
+				, [=](boost::system::error_code const&, size_t)
+				{
+					self->close_connection();
+				});
+			return;
+		}
+
+		// send response
+		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], len)
+			, std::bind(&socks_connection::wait_for_eof, shared_from_this(), _1, _2));
+	}
+
+	void socks_connection::wait_for_eof(boost::system::error_code const& ec
+		, std::size_t bytes_transferred)
+	{
+		if (ec)
+		{
+			std::printf("socks_connection::wait_for_eof: %s\n", ec.message().c_str());
+			m_udp_associate.close();
+			m_udp_associate_ep = udp::endpoint();
+			return;
+		}
+
+		m_client_connection.async_read_some(
+			asio::buffer(m_out_buffer, sizeof(m_out_buffer))
+			, std::bind(&socks_connection::wait_for_eof, shared_from_this()
+				, _1, _2));
+	}
+
+	void socks_connection::on_read_udp(boost::system::error_code const& ec
+		, std::size_t bytes_transferred)
+	{
+		std::printf("socks_connection::on_read_udp\n");
+		if (ec)
+		{
+			std::printf("socks_connection::on_read_udp: %s\n", ec.message().c_str());
+			return;
+		}
+
+		// if the client didn't specify an IP and port it would send packets from,
+		// we assumed the same IP as the TCP connection and assume the port is the
+		// same as the first UDP packet from that host
+		if (m_udp_associate_ep.port() == 0
+			&& m_udp_from.address() == m_udp_associate_ep.address())
+		{
+			m_udp_associate_ep.port(m_udp_from.port());
+		}
+
+		if (m_udp_from == m_udp_associate_ep)
+		{
+			// read UDP ASSICOATE header and forward outgoing packet
+			// +----+------+------+----------+----------+----------+
+			// |RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
+			// +----+------+------+----------+----------+----------+
+			// | 2  |  1   |  1   | Variable |    2     | Variable |
+			// +----+------+------+----------+----------+----------+
+
+			char const* ptr = m_udp_buffer.data();
+			if (ptr[2] != 0) std::printf("fragment != 0, not supported\n");
+
+			// TODO: support hostnames too
+			if (ptr[3] != 1) std::printf("only supports IPv4. ATYP: %d\n", ptr[3]);
+
+			boost::uint32_t addr = ptr[4] & 0xff;
+			addr <<= 8;
+			addr |= ptr[5] & 0xff;
+			addr <<= 8;
+			addr |= ptr[6] & 0xff;
+			addr <<= 8;
+			addr |= ptr[7] & 0xff;
+
+			boost::uint16_t port = ptr[8] & 0xff;
+			port <<= 8;
+			port |= ptr[9] & 0xff;
+
+			asio::ip::udp::endpoint const target(address_v4(addr), port);
+			error_code err;
+			m_udp_associate.send_to(boost::asio::buffer(ptr + 10, bytes_transferred - 10), target, 0, err);
+			if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+		}
+		else
+		{
+			// add UDP ASSOCIATE header and forward to client
+			std::uint32_t const from_addr = m_udp_from.address().to_v4().to_ulong();
+			std::uint16_t const from_port = m_udp_from.port();
+			std::array<char, 10> header;
+			header[0] = 0; // RSV
+			header[1] = 0;
+			header[2] = 0; // fragment
+			header[3] = 1; // ATYP
+			header[4] = (from_addr >> 24) & 0xff; // Address
+			header[5] = (from_addr >> 16) & 0xff;
+			header[6] = (from_addr >> 8) & 0xff;
+			header[7] = (from_addr) & 0xff;
+			header[8] = (from_port >> 8) & 0xff;
+			header[9] = from_port & 0xff;
+
+			std::array<boost::asio::const_buffer, 2> vec{{
+				{header.data(), header.size()},
+				{m_udp_buffer.data(), bytes_transferred}}};
+
+			error_code err;
+			m_udp_associate.send_to(vec, m_udp_associate_ep, 0, err);
+			if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+		}
+
+		m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
+			, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, _1, _2));
+	}
+
 	void socks_connection::start_accept(boost::system::error_code const& ec)
 	{
 		if (ec)
@@ -510,7 +670,7 @@ namespace sim
 				, _1, _2));
 	}
 
-	int socks_connection::format_response(asio::ip::tcp::endpoint const& ep
+	int socks_connection::format_response(address const& addr, int port
 		, int response)
 	{
 		int i = 0;
@@ -525,33 +685,33 @@ namespace sim
 			m_in_buffer[i++] = char(m_version); // version
 			m_in_buffer[i++] = char(response); // response
 			m_in_buffer[i++] = 0; // reserved
-			if (ep.address().is_v4())
+			if (addr.is_v4())
 			{
 				m_in_buffer[i++] = 1; // IPv4
-				address_v4::bytes_type b = ep.address().to_v4().to_bytes();
+				address_v4::bytes_type b = addr.to_v4().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
 				i += int(b.size());
 			} else {
 				m_in_buffer[i++] = 4; // IPv6
-				address_v6::bytes_type b = ep.address().to_v6().to_bytes();
+				address_v6::bytes_type b = addr.to_v6().to_bytes();
 				memcpy(&m_in_buffer[i], &b[0], b.size());
 				i += int(b.size());
 			}
 
-			m_in_buffer[i++] = ep.port() >> 8;
-			m_in_buffer[i++] = ep.port() & 0xff;
+			m_in_buffer[i++] = port >> 8;
+			m_in_buffer[i++] = port & 0xff;
 		}
 		else
 		{
 			m_in_buffer[i++] = 0; // response version
 			m_in_buffer[i++] = char(response); // return code
 
-			assert(ep.address().is_v4());
+			assert(addr.is_v4());
 
-			m_in_buffer[i++] = ep.port() >> 8;
-			m_in_buffer[i++] = ep.port() & 0xff;
+			m_in_buffer[i++] = port >> 8;
+			m_in_buffer[i++] = port & 0xff;
 
-			address_v4::bytes_type b = ep.address().to_v4().to_bytes();
+			address_v4::bytes_type b = addr.to_v4().to_bytes();
 			memcpy(&m_in_buffer[i], &b[0], b.size());
 			i += int(b.size());
 		}
@@ -580,7 +740,7 @@ namespace sim
 		int const response = ec
 			? (m_version == 4 ? 91 : 5)
 			: (m_version == 4 ? 90 : 0);
-		int const len = format_response(ep, response);
+		int const len = format_response(ep.address(), ep.port(), response);
 
 		if (ec)
 		{
