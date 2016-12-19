@@ -551,8 +551,7 @@ namespace sim
 			, std::bind(&socks_connection::wait_for_eof, shared_from_this(), _1, _2));
 	}
 
-	void socks_connection::wait_for_eof(boost::system::error_code const& ec
-		, std::size_t bytes_transferred)
+	void socks_connection::wait_for_eof(boost::system::error_code const& ec, std::size_t)
 	{
 		if (ec)
 		{
