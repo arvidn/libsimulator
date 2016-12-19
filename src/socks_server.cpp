@@ -669,8 +669,8 @@ namespace sim
 				, _1, _2));
 	}
 
-	int socks_connection::format_response(address const& addr, int port
-		, int response)
+	int socks_connection::format_response(address const& addr, int const port
+		, int const response)
 	{
 		int i = 0;
 		if (m_version == 5)
@@ -697,7 +697,7 @@ namespace sim
 				i += int(b.size());
 			}
 
-			m_in_buffer[i++] = port >> 8;
+			m_in_buffer[i++] = (port >> 8) & 0xff;
 			m_in_buffer[i++] = port & 0xff;
 		}
 		else
@@ -707,7 +707,7 @@ namespace sim
 
 			assert(addr.is_v4());
 
-			m_in_buffer[i++] = port >> 8;
+			m_in_buffer[i++] = (port >> 8) & 0xff;
 			m_in_buffer[i++] = port & 0xff;
 
 			address_v4::bytes_type b = addr.to_v4().to_bytes();
