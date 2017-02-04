@@ -105,7 +105,7 @@ namespace sim
 			forward_request(req);
 
 			// pop this request from the receive buffer
-			memmove(m_client_in_buffer + req_len, m_client_in_buffer
+			memmove(m_client_in_buffer, m_client_in_buffer + req_len
 				, m_num_client_in_bytes - req_len);
 			m_num_client_in_bytes -= req_len;
 
@@ -181,7 +181,7 @@ namespace sim
 				, int(m_num_server_out_bytes + out_request.size()));
 			throw std::runtime_error("pipeline too deep");
 		}
-		memmove(&m_server_out_buffer + m_num_server_out_bytes
+		memmove(&m_server_out_buffer[m_num_server_out_bytes]
 			, out_request.data(), out_request.size());
 		m_num_server_out_bytes += int(out_request.size());
 
@@ -282,7 +282,7 @@ namespace sim
 			return;
 		}
 
-		memmove(&m_server_out_buffer[0], m_server_out_buffer + bytes_transferred
+		memmove(&m_server_out_buffer[0], &m_server_out_buffer[bytes_transferred]
 			, m_num_server_out_bytes - bytes_transferred);
 		m_num_server_out_bytes -= int(bytes_transferred);
 
