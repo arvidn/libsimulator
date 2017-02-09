@@ -17,12 +17,11 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
+#include "simulator/pcap.hpp"
 
-#include "simulator/push_warnings.hpp"
-#include <boost/make_shared.hpp>
-#include <boost/tuple/tuple.hpp>
-#include "simulator/pop_warnings.hpp"
-
+#include <tuple> // for tie
+#include <memory> // for make_shared
 #include <cstdio> // for printf
 
 using namespace sim::asio;
@@ -32,10 +31,11 @@ namespace sim
 	simulation::simulation(configuration& config)
 		: m_config(config)
 		, m_internal_ios(*this)
-		, m_stopped(false)
 	{
 		m_config.build(*this);
 	}
+
+	simulation::~simulation() {}
 
 	std::size_t simulation::run()
 	{
@@ -103,7 +103,7 @@ namespace sim
 		if (m_timer_queue.empty()) return;
 		timer_queue_t::iterator begin;
 		timer_queue_t::iterator end;
-		boost::tuples::tie(begin, end) = m_timer_queue.equal_range(t);
+		std::tie(begin, end) = m_timer_queue.equal_range(t);
 		if (begin == end) return;
 		begin = std::find(begin, end, t);
 		if (begin == end) return;
@@ -125,8 +125,11 @@ namespace sim
 		if (ep.port() == 0)
 		{
 			// if the socket is being bound to port 0, it means the system picks a
-			// free port.
-			ep.port(2000);
+			// free port. We want to avoid re-using ports, because that may confuse
+			// wireshark when threading together the TCP streams.
+			ep.port(m_next_bind_port++);
+			if (m_next_bind_port > 65534) m_next_bind_port = 2000;
+
 			listen_socket_iter_t i = m_listen_sockets.lower_bound(ep);
 			while (i != m_listen_sockets.end() && i->first == ep)
 			{
@@ -244,7 +247,7 @@ namespace sim
 		c->ep[1] = remote->local_endpoint(ec);
 
 		aux::packet p;
-		p.type = aux::packet::syn;
+		p.type = aux::packet::type_t::syn;
 		p.overhead = 28;
 		*p.from = asio::ip::udp::endpoint(from.address(), from.port());
 		p.channel = c;
@@ -295,6 +298,12 @@ namespace sim
 			m_nodes.begin(), m_nodes.end(), std::back_inserter(ret)
 			, [](io_service* ios) { return ios->get_ips().empty(); });
 		return ret;
+	}
+
+	void simulation::log_pcap(char const* filename)
+	{
+		std::printf("saving packet capture to: \"%s\"\n", filename);
+		m_pcap = std::unique_ptr<aux::pcap>(new aux::pcap(filename));
 	}
 
 }

@@ -20,6 +20,7 @@ All rights reserved.
 #define QUEUE_HPP_INCLUDED
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
 
 #ifdef _MSC_VER
 #pragma warning(push)

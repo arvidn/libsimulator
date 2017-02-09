@@ -17,6 +17,8 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
+
 #include <functional>
 
 #define __STDC_FORMAT_MACROS 1
@@ -118,7 +120,7 @@ namespace ip {
 		}
 		m_accept_handler = h;
 		m_accept_into = &peer;
-		m_remote_endpoint = NULL;
+		m_remote_endpoint = nullptr;
 
 		check_accept_queue();
 	}
@@ -156,26 +158,28 @@ namespace ip {
 	{
 		switch (p.type)
 		{
-			case aux::packet::syn:
+			case aux::packet::type_t::syn:
 				m_incoming_queue.push_back(p.channel);
 				check_accept_queue();
 				return;
-			case aux::packet::error:
+			case aux::packet::type_t::error:
 				assert(false); // something is not wired up correctly
 				if (m_accept_handler)
 				{
 					m_io_service.post(std::bind(m_accept_handler
 						, boost::system::error_code(error::operation_aborted)));
 					m_accept_handler = 0;
-					m_accept_into = NULL;
-					m_remote_endpoint = NULL;
+					m_accept_into = nullptr;
+					m_remote_endpoint = nullptr;
 				}
 				return;
 			default:
+				// if this happens, it implies that an incoming connection sent
+				// payload before receiving a syn_ack. Alternatively that the
+				// acceptor sent the syn_ack but still left the last-hop in the
+				// incoming route to point to this socket, instead of the
+				// accepted-into socket
 				assert(false);
-				// TODO: not sure why this would happen. It would be nice to respond
-				// with a reset
-				// ignore for now
 				return;
 		}
 	}
@@ -186,16 +190,15 @@ namespace ip {
 		{
 			// if the acceptor socket is closed. Any potential socket in the queue
 			// should be closed too.
-			for (incoming_conns_t::iterator i = m_incoming_queue.begin()
-				, end(m_incoming_queue.end()); i != end; ++i)
+			for (auto const& incoming : m_incoming_queue)
 			{
 				aux::packet p;
 				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
-				p.type = aux::packet::error;
+				p.type = aux::packet::type_t::error;
 				p.ec = boost::system::error_code(error::connection_reset);
 				p.overhead = 28;
-				p.hops = p.channel->hops[0];
+				p.hops = incoming->hops[0];
 
 				forward_packet(std::move(p));
 			}
@@ -206,8 +209,8 @@ namespace ip {
 				m_io_service.post(std::bind(m_accept_handler
 					, boost::system::error_code(error::operation_aborted)));
 				m_accept_handler = 0;
-				m_accept_into = NULL;
-				m_remote_endpoint = NULL;
+				m_accept_into = nullptr;
+				m_remote_endpoint = nullptr;
 			}
 		}
 
@@ -217,7 +220,7 @@ namespace ip {
 
 		if (m_incoming_queue.empty()) return;
 
-		std::shared_ptr<aux::channel> c = m_incoming_queue[0];
+		std::shared_ptr<aux::channel> c = std::move(m_incoming_queue.front());
 		m_incoming_queue.erase(m_incoming_queue.begin());
 
 		// this was initiated at least one 3-way handshake ago.
@@ -234,12 +237,14 @@ namespace ip {
 			m_bound_to.address(), m_bound_to.port());
 		if (ec)
 		{
-			p.type = aux::packet::error;
+			c->hops[1] = route();
+			p.type = aux::packet::type_t::error;
 			p.ec = ec;
 		}
 		else
 		{
-			p.type = aux::packet::syn_ack;
+		// TODO: extend pcap logging to include SYN+ACK packets
+			p.type = aux::packet::type_t::syn_ack;
 			p.channel = c;
 		}
 		p.overhead = 28;
@@ -250,8 +255,8 @@ namespace ip {
 		assert(m_accept_handler);
 		m_io_service.post(std::bind(m_accept_handler, ec));
 		m_accept_handler = 0;
-		m_accept_into = NULL;
-		m_remote_endpoint = NULL;
+		m_accept_into = nullptr;
+		m_remote_endpoint = nullptr;
 	}
 
 	bool tcp::acceptor::internal_is_listening()
