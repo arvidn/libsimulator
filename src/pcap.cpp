@@ -37,7 +37,7 @@ namespace {
 
 	// documented here:
 	// http://www.tcpdump.org/linktypes.html
-	const std::uint32_t LINKTYPE_RAW = 101;
+	std::uint32_t const LINKTYPE_RAW = 101;
 
 	struct ip_header
 	{
@@ -109,8 +109,11 @@ namespace {
 		write(file, header);
 	}
 
-	void write_udp_header(std::fstream& file, int size, int src_port, int dst_port)
+	void write_udp_header(std::fstream& file, int const size, int const src_port
+		, int const dst_port)
 	{
+		assert(src_port != 0);
+		assert(dst_port != 0);
 		udp_header const header = {
 			htons(std::uint16_t(src_port)), // source port
 			htons(std::uint16_t(dst_port)), // destination port
@@ -121,11 +124,11 @@ namespace {
 		write(file, header);
 	}
 
-	void write_tcp_header(std::fstream& file, int size, int src_port
-		, int dst_port, std::uint32_t seq_nr)
+	void write_tcp_header(std::fstream& file, int const size, int const src_port
+		, int const dst_port, std::uint32_t const seq_nr)
 	{
-//		assert(src_port != 0);
-//		assert(dst_port != 0);
+		assert(src_port != 0);
+		assert(dst_port != 0);
 		tcp_header const header = {
 			htons(std::uint16_t(src_port)), // source port
 			htons(std::uint16_t(dst_port)), // destination port
@@ -149,8 +152,8 @@ namespace {
 
 		// just an arbitrary posix time used as starting point
 		std::uint32_t const sim_start_time = 441794304;
-		std::uint32_t const secs = duration_cast<chrono::seconds>(now.time_since_epoch()).count();
-		std::uint32_t const usecs = duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count();
+		std::uint32_t const secs(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
+		std::uint32_t const usecs(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
 		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(tcp_header) + p.buffer.size();
 
@@ -161,7 +164,7 @@ namespace {
 
 		// 6 is the protocol number for TCP
 		write_ip_header(m_file, packet_size, 6
-			, p.from->address().to_v4(), dst.address().to_v4());
+			, src.address().to_v4(), dst.address().to_v4());
 
 		write_tcp_header(m_file, packet_size, p.from->port(), dst.port(), p.byte_counter);
 
@@ -176,8 +179,8 @@ namespace {
 
 		// just an arbitrary posix time used as starting point
 		std::uint32_t const sim_start_time = 441794304;
-		std::uint32_t const secs = duration_cast<chrono::seconds>(now.time_since_epoch()).count();
-		std::uint32_t const usecs = duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count();
+		std::uint32_t const secs(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
+		std::uint32_t const usecs(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
 		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(udp_header) + p.buffer.size();
 
@@ -188,7 +191,7 @@ namespace {
 
 		// 17 is the protocol number for UDP
 		write_ip_header(m_file, packet_size, 17
-			, p.from->address().to_v4(), dst.address().to_v4());
+			, src.address().to_v4(), dst.address().to_v4());
 
 		write_udp_header(m_file, p.buffer.size(), p.from->port(), dst.port());
 

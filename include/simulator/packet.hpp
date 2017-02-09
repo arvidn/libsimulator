@@ -23,7 +23,7 @@ namespace sim { namespace aux {
 
 	struct channel;
 
-	struct SIMULATOR_DECL packet
+	struct packet
 	{
 		packet()
 			: type(type_t::uninitialized)
