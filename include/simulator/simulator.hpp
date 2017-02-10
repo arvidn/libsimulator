@@ -34,6 +34,7 @@ All rights reserved.
 #include "simulator/pop_warnings.hpp"
 
 #include "simulator/chrono.hpp"
+#include "simulator/sink_forwarder.hpp"
 
 #include <deque>
 #include <mutex>
@@ -51,22 +52,8 @@ namespace sim
 	{
 		struct channel;
 		struct packet;
-		struct sink_forwarder;
 		struct pcap;
 	}
-
-	// this is an interface for somthing that can accept incoming packets,
-	// such as queues, sockets, NATs and TCP congestion windows
-	struct SIMULATOR_DECL sink
-	{
-		virtual void incoming_packet(aux::packet p) = 0;
-
-		// used for visualization
-		virtual std::string label() const = 0;
-
-		virtual std::string attributes() const { return "shape=box"; }
-		virtual ~sink() {}
-	};
 
 	// this represents a network route (a series of sinks to pass a packet
 	// through)

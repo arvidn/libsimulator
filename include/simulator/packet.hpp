@@ -16,6 +16,9 @@ All rights reserved.
 
 */
 
+#ifndef PACKET_HPP_INCLUDED
+#define PACKET_HPP_INCLUDED
+
 #include "simulator/config.hpp"
 #include "simulator/simulator.hpp" // for route, endpoint
 
@@ -101,24 +104,7 @@ namespace sim { namespace aux {
 #endif
 	};
 
-	struct SIMULATOR_DECL sink_forwarder : sink
-	{
-		sink_forwarder(sink* dst) : m_dst(dst) {}
-
-		virtual void incoming_packet(packet p) override final
-		{
-			if (m_dst == nullptr) return;
-			m_dst->incoming_packet(std::move(p));
-		}
-
-		virtual std::string label() const override final
-		{ return m_dst ? m_dst->label() : ""; }
-
-		void clear() { m_dst = nullptr; }
-
-	private:
-		sink* m_dst;
-	};
-
 }} // sim
+
+#endif
 

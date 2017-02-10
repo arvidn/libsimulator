@@ -58,6 +58,7 @@ SOURCES =
 	socks_server
 	resolver
 	http_proxy
+	sink_forwarder
 	pcap
 	;
 
