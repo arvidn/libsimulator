@@ -19,6 +19,10 @@ All rights reserved.
 #ifndef CONFIG_HPP_INCLUDED
 #define CONFIG_HPP_INCLUDED
 
+#include "simulator/push_warnings.hpp"
+#include <boost/config.hpp>
+#include "simulator/pop_warnings.hpp"
+
 #ifdef SIMULATOR_BUILDING_SHARED
 #define SIMULATOR_DECL BOOST_SYMBOL_EXPORT
 #elif defined SIMULATOR_LINKING_SHARED
