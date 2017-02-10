@@ -312,7 +312,7 @@ namespace sim
 	}
 
 	void http_proxy::on_server_forward(error_code const& ec
-		, size_t /* bytes_transferred */)
+		, size_t)
 	{
 		if (ec)
 		{

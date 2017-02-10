@@ -156,11 +156,7 @@ namespace sim
 	{
 		socket_base(io_service& ios)
 			: m_io_service(ios)
-			, m_open(false)
-			, m_non_blocking(false)
-			, m_max_receive_queue_size(64 * 1024)
-		{
-		}
+		{}
 
 		// io_control
 		using non_blocking_io = boost::asio::socket_base::non_blocking_io;
@@ -247,16 +243,15 @@ namespace sim
 		std::shared_ptr<aux::sink_forwarder> m_forwarder;
 
 		// whether the socket is open or not
-		bool m_open;
+		bool m_open = false;
 
 		// true if the socket is set to non-blocking mode
-		bool m_non_blocking;
+		bool m_non_blocking = false;
 
 		// the max size of the incoming queue. This is to emulate the send and
 		// receive buffers. This should also depend on the bandwidth, to not
 		// make the queue size not grow too long in time.
-		int m_max_receive_queue_size;
-
+		int m_max_receive_queue_size = 64 * 1024;
 	};
 
 	namespace ip {
@@ -834,7 +829,8 @@ namespace sim
 			asio::high_resolution_timer m_connect_timer;
 
 			// the tcp "packet size" (segment size)
-			int m_mss;
+			// TODO: name this constant!
+			int m_mss = 1475;
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
@@ -847,7 +843,7 @@ namespace sim
 			std::list<aux::packet> m_incoming_queue;
 
 			// the number of bytes in the incoming packet queue
-			int m_queue_size;
+			int m_queue_size = 0;
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
@@ -860,32 +856,32 @@ namespace sim
 			asio::high_resolution_timer m_recv_timer;
 
 			// our address family
-			bool m_is_v4;
+			bool m_is_v4 = true;
 
 			// true if the currently outstanding read operation is for null_buffers
-			bool m_recv_null_buffers;
+			bool m_recv_null_buffers = false;
 
 			// true if the currenly outstanding write operation is for null_buffers
-			bool m_send_null_buffers;
+			bool m_send_null_buffers = false;
 
 			// if this socket is connected to another endpoint, this object is
 			// shared between both sockets and contain information and state about
 			// the channel.
 			std::shared_ptr<aux::channel> m_channel;
 
-			std::uint64_t m_next_outgoing_seq;
-			std::uint64_t m_next_incoming_seq;
+			std::uint64_t m_next_outgoing_seq = 0;
+			std::uint64_t m_next_incoming_seq = 0;
 
 			// the sequence number of the last dropped packet. We should only cut
 			// the cwnd in half once per round-trip. If a whole window is lost, we
 			// need to only halve it once
-			std::uint64_t m_last_drop_seq;
+			std::uint64_t m_last_drop_seq = 0;
 
 			// the current congestion window size (in bytes)
-			int m_cwnd;
+			int m_cwnd = m_mss * 2;
 
 			// the number of bytes that have been sent but not ACKed yet
-			int m_bytes_in_flight;
+			int m_bytes_in_flight = 0;
 
 			// reorder buffer for when packets are dropped
 			std::map<std::uint64_t, aux::packet> m_reorder_buffer;

@@ -41,17 +41,7 @@ namespace ip {
 	tcp::socket::socket(io_service& ios)
 		: socket_base(ios)
 		, m_connect_timer(ios)
-		, m_mss(1475)
-		, m_queue_size(0)
 		, m_recv_timer(ios)
-		, m_is_v4(true)
-		, m_recv_null_buffers(false)
-		, m_send_null_buffers(false)
-		, m_next_outgoing_seq(0)
-		, m_next_incoming_seq(0)
-		, m_last_drop_seq(0)
-		, m_cwnd(m_mss * 2)
-		, m_bytes_in_flight(0)
 	{}
 
 	tcp::socket::~socket()
@@ -169,6 +159,14 @@ namespace ip {
 			m_forwarder.reset();
 		}
 
+		// reset socket state
+		m_queue_size = 0;
+		m_mss = 1475;
+		m_cwnd = m_mss * 2;
+		m_bytes_in_flight = 0;
+		m_outstanding_packet_sizes.clear();
+		m_recv_null_buffers = false;
+		m_send_null_buffers = false;
 		m_next_incoming_seq = 0;
 		m_next_outgoing_seq = 0;
 		m_last_drop_seq = 0;
