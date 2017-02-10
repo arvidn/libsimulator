@@ -124,7 +124,7 @@ namespace {
 		write(file, header);
 	}
 
-	void write_tcp_header(std::fstream& file, int const size, int const src_port
+	void write_tcp_header(std::fstream& file, int const src_port
 		, int const dst_port, std::uint32_t const seq_nr)
 	{
 		assert(src_port != 0);
@@ -166,7 +166,7 @@ namespace {
 		write_ip_header(m_file, packet_size, 6
 			, src.address().to_v4(), dst.address().to_v4());
 
-		write_tcp_header(m_file, packet_size, p.from->port(), dst.port(), p.byte_counter);
+		write_tcp_header(m_file, p.from->port(), dst.port(), p.byte_counter);
 
 		m_file.write(reinterpret_cast<char const*>(p.buffer.data()), p.buffer.size());
 	}
