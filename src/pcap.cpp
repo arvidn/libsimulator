@@ -152,8 +152,8 @@ namespace {
 
 		// just an arbitrary posix time used as starting point
 		std::uint32_t const sim_start_time = 441794304;
-		std::uint32_t const secs(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
-		std::uint32_t const usecs(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
+		std::uint32_t const secs = static_cast<std::uint32_t>(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
+		std::uint32_t const usecs = static_cast<std::uint32_t>(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
 		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(tcp_header) + p.buffer.size();
 
@@ -179,8 +179,8 @@ namespace {
 
 		// just an arbitrary posix time used as starting point
 		std::uint32_t const sim_start_time = 441794304;
-		std::uint32_t const secs(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
-		std::uint32_t const usecs(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
+		std::uint32_t const secs = static_cast<std::uint32_t>(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
+		std::uint32_t const usecs = static_cast<std::uint32_t>(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
 		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(udp_header) + p.buffer.size();
 

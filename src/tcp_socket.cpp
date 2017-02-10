@@ -197,22 +197,18 @@ namespace ip {
 		}
 
 		std::size_t ret = 0;
-		for (std::vector<aux::packet>::const_iterator i = m_incoming_queue.begin()
-			, end(m_incoming_queue.end()); i != end; ++i)
+		for (aux::packet const& p : m_incoming_queue)
 		{
-			if (i->type == aux::packet::type_t::error)
+			if (p.type == aux::packet::type_t::error)
 			{
-				if (ret > 0)
-				{
-					return ret;
-				}
+				if (ret > 0) return ret;
 
 				// if the read buffer is drained and there is an error, report that
 				// error.
-				ec = i->ec;
+				ec = p.ec;
 				return 0;
 			}
-			ret += i->buffer.size();
+			ret += p.buffer.size();
 		}
 		return ret;
 	}

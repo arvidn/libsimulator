@@ -42,6 +42,7 @@ All rights reserved.
 #include <unordered_set>
 #include <set>
 #include <vector>
+#include <list>
 #include <functional>
 
 namespace sim
@@ -657,7 +658,7 @@ namespace sim
 			asio::high_resolution_timer m_send_timer;
 
 			// this is the incoming queue of packets for each socket
-			std::vector<aux::packet> m_incoming_queue;
+			std::list<aux::packet> m_incoming_queue;
 
 			bool m_recv_null_buffers;
 
@@ -854,7 +855,7 @@ namespace sim
 			std::vector<asio::const_buffer> m_send_buffer;
 
 			// this is the incoming queue of packets for each socket
-			std::vector<aux::packet> m_incoming_queue;
+			std::list<aux::packet> m_incoming_queue;
 
 			// the number of bytes in the incoming packet queue
 			int m_queue_size;
