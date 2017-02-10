@@ -166,6 +166,8 @@ namespace {
 		write_ip_header(m_file, packet_size, 6
 			, src.address().to_v4(), dst.address().to_v4());
 
+		// TODO: if the packet has error set with asio::error::eof
+		// set the FIN flag
 		write_tcp_header(m_file, p.from->port(), dst.port(), p.byte_counter);
 
 		m_file.write(reinterpret_cast<char const*>(p.buffer.data()), p.buffer.size());
