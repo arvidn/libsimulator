@@ -711,6 +711,8 @@ namespace sim
 			using lowest_layer_type = socket;
 
 			explicit socket(io_service& ios);
+			socket(socket const&) = delete;
+			socket& operator=(socket const&) = delete;
 // TODO: sockets are not movable right now unfortunately, because channels keep
 // pointers to the socke object to deliver new packets.
 /*
@@ -905,7 +907,7 @@ namespace sim
 			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
 
 			// packets to re-send (because they were dropped)
-			std::vector<aux::packet> m_outgoing_packets;
+			std::list<aux::packet> m_outgoing_packets;
 		};
 
 		struct SIMULATOR_DECL acceptor : socket
