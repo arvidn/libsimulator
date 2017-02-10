@@ -58,6 +58,8 @@ SOURCES =
 	socks_server
 	resolver
 	http_proxy
+	sink_forwarder
+	pcap
 	;
 
 lib simulator
@@ -108,5 +110,6 @@ test-suite simulator-tests : [ run
 	test/multi_accept.cpp
 	test/null_buffers.cpp
 	test/udp_socket.cpp
+	test/parse_request.cpp
 	] ;
 

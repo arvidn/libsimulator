@@ -30,13 +30,11 @@ All rights reserved.
 #include <boost/asio/read.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/function.hpp>
-#if !defined BOOST_ASIO_HAS_STD_CHRONO
-#include <boost/chrono/duration.hpp>
-#include <boost/chrono/time_point.hpp>
-#include <boost/ratio.hpp>
-#endif
 
 #include "simulator/pop_warnings.hpp"
+
+#include "simulator/chrono.hpp"
+#include "simulator/sink_forwarder.hpp"
 
 #include <deque>
 #include <mutex>
@@ -45,33 +43,8 @@ All rights reserved.
 #include <unordered_set>
 #include <set>
 #include <vector>
+#include <list>
 #include <functional>
-
-#if defined BOOST_ASIO_HAS_STD_CHRONO
-#include <chrono>
-#endif
-
-#ifdef SIMULATOR_BUILDING_SHARED
-#define SIMULATOR_DECL BOOST_SYMBOL_EXPORT
-#elif defined SIMULATOR_LINKING_SHARED
-#define SIMULATOR_DECL BOOST_SYMBOL_IMPORT
-#else
-#define SIMULATOR_DECL
-#endif
-
-#if !defined _MSC_VER || _MSC_VER > 1900
-#define LIBSIMULATOR_USE_MOVE 1
-#else
-#define LIBSIMULATOR_USE_MOVE 0
-#endif
-
-#ifdef _MSC_VER
-#pragma warning(push)
-// warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
-#pragma warning( disable : 4251)
-// warning C4661: X: no suitable definition provided for explicit template instantiation request
-#pragma warning( disable : 4661)
-#endif
 
 namespace sim
 {
@@ -79,20 +52,8 @@ namespace sim
 	{
 		struct channel;
 		struct packet;
-		struct sink_forwarder;
+		struct pcap;
 	}
-
-	// this is an interface for somthing that can accept incoming packets,
-	// such as queues, sockets, NATs and TCP congestion windows
-	struct SIMULATOR_DECL sink
-	{
-		virtual void incoming_packet(aux::packet p) = 0;
-
-		// used for visualization
-		virtual std::string label() const = 0;
-
-		virtual std::string attributes() const { return "shape=box"; }
-	};
 
 	// this represents a network route (a series of sinks to pass a packet
 	// through)
@@ -126,52 +87,6 @@ namespace sim
 	void forward_packet(aux::packet p);
 
 	struct simulation;
-
-	namespace chrono
-	{
-#if defined BOOST_ASIO_HAS_STD_CHRONO
-	using std::chrono::seconds;
-	using std::chrono::milliseconds;
-	using std::chrono::microseconds;
-	using std::chrono::nanoseconds;
-	using std::chrono::minutes;
-	using std::chrono::hours;
-	using std::chrono::duration_cast;
-	using std::chrono::time_point;
-	using std::chrono::duration;
-#else
-	using boost::chrono::seconds;
-	using boost::chrono::milliseconds;
-	using boost::chrono::microseconds;
-	using boost::chrono::nanoseconds;
-	using boost::chrono::minutes;
-	using boost::chrono::hours;
-	using boost::chrono::duration_cast;
-	using boost::chrono::time_point;
-	using boost::chrono::duration;
-#endif
-
-	// std.chrono / boost.chrono compatible high_resolution_clock using a simulated time
-	struct SIMULATOR_DECL high_resolution_clock
-	{
-		using rep = boost::int64_t;
-#if defined BOOST_ASIO_HAS_STD_CHRONO
-		using period = std::nano;
-		using time_point = std::chrono::time_point<high_resolution_clock, nanoseconds>;
-		using duration = std::chrono::duration<boost::int64_t, std::nano>;
-#else
-		using period = boost::nano;
-		using time_point = time_point<high_resolution_clock, nanoseconds>;
-		using duration = duration<boost::int64_t, boost::nano>;
-#endif
-		static const bool is_steady = true;
-		static time_point now();
-
-		// private interface
-		static void fast_forward(high_resolution_clock::duration d);
-	};
-
-	} // chrono
 
 	namespace asio
 	{
@@ -500,13 +415,12 @@ namespace sim
 			using lowest_layer_type = socket;
 
 			socket(io_service& ios);
-			~socket();
+			virtual ~socket();
 
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
 #if LIBSIMULATOR_USE_MOVE
-			socket(socket&&) = default;
-			socket& operator=(socket&&) = default;
+			socket(socket&&);
 #endif
 
 			lowest_layer_type& lowest_layer() { return *this; }
@@ -731,7 +645,7 @@ namespace sim
 			asio::high_resolution_timer m_send_timer;
 
 			// this is the incoming queue of packets for each socket
-			std::vector<aux::packet> m_incoming_queue;
+			std::list<aux::packet> m_incoming_queue;
 
 			bool m_recv_null_buffers;
 
@@ -784,6 +698,8 @@ namespace sim
 			using lowest_layer_type = socket;
 
 			explicit socket(io_service& ios);
+			socket(socket const&) = delete;
+			socket& operator=(socket const&) = delete;
 // TODO: sockets are not movable right now unfortunately, because channels keep
 // pointers to the socke object to deliver new packets.
 /*
@@ -792,7 +708,7 @@ namespace sim
 			socket& operator=(socket&&) = default;
 #endif
 */
-			~socket();
+			virtual ~socket();
 
 			boost::system::error_code close();
 			boost::system::error_code close(boost::system::error_code& ec);
@@ -928,7 +844,7 @@ namespace sim
 			std::vector<asio::const_buffer> m_send_buffer;
 
 			// this is the incoming queue of packets for each socket
-			std::vector<aux::packet> m_incoming_queue;
+			std::list<aux::packet> m_incoming_queue;
 
 			// the number of bytes in the incoming packet queue
 			int m_queue_size;
@@ -978,13 +894,13 @@ namespace sim
 			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
 
 			// packets to re-send (because they were dropped)
-			std::vector<aux::packet> m_outgoing_packets;
+			std::list<aux::packet> m_outgoing_packets;
 		};
 
 		struct SIMULATOR_DECL acceptor : socket
 		{
 			acceptor(io_service& ios);
-			~acceptor();
+			virtual ~acceptor();
 
 			boost::system::error_code cancel(boost::system::error_code& ec);
 			void cancel();
@@ -1146,7 +1062,7 @@ namespace sim
 		std::map<ip::address, route> m_outgoing_route;
 		std::map<ip::address, route> m_incoming_route;
 
-		bool m_stopped;
+		bool m_stopped = false;
 	};
 
 	template <typename Protocol>
@@ -1172,6 +1088,8 @@ namespace sim
 	// user supplied configuration of the network to simulate
 	struct SIMULATOR_DECL configuration
 	{
+		virtual ~configuration() {}
+
 		// build the network
 		virtual void build(simulation& sim) = 0;
 
@@ -1236,6 +1154,7 @@ namespace sim
 		friend struct high_resolution_timer;
 
 		simulation(configuration& config);
+		~simulation();
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -1284,6 +1203,9 @@ namespace sim
 		void remove_io_service(asio::io_service* ios);
 		std::vector<asio::io_service*> get_all_io_services() const;
 
+		aux::pcap* get_pcap() const { return m_pcap.get(); }
+		void log_pcap(char const* filename);
+
 	private:
 		struct timer_compare
 		{
@@ -1293,6 +1215,8 @@ namespace sim
 		};
 
 		configuration& m_config;
+
+		std::unique_ptr<aux::pcap> m_pcap;
 
 		// these are the io services that represent nodes on the network
 		std::unordered_set<asio::io_service*> m_nodes;
@@ -1315,101 +1239,16 @@ namespace sim
 		// used for internal timers
 		asio::io_service m_internal_ios;
 
-		bool m_stopped;
+		// the next port to use for an outgoing connection, where the port is not
+		// specified. We want this to be as unique as possible, to distinguish the
+		// TCP streams.
+		std::uint16_t m_next_bind_port = 2000;
+
+		bool m_stopped = false;
 	};
 
 	namespace aux
 	{
-		struct SIMULATOR_DECL packet
-		{
-			packet()
-				: type(uninitialized)
-				, from(new asio::ip::udp::endpoint)
-				, overhead{20}
-				, seq_nr{0}
-			{}
-
-			// this is move-only
-#if LIBSIMULATOR_USE_MOVE
-			packet(packet const&) = delete;
-			packet& operator=(packet const&) = delete;
-			packet(packet&&) = default;
-			packet& operator=(packet&&) = default;
-#endif
-
-			// to keep things simple, don't drop ACKs or errors
-			bool ok_to_drop() const
-			{
-				return type != syn_ack && type != ack && type != error;
-			}
-
-			enum type_t
-			{
-				uninitialized, // invalid type (used for debugging)
-				syn, // TCP connect
-				syn_ack, // TCP connection accepted
-				ack, // the seq_nr is interpreted as "we received this"
-				error, // the error_code (ec) is set
-				payload // the buffer is filled
-			} type;
-
-			boost::system::error_code ec;
-
-			// actual payload
-			std::vector<boost::uint8_t> buffer;
-
-			// used for UDP packets
-			// this is a unique_ptr just to make this type movable. the endpoint
-			// itself isn't
-#if LIBSIMULATOR_USE_MOVE
-			std::unique_ptr<asio::ip::udp::endpoint> from;
-#else
-			std::shared_ptr<asio::ip::udp::endpoint> from;
-#endif
-
-			// the number of bytes of overhead for this packet. The total packet
-			// size is the number of bytes in the buffer + this number
-			int overhead;
-
-			// each hop in the route will pop itself off and forward the packet to
-			// the next hop
-			route hops;
-
-			// for SYN packets, this is set to the channel we're trying to
-			// establish
-			std::shared_ptr<aux::channel> channel;
-
-			// sequence number of this packet (used for debugging)
-			std::uint64_t seq_nr;
-
-			// this function must be called with this packet in case the packet is
-			// dropped.
-#if LIBSIMULATOR_USE_MOVE
-			std::unique_ptr<std::function<void(aux::packet)>> drop_fun;
-#else
-			std::shared_ptr<std::function<void(aux::packet)>> drop_fun;
-#endif
-		};
-
-		struct SIMULATOR_DECL sink_forwarder : sink
-		{
-			sink_forwarder(sink* dst) : m_dst(dst) {}
-
-			virtual void incoming_packet(packet p) override final
-			{
-				if (m_dst == nullptr) return;
-				m_dst->incoming_packet(std::move(p));
-			}
-
-			virtual std::string label() const override final
-			{ return m_dst ? m_dst->label() : ""; }
-
-			void clear() { m_dst = nullptr; }
-
-		private:
-			sink* m_dst;
-		};
-
 		/* the channel can be in the following states:
 			1. handshake-1 - the initiating socket has sent SYN
 			2. handshake-2 - the accepting connection has sent SYN+ACK
@@ -1434,6 +1273,11 @@ namespace sim
 
 			// the endpoint of each end of the channel
 			asio::ip::tcp::endpoint ep[2];
+
+			// the number of bytes sent from respective direction
+			// this is used to simulate the TCP sequence number, so it deliberately
+			// is meant to wrap at 32 bits
+			std::uint32_t bytes_sent[2];
 
 			int remote_idx(const asio::ip::tcp::endpoint& self) const;
 			int self_idx(const asio::ip::tcp::endpoint& self) const;

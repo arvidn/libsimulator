@@ -17,6 +17,9 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
+#include "simulator/pcap.hpp"
+
 #include <functional>
 #include <cinttypes>
 #include <cstdio> // for printf
@@ -140,7 +143,7 @@ namespace ip {
 			if (!hops.empty() && !m_connect_handler)
 			{
 				aux::packet p;
-				p.type = aux::packet::error;
+				p.type = aux::packet::type_t::error;
 				p.ec = asio::error::eof;
 				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
@@ -194,22 +197,18 @@ namespace ip {
 		}
 
 		std::size_t ret = 0;
-		for (std::vector<aux::packet>::const_iterator i = m_incoming_queue.begin()
-			, end(m_incoming_queue.end()); i != end; ++i)
+		for (aux::packet const& p : m_incoming_queue)
 		{
-			if (i->type == aux::packet::error)
+			if (p.type == aux::packet::type_t::error)
 			{
-				if (ret > 0)
-				{
-					return ret;
-				}
+				if (ret > 0) return ret;
 
 				// if the read buffer is drained and there is an error, report that
 				// error.
-				ec = i->ec;
+				ec = p.ec;
 				return 0;
 			}
-			ret += i->buffer.size();
+			ret += p.buffer.size();
 		}
 		return ret;
 	}
@@ -403,6 +402,14 @@ namespace ip {
 			return 0;
 		}
 
+		// the connect handler is used as proxy that this socket has not competed
+		// the connection yet. We're still waiting for SYN+ACK
+		if (m_connect_handler)
+		{
+			ec = boost::system::error_code(error::would_block);
+			return 0;
+		}
+
 		int remote = m_channel->remote_idx(m_bound_to);
 		route hops = m_channel->hops[remote];
 		if (hops.empty())
@@ -431,7 +438,7 @@ namespace ip {
 			{
 				int packet_size = (std::min)(buf_size, m_mss);
 				aux::packet p;
-				p.type = aux::packet::payload;
+				p.type = aux::packet::type_t::payload;
 				p.buffer.assign(ptr, ptr + packet_size);
 				*p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
@@ -477,6 +484,12 @@ namespace ip {
 			ec = boost::system::error_code(error::not_connected);
 			return 0;
 		}
+		if (m_connect_handler)
+		{
+			// the socket is not done connecting yet
+			ec = boost::system::error_code(error::would_block);
+			return 0;
+		}
 
 		if (m_incoming_queue.empty())
 		{
@@ -496,7 +509,7 @@ namespace ip {
 		{
 			aux::packet& p = m_incoming_queue.front();
 
-			if (p.type == aux::packet::error)
+			if (p.type == aux::packet::type_t::error)
 			{
 				// if we have received bytes also, first deliver those. In the next
 				// read, deliver the error
@@ -508,7 +521,7 @@ namespace ip {
 				m_channel.reset();
 				return 0;
 			}
-			else if (p.type == aux::packet::payload)
+			else if (p.type == aux::packet::type_t::payload)
 			{
 				// copy bytes from the incoming queue into the receive buffer.
 				// both are vectors of buffers, so it can get a bit hairy
@@ -656,6 +669,17 @@ namespace ip {
 		m_bytes_in_flight += int(p.buffer.size());
 		m_outstanding_packet_sizes[p.seq_nr] = int(p.buffer.size());
 
+		int const idx = m_channel->self_idx(m_bound_to);
+		p.byte_counter = m_channel->bytes_sent[idx];
+		m_channel->bytes_sent[idx] += std::uint32_t(p.buffer.size());
+
+		auto* log = m_io_service.sim().get_pcap();
+		if (log)
+		{
+			int const remote = m_channel->remote_idx(m_bound_to);
+			log->log_tcp(p, m_bound_to, m_channel->ep[remote]);
+		}
+
 		forward_packet(std::move(p));
 	}
 
@@ -682,12 +706,12 @@ namespace ip {
 	{
 		switch (p.type)
 		{
-			case aux::packet::uninitialized:
+			case aux::packet::type_t::uninitialized:
 			{
 				assert(false && "uninitialized packet");
 				return;
 			}
-			case aux::packet::ack:
+			case aux::packet::type_t::ack:
 			{
 				// if the socket just became writeable, we need to notify the
 				// client. First we want to know whether it was not writeable.
@@ -724,25 +748,26 @@ namespace ip {
 
 				return;
 			}
-			case aux::packet::syn:
+			case aux::packet::type_t::syn:
 			{
 				// TODO: return connection refused
 				return;
 			}
-			case aux::packet::syn_ack:
+			case aux::packet::type_t::syn_ack:
 			{
 				assert(m_connect_handler);
 				boost::system::error_code ec;
 				m_io_service.post(std::bind(m_connect_handler, ec));
 				m_connect_handler = 0;
 				if (ec) m_channel.reset();
+				else maybe_wakeup_writer();
 				return;
 			}
-			case aux::packet::error:
-			case aux::packet::payload:
+			case aux::packet::type_t::error:
+			case aux::packet::type_t::payload:
 			{
 				aux::packet ack;
-				ack.type = aux::packet::ack;
+				ack.type = aux::packet::type_t::ack;
 				ack.seq_nr = p.seq_nr;
 
 				int remote = m_channel->remote_idx(m_bound_to);

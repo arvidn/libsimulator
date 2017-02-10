@@ -177,7 +177,7 @@ namespace sim
 
 		if (m_num_server_out_bytes + out_request.size() > sizeof(m_server_out_buffer))
 		{
-			std::printf("Too many queued server requests: %d bytes\n"
+			std::printf("http_proxy: Too many queued server requests: %d bytes\n"
 				, int(m_num_server_out_bytes + out_request.size()));
 			throw std::runtime_error("pipeline too deep");
 		}
@@ -221,7 +221,7 @@ namespace sim
 			}
 			else
 			{
-				std::printf("http_server::on_request_domain_lookup: empty response\n");
+				std::printf("http_proxy::on_request_domain_lookup: empty response\n");
 			}
 			error(503, "Resource Temporarily Unavailable");
 			return;
@@ -232,6 +232,9 @@ namespace sim
 	void http_proxy::open_forward_connection(const asio::ip::tcp::endpoint& target)
 	{
 		m_server_connection.open(target.protocol());
+
+		std::printf("http_proxy: async_connect: %s:%d\n"
+			, target.address().to_string().c_str(), target.port());
 		m_server_connection.async_connect(target
 			, std::bind(&http_proxy::on_connected, this, _1));
 	}
@@ -249,11 +252,13 @@ namespace sim
 	{
 		if (ec)
 		{
-			std::printf("connection failed: %s\n", ec.message().c_str());
+			std::printf("http_proxy::on_connected() connection failed: %s\n", ec.message().c_str());
 			m_server_connection.close();
 			error(503, "Service Temporarily Unavailable");
 			return;
 		}
+
+		std::printf("http_proxy: connected\n");
 
 		write_server_send_buffer();
 

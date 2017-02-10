@@ -17,6 +17,8 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
+#include "simulator/pcap.hpp"
 
 #include <functional>
 
@@ -35,13 +37,17 @@ namespace ip {
 	udp::socket::socket(io_service& ios)
 		: socket_base(ios)
 		, m_next_send(chrono::high_resolution_clock::now())
-		, m_recv_sender(NULL)
+		, m_recv_sender(nullptr)
 		, m_recv_timer(ios)
 		, m_send_timer(ios)
 		, m_recv_null_buffers(0)
 		, m_queue_size(0)
 		, m_is_v4(true)
 	{}
+
+#if LIBSIMULATOR_USE_MOVE
+	udp::socket::socket(socket&&) = default;
+#endif
 
 	udp::socket::~socket()
 	{
@@ -374,11 +380,11 @@ namespace ip {
 
 		hops.prepend(m_io_service.get_outgoing_route(m_bound_to.address()));
 
-		m_next_send = (std::max)(now, m_next_send);
+		m_next_send = std::max(now, m_next_send);
 
 		aux::packet p;
 		p.overhead = 28;
-		p.type = aux::packet::payload;
+		p.type = aux::packet::type_t::payload;
 		*p.from = m_bound_to;
 		p.hops = hops;
 		for (std::vector<asio::const_buffer>::const_iterator i = b.begin()
@@ -387,6 +393,9 @@ namespace ip {
 			p.buffer.insert(p.buffer.end(), asio::buffer_cast<uint8_t const*>(*i)
 				, asio::buffer_cast<uint8_t const*>(*i) + asio::buffer_size(*i));
 		}
+
+		auto* log = m_io_service.sim().get_pcap();
+		if (log) log->log_udp(p, m_bound_to, dst);
 
 		int const packet_size = int(p.buffer.size() + p.overhead);
 		forward_packet(std::move(p));
@@ -402,6 +411,7 @@ namespace ip {
 		int const packet_size = int(p.buffer.size() + p.overhead);
 
 		// silent drop. If the application isn't reading fast enough, drop packets
+		// TODO: make this limit controlled by SO_RECVBUF socket option
 		if (m_queue_size + packet_size > 256 * 1024) return;
 
 		m_queue_size += int(p.buffer.size());

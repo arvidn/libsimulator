@@ -17,6 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/packet.hpp"
 
 #include <functional>
 #include <unordered_set>

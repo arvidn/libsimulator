@@ -247,7 +247,7 @@ namespace sim
 		ret.method.assign(start, space);
 		ret.req.assign(space+1, space2);
 		ret.path.assign(normalize(ret.req.substr(0, ret.req.find_first_of('?'))));
-		std::printf("http_server: incoming request: %s %s [%s]\n"
+		std::printf("parse_request: %s %s [%s]\n"
 			, ret.method.c_str(), ret.path.c_str(), ret.req.c_str());
 
 		char const* header = find(space2, int(len - (space2 - start)), "\r\n", 2);
