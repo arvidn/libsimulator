@@ -155,7 +155,7 @@ namespace {
 		std::uint32_t const secs = static_cast<std::uint32_t>(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
 		std::uint32_t const usecs = static_cast<std::uint32_t>(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
-		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(tcp_header) + p.buffer.size();
+		std::uint32_t const packet_size = static_cast<std::uint32_t>(sizeof(ip_header) + sizeof(tcp_header) + p.buffer.size());
 
 		write(m_file, sim_start_time + secs);
 		write(m_file, usecs);
@@ -184,7 +184,7 @@ namespace {
 		std::uint32_t const secs = static_cast<std::uint32_t>(duration_cast<chrono::seconds>(now.time_since_epoch()).count());
 		std::uint32_t const usecs = static_cast<std::uint32_t>(duration_cast<chrono::microseconds>(now.time_since_epoch() - seconds(secs)).count());
 
-		std::uint32_t const packet_size = sizeof(ip_header) + sizeof(udp_header) + p.buffer.size();
+		std::uint32_t const packet_size = static_cast<std::uint32_t>(sizeof(ip_header) + sizeof(udp_header) + p.buffer.size());
 
 		write(m_file, sim_start_time + secs);
 		write(m_file, usecs);
@@ -195,7 +195,7 @@ namespace {
 		write_ip_header(m_file, packet_size, 17
 			, src.address().to_v4(), dst.address().to_v4());
 
-		write_udp_header(m_file, p.buffer.size(), p.from->port(), dst.port());
+		write_udp_header(m_file, static_cast<int>(p.buffer.size()), p.from->port(), static_cast<int>(dst.port()));
 
 		m_file.write(reinterpret_cast<char const*>(p.buffer.data()), p.buffer.size());
 	}
