@@ -186,7 +186,7 @@ namespace ip {
 	}
 
 	void udp::socket::async_send(const asio::null_buffers& bufs
-		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+		, std::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		if (m_send_handler) abort_send_handler();
 
@@ -252,7 +252,7 @@ namespace ip {
 
 	void udp::socket::async_receive_null_buffers_impl(
 		udp::endpoint* sender
-		, boost::function<void(boost::system::error_code const&
+		, std::function<void(boost::system::error_code const&
 			, std::size_t)> const& handler)
 	{
 		if (!m_open)
@@ -284,7 +284,7 @@ namespace ip {
 		std::vector<asio::mutable_buffer> const& bufs
 		, udp::endpoint* sender
 		, socket_base::message_flags /* flags */
-		, boost::function<void(boost::system::error_code const&
+		, std::function<void(boost::system::error_code const&
 			, std::size_t)> const& handler)
 	{
 		assert(!bufs.empty());

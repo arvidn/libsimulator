@@ -289,7 +289,7 @@ namespace ip {
 	}
 
 	void tcp::socket::async_connect(tcp::endpoint const& target
-		, boost::function<void(boost::system::error_code const&)> h)
+		, std::function<void(boost::system::error_code const&)> h)
 	{
 		if (!m_open) open(target.protocol());
 
@@ -356,7 +356,7 @@ namespace ip {
 	}
 
 	void tcp::socket::async_write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
-		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+		, std::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		int buf_size = 0;
 		for (int i = 0; i < int(bufs.size()); ++i)
@@ -567,7 +567,7 @@ namespace ip {
 	}
 
 	void tcp::socket::async_read_some_impl(std::vector<boost::asio::mutable_buffer> const& bufs
-		, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+		, std::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		assert(!bufs.empty());
 		assert(buffer_size(bufs[0]));
@@ -598,7 +598,7 @@ namespace ip {
 	}
 
 	void tcp::socket::async_read_some_null_buffers_impl(
-		boost::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+		std::function<void(boost::system::error_code const&, std::size_t)> const& handler)
 	{
 		boost::system::error_code ec;
 		// null_buffers notifies the handler when data is available, without

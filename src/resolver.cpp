@@ -36,7 +36,7 @@ namespace ip {
 
 	template<typename Protocol>
 	void basic_resolver<Protocol>::async_resolve(basic_resolver_query<Protocol> q,
-		boost::function<void(boost::system::error_code const&
+		std::function<void(boost::system::error_code const&
 			, basic_resolver_iterator<Protocol>)> handler)
 	{
 		std::vector<asio::ip::address> result;

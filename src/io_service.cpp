@@ -115,10 +115,10 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	void io_service::dispatch(boost::function<void()> handler)
+	void io_service::dispatch(std::function<void()> handler)
 	{ m_sim.get_internal_service().dispatch(handler); }
 
-	void io_service::post(boost::function<void()> handler)
+	void io_service::post(std::function<void()> handler)
 	{ m_sim.get_internal_service().post(handler); }
 
 	// private interface
