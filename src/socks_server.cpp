@@ -282,7 +282,9 @@ namespace sim
 		}
 
 		std::printf("socks_connection: received %s request address type: %d\n"
-			, command == 1 ? "CONNECT" : "BIND", atyp);
+			, command == 1 ? "CONNECT"
+			: command == 2 ? "BIND"
+			: "UDP_ASSOCIATE", atyp);
 
 		switch (atyp)
 		{
