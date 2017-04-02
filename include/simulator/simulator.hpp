@@ -29,7 +29,6 @@ All rights reserved.
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/system/error_code.hpp>
-#include <boost/function.hpp>
 
 #include "simulator/pop_warnings.hpp"
 
@@ -132,7 +131,7 @@ namespace sim
 		void wait();
 		void wait(boost::system::error_code& ec);
 
-		void async_wait(const boost::function<void(boost::system::error_code)>& handler);
+		void async_wait(const std::function<void(boost::system::error_code)>& handler);
 
 		io_service& get_io_service() const { return m_io_service; }
 
@@ -141,7 +140,7 @@ namespace sim
 		void fire(boost::system::error_code ec);
 
 		time_type m_expiration_time;
-		boost::function<void(boost::system::error_code const&)> m_handler;
+		std::function<void(boost::system::error_code const&)> m_handler;
 		io_service& m_io_service;
 		bool m_expired;
 	};
@@ -371,7 +370,7 @@ namespace sim
 		void cancel();
 
 		void async_resolve(basic_resolver_query<Protocol> q,
-			boost::function<void(boost::system::error_code const&,
+			std::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler);
 
 		//TODO: add remaining members
@@ -385,7 +384,7 @@ namespace sim
 			chrono::high_resolution_clock::time_point completion_time;
 			boost::system::error_code err;
 			basic_resolver_iterator<Protocol> iter;
-			boost::function<void(boost::system::error_code const&,
+			std::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler;
 		};
 
@@ -460,11 +459,11 @@ namespace sim
 			}
 
 			void async_send(const asio::null_buffers& bufs
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler);
 
 			void async_receive(asio::null_buffers const&
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
@@ -473,7 +472,7 @@ namespace sim
 
 			template <class BufferSequence>
 			void async_receive(BufferSequence const& bufs
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
@@ -486,7 +485,7 @@ namespace sim
 			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
 				, socket_base::message_flags /* flags */
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
@@ -495,7 +494,7 @@ namespace sim
 
 			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				// TODO: does it make sense to receive null_buffers and still have a
@@ -507,7 +506,7 @@ namespace sim
 			template <class BufferSequence>
 			void async_receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
@@ -520,7 +519,7 @@ namespace sim
 			void async_receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender
 				, socket_base::message_flags flags
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
@@ -530,7 +529,7 @@ namespace sim
 			}
 /*
 			void async_read_from(null_buffers const&
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
@@ -589,7 +588,7 @@ namespace sim
 			void async_receive_from_impl(std::vector<asio::mutable_buffer> const& bufs
 				, udp::endpoint* sender
 				, socket_base::message_flags flags
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler);
 
 			std::size_t receive_from_impl(
@@ -600,7 +599,7 @@ namespace sim
 
 			void async_receive_null_buffers_impl(
 				udp::endpoint* sender
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler);
 
 		private:
@@ -620,12 +619,12 @@ namespace sim
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
-			boost::function<void(boost::system::error_code const&, std::size_t)>
+			std::function<void(boost::system::error_code const&, std::size_t)>
 				m_send_handler;
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
-			boost::function<void(boost::system::error_code const&, std::size_t)>
+			std::function<void(boost::system::error_code const&, std::size_t)>
 				m_recv_handler;
 
 			// if we have an outstanding read operation, this is the buffer to
@@ -720,11 +719,11 @@ namespace sim
 			lowest_layer_type& lowest_layer() { return *this; }
 
 			void async_connect(tcp::endpoint const& target
-				, boost::function<void(boost::system::error_code const&)> h);
+				, std::function<void(boost::system::error_code const&)> h);
 
 			template <class ConstBufferSequence>
 			void async_write_some(ConstBufferSequence const& bufs
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
@@ -733,7 +732,7 @@ namespace sim
 			}
 
 			void async_write_some(null_buffers const&
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& /* handler */)
 			{
 				if (m_send_handler) abort_send_handler();
@@ -742,7 +741,7 @@ namespace sim
 			}
 
 			void async_read_some(null_buffers const&
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
@@ -769,7 +768,7 @@ namespace sim
 
 			template <class BufferSequence>
 			void async_read_some(BufferSequence const& bufs
-				, boost::function<void(boost::system::error_code const&
+				, std::function<void(boost::system::error_code const&
 					, std::size_t)> const& handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
@@ -809,11 +808,11 @@ namespace sim
 			void maybe_wakeup_writer();
 
 			void async_write_some_impl(std::vector<asio::const_buffer> const& bufs
-				, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				, std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
 			void async_read_some_impl(std::vector<asio::mutable_buffer> const& bufs
-				, boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				, std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
 			void async_read_some_null_buffers_impl(
-				boost::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
 			std::size_t write_some_impl(std::vector<asio::const_buffer> const& bufs
 				, boost::system::error_code& ec);
 			std::size_t read_some_impl(std::vector<asio::mutable_buffer> const& bufs
@@ -824,7 +823,7 @@ namespace sim
 			// called when a packet is dropped
 			void packet_dropped(aux::packet p);
 
-			boost::function<void(boost::system::error_code const&)> m_connect_handler;
+			std::function<void(boost::system::error_code const&)> m_connect_handler;
 
 			asio::high_resolution_timer m_connect_timer;
 
@@ -834,7 +833,7 @@ namespace sim
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
-			boost::function<void(boost::system::error_code const&, std::size_t)>
+			std::function<void(boost::system::error_code const&, std::size_t)>
 				m_send_handler;
 
 			std::vector<asio::const_buffer> m_send_buffer;
@@ -847,7 +846,7 @@ namespace sim
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
-			boost::function<void(boost::system::error_code const&, std::size_t)>
+			std::function<void(boost::system::error_code const&, std::size_t)>
 				m_recv_handler;
 
 			// if we have an outstanding buffers to receive into, these are them
@@ -905,10 +904,10 @@ namespace sim
 			void listen(int qs, boost::system::error_code& ec);
 
 			void async_accept(ip::tcp::socket& peer
-				, const boost::function<void(boost::system::error_code const&)>& h);
+				, const std::function<void(boost::system::error_code const&)>& h);
 			void async_accept(ip::tcp::socket& peer
 				, ip::tcp::endpoint& peer_endpoint
-				, const boost::function<void(boost::system::error_code const&)>& h);
+				, const std::function<void(boost::system::error_code const&)>& h);
 
 			boost::system::error_code close(boost::system::error_code& ec);
 			void close();
@@ -925,7 +924,7 @@ namespace sim
 			void check_accept_queue();
 			void do_check_accept_queue(boost::system::error_code const& ec);
 
-			boost::function<void(boost::system::error_code const&)> m_accept_handler;
+			std::function<void(boost::system::error_code const&)> m_accept_handler;
 
 			// the number of half-open incoming connections this listen socket can
 			// hold. If this is -1, this socket is not yet listening and incoming
@@ -1012,8 +1011,8 @@ namespace sim
 		bool stopped() const;
 		void reset();
 
-		void dispatch(boost::function<void()> handler);
-		void post(boost::function<void()> handler);
+		void dispatch(std::function<void()> handler);
+		void post(std::function<void()> handler);
 
 		// internal interface
 		boost::asio::io_service& get_internal_service();
