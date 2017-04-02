@@ -37,6 +37,14 @@ All rights reserved.
 #define LIBSIMULATOR_USE_MOVE 0
 #endif
 
+#if defined __clang__ || defined __GNUC__
+#define LIBSIMULATOR_NO_RETURN __attribute((noreturn))
+#elif _MSC_VER
+#define LIBSIMULATOR_NO_RETURN __declspec(noreturn)
+#else
+#define LIBSIMULATOR_NO_RETURN
+#endif
+
 #ifdef _MSC_VER
 #pragma warning(push)
 // warning C4251: X: class Y needs to have dll-interface to be used by clients of struct

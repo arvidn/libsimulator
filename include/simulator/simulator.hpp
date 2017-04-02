@@ -325,8 +325,8 @@ namespace sim
 			return lhs_end == rhs_end;
 		}
 
-		value_type operator*() const { return m_results[m_idx]; }
-		value_type const* operator->() const { return &m_results[m_idx]; }
+		value_type operator*() const { assert(m_idx >= 0); return m_results[static_cast<std::size_t>(m_idx)]; }
+		value_type const* operator->() const { assert(m_idx >= 0); return &m_results[static_cast<std::size_t>(m_idx)]; }
 
 		basic_resolver_iterator& operator++() { ++m_idx; return *this; }
 		basic_resolver_iterator operator++(int)
@@ -731,9 +731,9 @@ namespace sim
 				async_write_some_impl(b, handler);
 			}
 
-			void async_write_some(null_buffers const&
+			void LIBSIMULATOR_NO_RETURN async_write_some(null_buffers const&
 				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& /* handler */)
+				, std::size_t)> const& /* handler */)
 			{
 				if (m_send_handler) abort_send_handler();
 				assert(false && "not supported yet");
