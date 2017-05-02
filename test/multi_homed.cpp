@@ -68,7 +68,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 	}
 }
 
-TEST_CASE("one node can have multiple addresses", "multi-homed")
+TEST_CASE("one node can have multiple addresses (UDP)", "multi-homed")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -129,4 +129,88 @@ TEST_CASE("one node can have multiple addresses", "multi-homed")
 		, millis, ec.message().c_str());
 }
 
+TEST_CASE("one node can have multiple addresses (TCP)", "multi-homed")
+{
+	default_config cfg;
+	simulation sim(cfg);
+
+	const unsigned short listen_port = 4242;
+
+	// the machine receiving packets has two IP addresses
+	asio::io_service incoming_ios(sim, {
+		address_v4::from_string("40.30.20.10"),
+		address_v6::from_string("ff::dead:beef:1337")} );
+
+	// the machine sending packets has two IP addresses
+	asio::io_service outgoing_ios(sim, {
+		address_v4::from_string("10.20.30.40"),
+		address_v6::from_string("ff::abad:cafe:1337")
+	});
+
+	// we create two acceptors for it, one for each interface
+	asio::ip::tcp::acceptor incoming_v4(incoming_ios);
+	asio::ip::tcp::acceptor incoming_v6(incoming_ios);
+
+	tcp::socket outgoing_v4(outgoing_ios);
+	tcp::socket outgoing_v6(outgoing_ios);
+
+	boost::system::error_code ec;
+
+	incoming_v4.open(tcp::v4(), ec);
+	REQUIRE(!ec);
+	incoming_v4.bind(tcp::endpoint(address_v4::any(), listen_port));
+	REQUIRE(!ec);
+	incoming_v4.listen();
+
+	incoming_v6.open(tcp::v6(), ec);
+	REQUIRE(!ec);
+	incoming_v6.bind(tcp::endpoint(address_v6::any(), listen_port));
+	REQUIRE(!ec);
+	incoming_v6.listen();
+
+	int num_incoming_v4 = 0;
+	int num_incoming_v6 = 0;
+
+	tcp::socket incoming_socket(incoming_ios);
+	incoming_v4.async_accept(incoming_socket, [&] (boost::system::error_code ec) {
+		REQUIRE(!ec);
+		CHECK(incoming_socket.remote_endpoint().address() == address_v4::from_string("10.20.30.40"));
+		num_incoming_v4++;
+		incoming_socket.close();
+	});
+
+	incoming_v6.async_accept(incoming_socket, [&] (boost::system::error_code ec) {
+		REQUIRE(!ec);
+		CHECK(incoming_socket.remote_endpoint().address() == address_v6::from_string("ff::abad:cafe:1337"));
+		num_incoming_v6++;
+		incoming_socket.close();
+	});
+
+	// connect via ipv4
+	outgoing_v4.open(tcp::v4(), ec);
+	REQUIRE(!ec);
+	auto endpoint_v4 = asio::ip::tcp::endpoint(asio::ip::address::from_string("40.30.20.10"), listen_port);
+	outgoing_v4.async_connect(endpoint_v4, [] (boost::system::error_code ec) {
+		REQUIRE(!ec);
+	});
+	sim.run(ec);
+	REQUIRE(!ec);
+
+	CHECK(num_incoming_v4 == 1);
+	CHECK(num_incoming_v6 == 0);
+
+	// connect via ipv6
+	outgoing_v6.open(tcp::v6(), ec);
+	REQUIRE(!ec);
+	auto endpoint_v6 = asio::ip::tcp::endpoint(asio::ip::address::from_string("ff::dead:beef:1337"), listen_port);
+	outgoing_v6.async_connect(endpoint_v6, [] (boost::system::error_code ec) {
+		REQUIRE(!ec);
+	});
+
+	sim.run(ec);
+	REQUIRE(!ec);
+
+	CHECK(num_incoming_v4 == 1);
+	CHECK(num_incoming_v6 == 1);
+}
 

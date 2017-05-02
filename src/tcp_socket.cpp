@@ -300,11 +300,14 @@ namespace ip {
 		boost::system::error_code ec;
 		if (m_bound_to.address() == ip::address())
 		{
-			// TODO: if we're on a multi-homed node, we should bind to the address
-			// family corresponding to target. We probably need to pass down target
-			// to the io_service bind_socket call.
+			auto endpoint = ip::tcp::endpoint();
+			if (target.address().is_v4()) {
+				endpoint.address(ip::address_v4::any());
+			} else {
+				endpoint.address(ip::address_v6::any());
+			}
 			ip::tcp::endpoint addr = m_io_service.bind_socket(this
-				, ip::tcp::endpoint(), ec);
+				, endpoint, ec);
 			if (ec)
 			{
 				m_io_service.post(std::bind(h, ec));
