@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 2.8.7)
 set(SRC_DIR src)
 set(TEST_SRC_DIR test)
 set(INCLUDE_DIR include)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost COMPONENTS system REQUIRED)
 
@@ -28,7 +30,6 @@ set(SIMULATOR_SRC_FILES
 
 add_library(simulator ${SIMULATOR_SRC_FILES})
 include_directories(${Boost_INCLUDE_DIR} ${INCLUDE_DIR})
-set(CMAKE_CXX_FLAGS "-std=c++11")
 
 enable_testing()
 

@@ -32,7 +32,7 @@ addons:
     - cmake
 
 install:
-  - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam; export CXX=g++-4.8; fi'
+  - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam; export CXX="g++-4.8" CXX_FLAGS="-std=c++11"; fi'
   - 'if [ $TRAVIS_OS_NAME == "osx" ]; then echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam; fi'
   - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build && brew upgrade --quiet cmake ; fi
   - ccache -V && ccache --show-stats && ccache --zero-stats
