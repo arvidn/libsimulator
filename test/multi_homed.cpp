@@ -68,7 +68,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 	}
 }
 
-TEST_CASE("one node can have multiple addresses (UDP)", "multi-homed")
+TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 {
 	default_config cfg;
 	simulation sim(cfg);
@@ -129,7 +129,7 @@ TEST_CASE("one node can have multiple addresses (UDP)", "multi-homed")
 		, millis, ec.message().c_str());
 }
 
-TEST_CASE("one node can have multiple addresses (TCP)", "multi-homed")
+TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 {
 	default_config cfg;
 	simulation sim(cfg);

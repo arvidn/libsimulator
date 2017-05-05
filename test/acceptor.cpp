@@ -138,7 +138,7 @@ void on_connected(boost::system::error_code const& ec
 
 }
 
-TEST_CASE("accept incoming connection on acceptor socket", "acceptor")
+TEST_CASE("accept incoming connection on acceptor socket", "[acceptor]")
 {
 	default_config cfg;
 	simulation sim(cfg);

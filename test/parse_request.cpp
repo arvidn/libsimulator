@@ -27,7 +27,7 @@ All rights reserved.
 #pragma GCC diagnostic ignored "-Wparentheses"
 #endif
 
-TEST_CASE("parse_request")
+TEST_CASE("[parse_request]")
 {
 	auto str = "GET /foo/bar?x=4 HTTP/1.1\r\n\r\n";
 	sim::http_request req = sim::parse_request(str, std::strlen(str));

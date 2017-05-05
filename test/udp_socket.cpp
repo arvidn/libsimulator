@@ -68,7 +68,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 }
 
-TEST_CASE("send packet to udp socket", "udp_socket")
+TEST_CASE("send packet to udp socket", "[udp_socket]")
 {
 	default_config cfg;
 	simulation sim(cfg);

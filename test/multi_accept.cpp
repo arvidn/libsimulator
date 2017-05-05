@@ -87,7 +87,7 @@ void on_connected(boost::system::error_code const& ec
 
 }
 
-TEST_CASE("accept a connection multiple times on the same socket", "accept")
+TEST_CASE("accept a connection multiple times on the same socket", "[accept]")
 {
 	default_config cfg;
 	simulation sim(cfg);
