@@ -98,7 +98,7 @@ struct sim_config : sim::default_config
 	}
 };
 
-TEST_CASE("resolve multiple IPv4 addresses", "resolver") {
+TEST_CASE("resolve multiple IPv4 addresses", "[resolver]") {
 	sim_config cfg;
 	simulation sim(cfg);
 
@@ -123,7 +123,7 @@ TEST_CASE("resolve multiple IPv4 addresses", "resolver") {
 		, millis, ec.message().c_str());
 }
 
-TEST_CASE("resolve non-existent hostname", "resolver") {
+TEST_CASE("resolve non-existent hostname", "[resolver]") {
 	sim_config cfg;
 	simulation sim(cfg);
 
@@ -148,7 +148,7 @@ TEST_CASE("resolve non-existent hostname", "resolver") {
 		, millis, ec.message().c_str());
 }
 
-TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
+TEST_CASE("lookups resolve serially, compounding the latency", "[resolver]") {
 	sim_config cfg;
 	simulation sim(cfg);
 
@@ -175,7 +175,7 @@ TEST_CASE("lookups resolve serially, compounding the latency", "resolver") {
 		, millis, ec.message().c_str());
 }
 
-TEST_CASE("resolve an IP address", "resolver") {
+TEST_CASE("resolve an IP address", "[resolver]") {
 	sim_config cfg;
 	simulation sim(cfg);
 

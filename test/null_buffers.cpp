@@ -154,7 +154,7 @@ void on_connected(boost::system::error_code const& ec
 		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
 
-TEST_CASE("receive null_buffers", "null_buffers")
+TEST_CASE("receive null_buffers", "[null_buffers]")
 {
 	default_config cfg;
 	simulation sim(cfg);

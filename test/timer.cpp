@@ -68,7 +68,7 @@ void print_time(high_resolution_timer& timer
 	}
 }
 
-TEST_CASE("wait for timers", "timer")
+TEST_CASE("wait for timers", "[timer]")
 {
 	default_config cfg;
 	simulation sim(cfg);
