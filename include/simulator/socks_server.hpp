@@ -30,9 +30,17 @@ All rights reserved.
 namespace sim
 {
 
+enum socks_flag
+{
+	// when this flag is set, the proxy will close the client connection
+	// immediately after sending the response to a UDP ASSOCIATE command
+	disconnect_udp_associate = 1
+};
+
 struct SIMULATOR_DECL socks_connection : std::enable_shared_from_this<socks_connection>
 {
-	socks_connection(asio::io_service& ios, int version);
+	socks_connection(asio::io_service& ios, int version, std::array<int, 3>& cmd_counts
+		, std::uint32_t flags);
 
 	asio::ip::tcp::socket& socket() { return m_client_connection; }
 
@@ -113,15 +121,25 @@ private:
 	const int m_version;
 
 	int m_command;
+
+	std::array<int, 3>& m_cmd_counts;
+
+	std::uint32_t const m_flags;
 };
 
 // This is a very simple socks4 and 5 server that only supports a single
 // concurrent connection
 struct SIMULATOR_DECL socks_server
 {
-	socks_server(asio::io_service& ios, unsigned short listen_port, int version = 5);
+	socks_server(asio::io_service& ios, unsigned short listen_port
+		, int version = 5, std::uint32_t flags = 0);
 
 	void stop();
+
+	// return the number of CONNECT, BIND and UDP_ASSOCIATE commands the proxy
+	// has received
+	std::array<int, 3> cmd_counts() const
+	{ return m_cmd_counts; }
 
 private:
 
@@ -140,6 +158,10 @@ private:
 
 	// the SOCKS protocol version (4 or 5)
 	const int m_version;
+
+	std::array<int, 3> m_cmd_counts;
+
+	std::uint32_t const m_flags;
 };
 
 }

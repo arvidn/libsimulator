@@ -20,6 +20,8 @@ All rights reserved.
 #include "simulator/socks_server.hpp"
 
 #include <functional>
+#include <cstdint>
+#include <cinttypes>
 #include <cstdio> // for printf
 
 using namespace sim::asio;
@@ -32,13 +34,16 @@ namespace sim
 {
 	using namespace aux;
 
-	socks_server::socks_server(io_service& ios, unsigned short listen_port, int version)
+	socks_server::socks_server(io_service& ios, unsigned short listen_port, int version
+		, std::uint32_t const flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
-		, m_conn(std::make_shared<socks_connection>(m_ios, version))
+		, m_conn(std::make_shared<socks_connection>(m_ios, version, m_cmd_counts, flags))
 		, m_close(false)
 		, m_version(version)
+		, m_flags(flags)
 	{
+		m_cmd_counts.fill(0);
 		address local_ip = ios.get_ips().front();
 		if (local_ip.is_v4())
 		{
@@ -74,7 +79,7 @@ namespace sim
 		m_conn->start();
 
 		// create a new connection to accept into
-		m_conn = std::make_shared<socks_connection>(m_ios, m_version);
+		m_conn = std::make_shared<socks_connection>(m_ios, m_version, m_cmd_counts, m_flags);
 
 		// now we can accept another connection
 		m_listen_socket.async_accept(m_conn->socket(), m_ep
@@ -88,7 +93,7 @@ namespace sim
 	}
 
 	socks_connection::socks_connection(asio::io_service& ios
-		, int version)
+		, int version, std::array<int, 3>& cmd_counts, std::uint32_t const flags)
 		: m_ios(ios)
 		, m_resolver(m_ios)
 		, m_client_connection(ios)
@@ -100,6 +105,8 @@ namespace sim
 		, m_close(false)
 		, m_version(version)
 		, m_command(0)
+		, m_cmd_counts(cmd_counts)
+		, m_flags(flags)
 	{
 	}
 
@@ -203,6 +210,7 @@ namespace sim
 		int const version = m_out_buffer[0];
 		int const command = m_out_buffer[1];
 		m_command = command;
+		++m_cmd_counts[command - 1];
 
 		if (version != m_version)
 		{
@@ -222,11 +230,11 @@ namespace sim
 				return;
 			}
 
-			boost::uint16_t port = m_out_buffer[2] & 0xff;
+			std::uint16_t port = m_out_buffer[2] & 0xff;
 			port <<= 8;
 			port |= m_out_buffer[3] & 0xff;
 
-			boost::uint32_t addr = m_out_buffer[4] & 0xff;
+			std::uint32_t addr = m_out_buffer[4] & 0xff;
 			addr <<= 8;
 			addr |= m_out_buffer[5] & 0xff;
 			addr <<= 8;
@@ -296,7 +304,7 @@ namespace sim
 // | 1  |  1  | X'00' |  1   | 4        |    2     |
 // +----+-----+-------+------+----------+----------+
 
-				boost::uint32_t addr = m_out_buffer[4] & 0xff;
+				std::uint32_t addr = m_out_buffer[4] & 0xff;
 				addr <<= 8;
 				addr |= m_out_buffer[5] & 0xff;
 				addr <<= 8;
@@ -304,7 +312,7 @@ namespace sim
 				addr <<= 8;
 				addr |= m_out_buffer[7] & 0xff;
 
-				boost::uint16_t port = m_out_buffer[8] & 0xff;
+				std::uint16_t port = m_out_buffer[8] & 0xff;
 				port <<= 8;
 				port |= m_out_buffer[9] & 0xff;
 
@@ -343,7 +351,7 @@ namespace sim
 					return;
 				}
 
-				const int len = boost::uint8_t(m_out_buffer[4]);
+				const int len = std::uint8_t(m_out_buffer[4]);
 				// we already read an address of length 4, assuming it was an IPv4
 				// address. Now, with a domain name, one of those bytes was the
 				// length-prefix, but we still read 3 bytes already.
@@ -378,11 +386,11 @@ namespace sim
 
 		int const buffer_size = int(10 + bytes_transferred);
 
-		boost::uint16_t port = m_out_buffer[buffer_size - 2] & 0xff;
+		std::uint16_t port = m_out_buffer[buffer_size - 2] & 0xff;
 		port <<= 8;
 		port |= m_out_buffer[buffer_size - 1] & 0xff;
 
-		std::string hostname(&m_out_buffer[5], boost::uint8_t(m_out_buffer[4]));
+		std::string hostname(&m_out_buffer[5], std::uint8_t(m_out_buffer[4]));
 		std::printf("socks_connection::on_request_domain_name(%s): hostname: %s port: %d\n"
 			, command(), hostname.c_str(), port);
 
@@ -560,6 +568,14 @@ namespace sim
 			std::printf("socks_connection::wait_for_eof: %s\n", ec.message().c_str());
 			m_udp_associate.close();
 			m_udp_associate_ep = udp::endpoint();
+			m_client_connection.close();
+			return;
+		}
+
+		if (m_flags & socks_flag::disconnect_udp_associate)
+		{
+			std::printf("socks_connection::wait_for_eof: closing connection prematurely\n");
+			m_client_connection.close();
 			return;
 		}
 
@@ -603,7 +619,7 @@ namespace sim
 			// TODO: support hostnames too
 			if (ptr[3] != 1) std::printf("only supports IPv4. ATYP: %d\n", ptr[3]);
 
-			boost::uint32_t addr = ptr[4] & 0xff;
+			std::uint32_t addr = ptr[4] & 0xff;
 			addr <<= 8;
 			addr |= ptr[5] & 0xff;
 			addr <<= 8;
@@ -611,7 +627,7 @@ namespace sim
 			addr <<= 8;
 			addr |= ptr[7] & 0xff;
 
-			boost::uint16_t port = ptr[8] & 0xff;
+			std::uint16_t port = ptr[8] & 0xff;
 			port <<= 8;
 			port |= ptr[9] & 0xff;
 
