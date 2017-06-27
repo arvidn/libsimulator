@@ -86,9 +86,9 @@ namespace ip {
 	{
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(m_accept_handler
+			m_io_service.post(std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = 0;
+			m_accept_handler = nullptr;
 		}
 
 		ec.clear();
@@ -103,7 +103,7 @@ namespace ip {
 	}
 
 	void tcp::acceptor::async_accept(ip::tcp::socket& peer
-		, const std::function<void(boost::system::error_code const&)>& h)
+		, aux::function<void(boost::system::error_code const&)> h)
 	{
 		// TODO: assert that the io_service we use is the same as the one peer use
 		if (peer.is_open())
@@ -114,11 +114,11 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(m_accept_handler
+			m_io_service.post(std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = 0;
+			m_accept_handler = nullptr;
 		}
-		m_accept_handler = h;
+		m_accept_handler = std::move(h);
 		m_accept_into = &peer;
 		m_remote_endpoint = nullptr;
 
@@ -127,7 +127,7 @@ namespace ip {
 
 	void tcp::acceptor::async_accept(ip::tcp::socket& peer
 		, ip::tcp::endpoint& peer_endpoint
-		, const std::function<void(boost::system::error_code const&)>& h)
+		, aux::function<void(boost::system::error_code const&)> h)
 	{
 		if (peer.is_open())
 		{
@@ -137,11 +137,11 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(m_accept_handler
+			m_io_service.post(std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = 0;
+			m_accept_handler = nullptr;
 		}
-		m_accept_handler = h;
+		m_accept_handler = std::move(h);
 		m_accept_into = &peer;
 		m_remote_endpoint = &peer_endpoint;
 
@@ -166,9 +166,9 @@ namespace ip {
 				assert(false); // something is not wired up correctly
 				if (m_accept_handler)
 				{
-					m_io_service.post(std::bind(m_accept_handler
+					m_io_service.post(std::bind(std::move(m_accept_handler)
 						, boost::system::error_code(error::operation_aborted)));
-					m_accept_handler = 0;
+					m_accept_handler = nullptr;
 					m_accept_into = nullptr;
 					m_remote_endpoint = nullptr;
 				}
@@ -206,9 +206,9 @@ namespace ip {
 
 			if (m_accept_handler)
 			{
-				m_io_service.post(std::bind(m_accept_handler
+				m_io_service.post(std::bind(std::move(m_accept_handler)
 					, boost::system::error_code(error::operation_aborted)));
-				m_accept_handler = 0;
+				m_accept_handler = nullptr;
 				m_accept_into = nullptr;
 				m_remote_endpoint = nullptr;
 			}
@@ -253,8 +253,8 @@ namespace ip {
 		forward_packet(std::move(p));
 
 		assert(m_accept_handler);
-		m_io_service.post(std::bind(m_accept_handler, ec));
-		m_accept_handler = 0;
+		m_io_service.post(std::bind(std::move(m_accept_handler), ec));
+		m_accept_handler = nullptr;
 		m_accept_into = nullptr;
 		m_remote_endpoint = nullptr;
 	}

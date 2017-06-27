@@ -45,9 +45,7 @@ namespace ip {
 		, m_is_v4(true)
 	{}
 
-#if LIBSIMULATOR_USE_MOVE
 	udp::socket::socket(socket&&) = default;
-#endif
 
 	udp::socket::~socket()
 	{
@@ -169,40 +167,46 @@ namespace ip {
 
 	void udp::socket::abort_send_handler()
 	{
-		m_io_service.post(std::bind(m_send_handler
+		m_io_service.post(std::bind(std::move(m_send_handler)
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_send_timer.cancel();
-		m_send_handler = 0;
+		m_send_handler = nullptr;
 //		m_send_buffer.clear();
 	}
 
 	void udp::socket::abort_recv_handler()
 	{
-		m_io_service.post(std::bind(m_recv_handler
+		m_io_service.post(std::bind(std::move(m_recv_handler)
 			, boost::system::error_code(error::operation_aborted), 0));
 		m_recv_timer.cancel();
-		m_recv_handler = 0;
+		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
 	}
 
-	void udp::socket::async_send(const asio::null_buffers& bufs
-		, std::function<void(boost::system::error_code const&, std::size_t)> const& handler)
+	void udp::socket::async_send(asio::null_buffers const& bufs
+		, aux::function<void(boost::system::error_code const&, std::size_t)> handler)
 	{
 		if (m_send_handler) abort_send_handler();
 
 		// TODO: make the send buffer size configurable
-		time_point now = chrono::high_resolution_clock::now();
-		if (m_next_send  - now > chrono::milliseconds(1000))
+		time_point const now = chrono::high_resolution_clock::now();
+		if (m_next_send - now > chrono::milliseconds(1000))
 		{
-			// our send queue is too large.
+			// our send queue is too large. Defer
 			m_recv_timer.expires_at(m_next_send - chrono::milliseconds(1000) / 2);
-			m_recv_timer.async_wait(std::bind(&udp::socket::async_send
-				, this, bufs, handler));
+
+			using namespace std::placeholders;
+
+			// this additional layer of binder is here to make sure the last bound
+			// argument (handler) is moved into the function call
+			m_recv_timer.async_wait(aux::move_bind<void>(std::bind(&udp::socket::async_send
+				, this, bufs, _1), std::move(handler)));
 			return;
 		}
 
 		// the socket is writable, post the completion handler immediately
-		m_io_service.post(std::bind(handler, boost::system::error_code(), 0));
+		boost::system::error_code no_error;
+		m_io_service.post(std::bind(std::move(handler), no_error, 0));
 	}
 
 	std::size_t udp::socket::receive_from_impl(
@@ -252,31 +256,31 @@ namespace ip {
 
 	void udp::socket::async_receive_null_buffers_impl(
 		udp::endpoint* sender
-		, std::function<void(boost::system::error_code const&
-			, std::size_t)> const& handler)
+		, aux::function<void(boost::system::error_code const&
+			, std::size_t)> handler)
 	{
 		if (!m_open)
 		{
-			m_io_service.post(std::bind(handler
+			m_io_service.post(std::bind(std::move(handler)
 				, boost::system::error_code(error::bad_descriptor), 0));
 			return;
 		}
 
 		if (m_bound_to == udp::endpoint())
 		{
-			m_io_service.post(std::bind(handler
+			m_io_service.post(std::bind(std::move(handler)
 				, boost::system::error_code(error::invalid_argument), 0));
 			return;
 		}
 
 		if (!m_incoming_queue.empty())
 		{
-			m_io_service.post(std::bind(handler, boost::system::error_code(), 0));
+			m_io_service.post(std::bind(std::move(handler), boost::system::error_code(), 0));
 			return;
 		}
 
 		m_recv_null_buffers = true;
-		m_recv_handler = handler;
+		m_recv_handler = std::move(handler);
 		m_recv_sender = sender;
 	}
 
@@ -284,8 +288,8 @@ namespace ip {
 		std::vector<asio::mutable_buffer> const& bufs
 		, udp::endpoint* sender
 		, socket_base::message_flags /* flags */
-		, std::function<void(boost::system::error_code const&
-			, std::size_t)> const& handler)
+		, aux::function<void(boost::system::error_code const&
+			, std::size_t)> handler)
 	{
 		assert(!bufs.empty());
 
@@ -294,7 +298,7 @@ namespace ip {
 		if (ec == boost::system::error_code(error::would_block))
 		{
 			m_recv_buffer = bufs;
-			m_recv_handler = handler;
+			m_recv_handler = std::move(handler);
 			m_recv_sender = sender;
 			m_recv_null_buffers = false;
 
@@ -303,18 +307,18 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(std::bind(handler, ec, 0));
-			m_recv_handler = 0;
+			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
-			m_recv_sender = NULL;
+			m_recv_sender = nullptr;
 			m_recv_null_buffers = false;
 			return;
 		}
 
-		m_io_service.post(std::bind(handler, ec, bytes_transferred));
-		m_recv_handler = 0;
+		m_io_service.post(std::bind(std::move(handler), ec, bytes_transferred));
+		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
-		m_recv_sender = NULL;
+		m_recv_sender = nullptr;
 		m_recv_null_buffers = false;
 	}
 
@@ -427,16 +431,16 @@ namespace ip {
 		// there is an outstanding operation waiting for an incoming packet
 		if (m_recv_null_buffers)
 		{
-			async_receive_null_buffers_impl(m_recv_sender, m_recv_handler);
+			async_receive_null_buffers_impl(m_recv_sender, std::move(m_recv_handler));
 		}
 		else
 		{
-			async_receive_from_impl(m_recv_buffer, m_recv_sender, 0, m_recv_handler);
+			async_receive_from_impl(m_recv_buffer, m_recv_sender, 0, std::move(m_recv_handler));
 		}
 
-		m_recv_handler = 0;
+		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
-		m_recv_sender = NULL;
+		m_recv_sender = nullptr;
 	}
 
 } // ip

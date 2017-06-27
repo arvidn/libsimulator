@@ -66,7 +66,7 @@ namespace sim
 	{
 		std::string ret;
 		std::transform(s.begin(), s.end(), std::back_inserter(ret)
-			, [](char c) { return tolower(c); } );
+			, [](char c) { return static_cast<char>(tolower(c)); } );
 		return ret;
 	}
 

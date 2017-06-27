@@ -28,12 +28,12 @@ namespace sim
 struct timer
 {
 	timer(simulation& sim, chrono::high_resolution_clock::duration timeout
-		, std::function<void(boost::system::error_code const&)> f)
+		, aux::function<void(boost::system::error_code const&)> f)
 		: m_ios(sim, asio::ip::address_v4())
 		, m_timer(m_ios)
 	{
 		m_timer.expires_from_now(timeout);
-		m_timer.async_wait(f);
+		m_timer.async_wait(std::move(f));
 	}
 
 private:

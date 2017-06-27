@@ -87,6 +87,7 @@ lib simulator
 
 	: # usage requirements
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
+	<define>BOOST_ASIO_HAS_MOVE
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
 	<toolset>gcc:<cxxflags>-std=c++11

@@ -31,12 +31,6 @@ All rights reserved.
 #define SIMULATOR_DECL
 #endif
 
-#if !defined _MSC_VER || _MSC_VER > 1900
-#define LIBSIMULATOR_USE_MOVE 1
-#else
-#define LIBSIMULATOR_USE_MOVE 0
-#endif
-
 #if defined __clang__ || defined __GNUC__
 #define LIBSIMULATOR_NO_RETURN __attribute((noreturn))
 #elif _MSC_VER

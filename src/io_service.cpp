@@ -50,7 +50,7 @@ namespace sim { namespace asio {
 	}
 
 	io_service::io_service()
-		: m_sim(*reinterpret_cast<sim::simulation*>(NULL))
+		: m_sim(*reinterpret_cast<sim::simulation*>(0))
 	{
 		assert(false);
 	}
@@ -115,11 +115,11 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	void io_service::dispatch(std::function<void()> handler)
-	{ m_sim.get_internal_service().dispatch(handler); }
+	void io_service::dispatch(aux::function<void()> handler)
+	{ m_sim.get_internal_service().dispatch(std::move(handler)); }
 
-	void io_service::post(std::function<void()> handler)
-	{ m_sim.get_internal_service().post(handler); }
+	void io_service::post(aux::function<void()> handler)
+	{ m_sim.get_internal_service().post(std::move(handler)); }
 
 	// private interface
 

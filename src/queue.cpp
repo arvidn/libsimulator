@@ -79,7 +79,7 @@ namespace sim
 			// if any hop on the network drops a packet, it has to return it to the
 			// sender.
 			auto drop_fun = std::move(p.drop_fun);
-			if (drop_fun) (*drop_fun)(std::move(p));
+			if (drop_fun) drop_fun(std::move(p));
 			return;
 		}
 
@@ -96,9 +96,9 @@ namespace sim
 	{
 		time_point now = chrono::high_resolution_clock::now();
 
-		if (m_queue.front().first > now)
+		if (m_queue.front().ts > now)
 		{
-			m_forward_timer.expires_at(m_queue.front().first);
+			m_forward_timer.expires_at(m_queue.front().ts);
 			m_forward_timer.async_wait(std::bind(&queue::begin_send_next_packet
 				, this));
 			return;
@@ -114,7 +114,7 @@ namespace sim
 		const double nanoseconds_per_byte = 1000000000.0
 			/ double(m_bandwidth);
 
-		aux::packet const& p = m_queue.front().second;
+		aux::packet const& p = m_queue.front().pkt;
 		const int packet_size = int(p.buffer.size() + p.overhead);
 
 		m_last_forward += chrono::duration_cast<duration>(chrono::nanoseconds(
@@ -127,7 +127,7 @@ namespace sim
 
 	void queue::next_packet_sent()
 	{
-		aux::packet p = std::move(m_queue.front().second);
+		aux::packet p = std::move(m_queue.front().pkt);
 		m_queue.erase(m_queue.begin());
 		const int packet_size = int(p.buffer.size() + p.overhead);
 		m_queue_size -= packet_size;

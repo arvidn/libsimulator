@@ -36,7 +36,7 @@ namespace ip {
 
 	template<typename Protocol>
 	void basic_resolver<Protocol>::async_resolve(basic_resolver_query<Protocol> q,
-		std::function<void(boost::system::error_code const&
+		aux::function<void(boost::system::error_code const&
 			, basic_resolver_iterator<Protocol>)> handler)
 	{
 		std::vector<asio::ip::address> result;
@@ -64,8 +64,8 @@ namespace ip {
 				typename Protocol::endpoint(addr, static_cast<unsigned short>(port))
 				, q.host_name()
 				, q.service_name());
-			result_t res = {t, ec, iter, handler };
-			m_queue.insert(m_queue.begin(), res);
+			result_t res = {t, ec, iter, std::move(handler) };
+			m_queue.insert(m_queue.begin(), std::move(res));
 			m_timer.expires_at(m_queue.front().completion_time);
 			m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
 			return;
@@ -91,7 +91,7 @@ namespace ip {
 				, q.service_name());
 		}
 
-		m_queue.push_back({completion_time, ec, iter, handler });
+		m_queue.push_back({completion_time, ec, iter, std::move(handler) });
 
 		m_timer.expires_at(m_queue.front().completion_time);
 		m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
@@ -104,7 +104,7 @@ namespace ip {
 
 		if (m_queue.empty()) return;
 
-		typename queue_t::value_type v = m_queue.front();
+		typename queue_t::value_type v = std::move(m_queue.front());
 		m_queue.erase(m_queue.begin());
 
 		v.handler(v.err, v.iter);
@@ -124,9 +124,8 @@ namespace ip {
 		{
 			r.err = asio::error::operation_aborted;
 			r.iter = basic_resolver_iterator<Protocol>();
-			m_timer.get_io_service().post(std::bind(r.handler
-				, r.err
-				, r.iter));
+			m_timer.get_io_service().post(std::bind(std::move(r.handler)
+				, r.err, r.iter));
 		}
 	}
 
