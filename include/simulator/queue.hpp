@@ -28,8 +28,20 @@ All rights reserved.
 #pragma warning( disable : 4251)
 #endif
 
-namespace sim
-{
+namespace sim {
+
+	struct timed_packet
+	{
+		timed_packet(chrono::high_resolution_clock::time_point t, aux::packet p)
+			: ts(t), pkt(std::move(p))
+		{}
+		timed_packet(timed_packet&&) = default;
+		timed_packet& operator=(timed_packet&&) = default;
+		timed_packet(timed_packet const&) = delete;
+		timed_packet& operator=(timed_packet const&) = delete;
+		chrono::high_resolution_clock::time_point ts;
+		aux::packet pkt;
+	};
 
 	// this is a queue. It can be configured to contrain
 	struct SIMULATOR_DECL queue : sink
@@ -41,6 +53,12 @@ namespace sim
 		virtual void incoming_packet(aux::packet p) override final;
 
 		virtual std::string label() const override final;
+
+		queue(queue const&) = delete;
+		queue& operator=(queue const&) = delete;
+
+		queue(queue&&) = default;
+		queue& operator=(queue&&) = default;
 
 	private:
 
@@ -65,7 +83,7 @@ namespace sim
 		std::string m_node_name;
 
 		// this is the queue of packets and the time each packet was enqueued
-		std::deque<std::pair<chrono::high_resolution_clock::time_point, aux::packet>> m_queue;
+		std::deque<timed_packet> m_queue;
 		asio::high_resolution_timer m_forward_timer;
 
 		chrono::high_resolution_clock::time_point m_last_forward;

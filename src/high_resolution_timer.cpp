@@ -83,13 +83,13 @@ namespace sim
 	high_resolution_timer::time_type high_resolution_timer::expires_at() const
 	{ return m_expiration_time; }
 
-	std::size_t high_resolution_timer::expires_at(const high_resolution_timer::time_type& expiry_time)
+	std::size_t high_resolution_timer::expires_at(high_resolution_timer::time_type const& expiry_time)
 	{
 		boost::system::error_code ec;
 		return expires_at(expiry_time, ec);
 	}
 
-	std::size_t high_resolution_timer::expires_at(const high_resolution_timer::time_type& expiry_time, boost::system::error_code& ec)
+	std::size_t high_resolution_timer::expires_at(high_resolution_timer::time_type const& expiry_time, boost::system::error_code& ec)
 	{
 		ec.clear();
 		std::size_t ret = cancel(ec);
@@ -136,12 +136,13 @@ namespace sim
 		chrono::high_resolution_clock::fast_forward(m_expiration_time - now);
 	}
 
-	void high_resolution_timer::async_wait(const std::function<void(boost::system::error_code)>& handler)
+	void high_resolution_timer::async_wait(aux::function<void(boost::system::error_code const&)> handler)
 	{
 		// TODO: support multiple handlers
 		assert(!m_handler);
-		m_handler = handler;
-		if (m_expired) {
+		m_handler = std::move(handler);
+		if (m_expired)
+		{
 			fire(boost::system::error_code());
 			return;
 		}
@@ -151,8 +152,8 @@ namespace sim
 	{
 		m_expired = true;
 		if (!m_handler) return;
-		m_io_service.post(std::bind(m_handler, ec));
-		m_handler = 0;
+		m_io_service.post(std::bind(std::move(m_handler), ec));
+		m_handler = nullptr;
 	}
 
 	} // asio

@@ -37,12 +37,10 @@ namespace sim { namespace aux {
 		{}
 
 		// this is move-only
-#if LIBSIMULATOR_USE_MOVE
 		packet(packet const&) = delete;
 		packet& operator=(packet const&) = delete;
 		packet(packet&&) = default;
 		packet& operator=(packet&&) = default;
-#endif
 
 		// to keep things simple, don't drop ACKs or errors
 		bool ok_to_drop() const
@@ -70,11 +68,7 @@ namespace sim { namespace aux {
 		// used for UDP packets
 		// this is a unique_ptr just to make this type movable. the endpoint
 		// itself isn't
-#if LIBSIMULATOR_USE_MOVE
 		std::unique_ptr<asio::ip::udp::endpoint> from;
-#else
-		std::shared_ptr<asio::ip::udp::endpoint> from;
-#endif
 
 		// the number of bytes of overhead for this packet. The total packet
 		// size is the number of bytes in the buffer + this number
@@ -97,11 +91,7 @@ namespace sim { namespace aux {
 
 		// this function must be called with this packet in case the packet is
 		// dropped.
-#if LIBSIMULATOR_USE_MOVE
-		std::unique_ptr<std::function<void(aux::packet)>> drop_fun;
-#else
-		std::shared_ptr<std::function<void(aux::packet)>> drop_fun;
-#endif
+		aux::function<void(aux::packet)> drop_fun;
 	};
 
 }} // sim

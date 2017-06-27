@@ -34,6 +34,7 @@ All rights reserved.
 
 #include "simulator/chrono.hpp"
 #include "simulator/sink_forwarder.hpp"
+#include "simulator/function.hpp"
 
 #include <deque>
 #include <mutex>
@@ -131,7 +132,7 @@ namespace sim
 		void wait();
 		void wait(boost::system::error_code& ec);
 
-		void async_wait(const std::function<void(boost::system::error_code)>& handler);
+		void async_wait(aux::function<void(boost::system::error_code const&)> handler);
 
 		io_service& get_io_service() const { return m_io_service; }
 
@@ -140,7 +141,7 @@ namespace sim
 		void fire(boost::system::error_code ec);
 
 		time_type m_expiration_time;
-		std::function<void(boost::system::error_code const&)> m_handler;
+		aux::function<void(boost::system::error_code const&)> m_handler;
 		io_service& m_io_service;
 		bool m_expired;
 	};
@@ -370,7 +371,7 @@ namespace sim
 		void cancel();
 
 		void async_resolve(basic_resolver_query<Protocol> q,
-			std::function<void(boost::system::error_code const&,
+			aux::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler);
 
 		//TODO: add remaining members
@@ -384,7 +385,7 @@ namespace sim
 			chrono::high_resolution_clock::time_point completion_time;
 			boost::system::error_code err;
 			basic_resolver_iterator<Protocol> iter;
-			std::function<void(boost::system::error_code const&,
+			aux::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler;
 		};
 
@@ -413,9 +414,7 @@ namespace sim
 
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
-#if LIBSIMULATOR_USE_MOVE
 			socket(socket&&);
-#endif
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
@@ -436,8 +435,8 @@ namespace sim
 			void open(udp protocol);
 
 			template<typename ConstBufferSequence>
-			std::size_t send_to(const ConstBufferSequence& bufs
-				, const udp::endpoint& destination
+			std::size_t send_to(ConstBufferSequence const& bufs
+				, udp::endpoint const& destination
 				, socket_base::message_flags flags
 				, boost::system::error_code& ec)
 			{
@@ -447,8 +446,8 @@ namespace sim
 			}
 
 			template<typename ConstBufferSequence>
-			std::size_t send_to(const ConstBufferSequence& bufs
-				, const udp::endpoint& destination)
+			std::size_t send_to(ConstBufferSequence const& bufs
+				, udp::endpoint const& destination)
 			{
 				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
 				if (m_send_handler) abort_send_handler();
@@ -458,82 +457,82 @@ namespace sim
 				return ret;
 			}
 
-			void async_send(const asio::null_buffers& bufs
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler);
+			void async_send(asio::null_buffers const& bufs
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler);
 
 			void async_receive(asio::null_buffers const&
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(NULL, handler);
+				async_receive_null_buffers_impl(nullptr, std::move(handler));
 			}
 
 			template <class BufferSequence>
 			void async_receive(BufferSequence const& bufs
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
 				if (m_recv_handler) abort_recv_handler();
 
-				async_receive_from_impl(b, nullptr, 0, handler);
+				async_receive_from_impl(b, nullptr, 0, std::move(handler));
 			}
 
 
 			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
 				, socket_base::message_flags /* flags */
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(&sender, handler);
+				async_receive_null_buffers_impl(&sender, std::move(handler));
 			}
 
 			void async_receive_from(asio::null_buffers const&
 				, udp::endpoint& sender
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				// TODO: does it make sense to receive null_buffers and still have a
 				// sender argument?
 				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(&sender, handler);
+				async_receive_null_buffers_impl(&sender, std::move(handler));
 			}
 
 			template <class BufferSequence>
 			void async_receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
 				if (m_recv_handler) abort_recv_handler();
 
-				async_receive_from_impl(b, &sender, 0, handler);
+				async_receive_from_impl(b, &sender, 0, std::move(handler));
 			}
 
 			template <class BufferSequence>
 			void async_receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender
 				, socket_base::message_flags flags
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
 				if (m_recv_handler) abort_recv_handler();
 
-				async_receive_from_impl(b, &sender, flags, handler);
+				async_receive_from_impl(b, &sender, flags, std::move(handler));
 			}
 /*
 			void async_read_from(null_buffers const&
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
-				async_read_some_null_buffers_impl(handler);
+				async_read_some_null_buffers_impl(std::move(handler));
 			}
 */
 
@@ -588,8 +587,8 @@ namespace sim
 			void async_receive_from_impl(std::vector<asio::mutable_buffer> const& bufs
 				, udp::endpoint* sender
 				, socket_base::message_flags flags
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler);
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler);
 
 			std::size_t receive_from_impl(
 				std::vector<asio::mutable_buffer> const& bufs
@@ -599,10 +598,11 @@ namespace sim
 
 			void async_receive_null_buffers_impl(
 				udp::endpoint* sender
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler);
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler);
 
 		private:
+
 			void maybe_wakeup_reader();
 			void abort_send_handler();
 			void abort_recv_handler();
@@ -619,12 +619,12 @@ namespace sim
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
-			std::function<void(boost::system::error_code const&, std::size_t)>
+			aux::function<void(boost::system::error_code const&, std::size_t)>
 				m_send_handler;
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
-			std::function<void(boost::system::error_code const&, std::size_t)>
+			aux::function<void(boost::system::error_code const&, std::size_t)>
 				m_recv_handler;
 
 			// if we have an outstanding read operation, this is the buffer to
@@ -697,10 +697,8 @@ namespace sim
 // TODO: sockets are not movable right now unfortunately, because channels keep
 // pointers to the socke object to deliver new packets.
 /*
-#if LIBSIMULATOR_USE_MOVE
 			socket(socket&&) = default;
 			socket& operator=(socket&&) = default;
-#endif
 */
 			virtual ~socket();
 
@@ -719,33 +717,33 @@ namespace sim
 			lowest_layer_type& lowest_layer() { return *this; }
 
 			void async_connect(tcp::endpoint const& target
-				, std::function<void(boost::system::error_code const&)> h);
+				, aux::function<void(boost::system::error_code const&)> h);
 
 			template <class ConstBufferSequence>
 			void async_write_some(ConstBufferSequence const& bufs
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
 				if (m_send_handler) abort_send_handler();
-				async_write_some_impl(b, handler);
+				async_write_some_impl(b, std::move(handler));
 			}
 
 			void LIBSIMULATOR_NO_RETURN async_write_some(null_buffers const&
-				, std::function<void(boost::system::error_code const&
-				, std::size_t)> const& /* handler */)
+				, aux::function<void(boost::system::error_code const&
+				, std::size_t)> /* handler */)
 			{
 				if (m_send_handler) abort_send_handler();
 				assert(false && "not supported yet");
-//				async_write_some_null_buffers_impl(b, handler);
+//				async_write_some_null_buffers_impl(b, std::move(handler));
 			}
 
 			void async_read_some(null_buffers const&
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				if (m_recv_handler) abort_recv_handler();
-				async_read_some_null_buffers_impl(handler);
+				async_read_some_null_buffers_impl(std::move(handler));
 			}
 
 			template <class BufferSequence>
@@ -768,13 +766,13 @@ namespace sim
 
 			template <class BufferSequence>
 			void async_read_some(BufferSequence const& bufs
-				, std::function<void(boost::system::error_code const&
-					, std::size_t)> const& handler)
+				, aux::function<void(boost::system::error_code const&
+					, std::size_t)> handler)
 			{
 				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
 				if (m_recv_handler) abort_recv_handler();
 
-				async_read_some_impl(b, handler);
+				async_read_some_impl(b, std::move(handler));
 			}
 
 			std::size_t available(boost::system::error_code & ec) const;
@@ -808,11 +806,11 @@ namespace sim
 			void maybe_wakeup_writer();
 
 			void async_write_some_impl(std::vector<asio::const_buffer> const& bufs
-				, std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				, aux::function<void(boost::system::error_code const&, std::size_t)> handler);
 			void async_read_some_impl(std::vector<asio::mutable_buffer> const& bufs
-				, std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				, aux::function<void(boost::system::error_code const&, std::size_t)> handler);
 			void async_read_some_null_buffers_impl(
-				std::function<void(boost::system::error_code const&, std::size_t)> const& handler);
+				aux::function<void(boost::system::error_code const&, std::size_t)> handler);
 			std::size_t write_some_impl(std::vector<asio::const_buffer> const& bufs
 				, boost::system::error_code& ec);
 			std::size_t read_some_impl(std::vector<asio::mutable_buffer> const& bufs
@@ -823,7 +821,7 @@ namespace sim
 			// called when a packet is dropped
 			void packet_dropped(aux::packet p);
 
-			std::function<void(boost::system::error_code const&)> m_connect_handler;
+			aux::function<void(boost::system::error_code const&)> m_connect_handler;
 
 			asio::high_resolution_timer m_connect_timer;
 
@@ -833,8 +831,7 @@ namespace sim
 
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
-			std::function<void(boost::system::error_code const&, std::size_t)>
-				m_send_handler;
+			aux::function<void(boost::system::error_code const&, std::size_t)> m_send_handler;
 
 			std::vector<asio::const_buffer> m_send_buffer;
 
@@ -846,8 +843,7 @@ namespace sim
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
-			std::function<void(boost::system::error_code const&, std::size_t)>
-				m_recv_handler;
+			aux::function<void(boost::system::error_code const&, std::size_t)> m_recv_handler;
 
 			// if we have an outstanding buffers to receive into, these are them
 			std::vector<asio::mutable_buffer> m_recv_buffer;
@@ -904,10 +900,10 @@ namespace sim
 			void listen(int qs, boost::system::error_code& ec);
 
 			void async_accept(ip::tcp::socket& peer
-				, const std::function<void(boost::system::error_code const&)>& h);
+				, aux::function<void(boost::system::error_code const&)> h);
 			void async_accept(ip::tcp::socket& peer
 				, ip::tcp::endpoint& peer_endpoint
-				, const std::function<void(boost::system::error_code const&)>& h);
+				, aux::function<void(boost::system::error_code const&)> h);
 
 			boost::system::error_code close(boost::system::error_code& ec);
 			void close();
@@ -924,7 +920,7 @@ namespace sim
 			void check_accept_queue();
 			void do_check_accept_queue(boost::system::error_code const& ec);
 
-			std::function<void(boost::system::error_code const&)> m_accept_handler;
+			aux::function<void(boost::system::error_code const&)> m_accept_handler;
 
 			// the number of half-open incoming connections this listen socket can
 			// hold. If this is -1, this socket is not yet listening and incoming
@@ -989,14 +985,12 @@ namespace sim
 		io_service();
 		~io_service();
 
-#if LIBSIMULATOR_USE_MOVE
 		// not copyable and non movable (it's not movable because we currently
 		// keep pointers to the io_service instances in the simulator object)
 		io_service(io_service const&) = delete;
 		io_service(io_service&&) = delete;
 		io_service& operator=(io_service const&) = delete;
 		io_service& operator=(io_service&&) = delete;
-#endif
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -1011,8 +1005,8 @@ namespace sim
 		bool stopped() const;
 		void reset();
 
-		void dispatch(std::function<void()> handler);
-		void post(std::function<void()> handler);
+		void dispatch(aux::function<void()> handler);
+		void post(aux::function<void()> handler);
 
 		// internal interface
 		boost::asio::io_service& get_internal_service();
