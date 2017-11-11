@@ -236,15 +236,15 @@ namespace sim
 		// create a channel
 		std::shared_ptr<aux::channel> c = std::make_shared<aux::channel>();
 
-		asio::ip::tcp::endpoint from = s->local_endpoint(ec);
+		asio::ip::tcp::endpoint from = s->local_bound_to(ec);
 
 		route network_route = m_config.channel_route(from.address()
 			, target.address());
 		c->hops[0] = remote->get_outgoing_route() + network_route + s->get_incoming_route();
 		c->hops[1] = s->get_outgoing_route() + network_route + remote->get_incoming_route();
 
-		c->ep[0] = s->local_endpoint(ec);
-		c->ep[1] = remote->local_endpoint(ec);
+		c->ep[0] = s->local_bound_to(ec);
+		c->ep[1] = remote->local_bound_to(ec);
 
 		aux::packet p;
 		p.type = aux::packet::type_t::syn;
@@ -267,7 +267,7 @@ namespace sim
 		if (i == m_udp_sockets.end())
 			return route();
 
-		ip::udp::endpoint src = socket.local_endpoint();
+		ip::udp::endpoint src = socket.local_bound_to();
 		route network_route = m_config.channel_route(src.address(), ep.address());
 
 		// ask the socket for its incoming route

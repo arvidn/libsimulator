@@ -81,6 +81,7 @@ namespace ip {
 			return;
 		}
 		m_bound_to = bind_ip;
+		m_user_bound_to = bind_ip;
 		m_channel = c;
 		assert(m_forwarder);
 		c->hops[1].replace_last(m_forwarder);
@@ -104,6 +105,7 @@ namespace ip {
 		ip::tcp::endpoint addr = m_io_service.bind_socket(this, ep, ec);
 		if (ec) return ec;
 		m_bound_to = addr;
+		m_user_bound_to = ep;
 		return ec;
 	}
 
@@ -149,6 +151,7 @@ namespace ip {
 		{
 			m_io_service.unbind_socket(this, m_bound_to);
 			m_bound_to = ip::tcp::endpoint();
+			m_user_bound_to = ip::tcp::endpoint();
 		}
 		m_open = false;
 
@@ -242,26 +245,6 @@ namespace ip {
 		if (ec) throw boost::system::system_error(ec);
 	}
 
-	tcp::endpoint tcp::socket::local_endpoint(boost::system::error_code& ec)
-		const
-	{
-		if (!m_open)
-		{
-			ec = error::bad_descriptor;
-			return tcp::endpoint();
-		}
-
-		return m_bound_to;
-	}
-
-	tcp::endpoint tcp::socket::local_endpoint() const
-	{
-		boost::system::error_code ec;
-		tcp::endpoint ret = local_endpoint(ec);
-		if (ec) throw boost::system::system_error(ec);
-		return ret;
-	}
-
 	tcp::endpoint tcp::socket::remote_endpoint(boost::system::error_code& ec) const
 	{
 		if (!m_open)
@@ -314,6 +297,7 @@ namespace ip {
 				return;
 			}
 			m_bound_to = addr;
+			m_user_bound_to = addr;
 		}
 		if (m_bound_to.address().is_v4() != target.address().is_v4())
 		{
