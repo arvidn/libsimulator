@@ -540,7 +540,7 @@ namespace sim
 		}
 
 		int const response = ec ? 1 : 0;
-		udp::endpoint ep = m_udp_associate.local_endpoint();
+		udp::endpoint ep = m_udp_associate.local_bound_to();
 		int const len = format_response(ep.address(), ep.port(), response);
 
 		if (ec)

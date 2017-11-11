@@ -191,6 +191,44 @@ namespace sim
 			return ec;
 		}
 
+		typename Protocol::endpoint local_endpoint(boost::system::error_code& ec) const
+		{
+			if (!m_open)
+			{
+				ec = error::bad_descriptor;
+				return typename Protocol::endpoint{};
+			}
+
+			return m_user_bound_to;
+		}
+
+		typename Protocol::endpoint local_endpoint() const
+		{
+			boost::system::error_code ec;
+			auto const ret = local_endpoint(ec);
+			if (ec) throw boost::system::system_error(ec);
+			return ret;
+		}
+
+		typename Protocol::endpoint local_bound_to(boost::system::error_code& ec) const
+		{
+			if (!m_open)
+			{
+				ec = error::bad_descriptor;
+				return typename Protocol::endpoint{};
+			}
+
+			return m_bound_to;
+		}
+
+		typename Protocol::endpoint local_bound_to() const
+		{
+			boost::system::error_code ec;
+			auto const ret = local_bound_to(ec);
+			if (ec) throw boost::system::system_error(ec);
+			return ret;
+		}
+
 		template <class Option>
 		boost::system::error_code get_option(Option&
 			, boost::system::error_code& ec) { return ec; }
@@ -235,6 +273,12 @@ namespace sim
 		io_service& m_io_service;
 
 		typename Protocol::endpoint m_bound_to;
+
+		// this is the interface the user requested to bind to (in order to
+		// distinguish the concrete interface it was bound to and INADDR_ANY if
+		// that was requested). We keep this separately to return it as the local
+		// endpoint
+		typename Protocol::endpoint m_user_bound_to;
 
 		// this is an object implementing the sink interface, forwarding
 		// packets to this socket. If this socket is destructed, this forwarder
@@ -417,9 +461,6 @@ namespace sim
 			socket(socket&&);
 
 			lowest_layer_type& lowest_layer() { return *this; }
-
-			udp::endpoint local_endpoint(boost::system::error_code& ec) const;
-			udp::endpoint local_endpoint() const;
 
 			boost::system::error_code bind(ip::udp::endpoint const& ep
 				, boost::system::error_code& ec);
@@ -709,8 +750,6 @@ namespace sim
 			boost::system::error_code bind(ip::tcp::endpoint const& ep
 				, boost::system::error_code& ec);
 			void bind(ip::tcp::endpoint const& ep);
-			tcp::endpoint local_endpoint(boost::system::error_code& ec) const;
-			tcp::endpoint local_endpoint() const;
 			tcp::endpoint remote_endpoint(boost::system::error_code& ec) const;
 			tcp::endpoint remote_endpoint() const;
 

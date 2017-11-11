@@ -53,26 +53,6 @@ namespace ip {
 		close(ec);
 	}
 
-	udp::endpoint udp::socket::local_endpoint(boost::system::error_code& ec)
-		const
-	{
-		if (!m_open)
-		{
-			ec = error::bad_descriptor;
-			return udp::endpoint();
-		}
-
-		return m_bound_to;
-	}
-
-	udp::endpoint udp::socket::local_endpoint() const
-	{
-		boost::system::error_code ec;
-		udp::endpoint ret = local_endpoint(ec);
-		if (ec) throw boost::system::system_error(ec);
-		return ret;
-	}
-
 	boost::system::error_code udp::socket::bind(ip::udp::endpoint const& ep
 		, boost::system::error_code& ec)
 	{
@@ -91,6 +71,7 @@ namespace ip {
 		ip::udp::endpoint addr = m_io_service.bind_udp_socket(this, ep, ec);
 		if (ec) return ec;
 		m_bound_to = addr;
+		m_user_bound_to = ep;
 		return ec;
 	}
 
@@ -132,6 +113,7 @@ namespace ip {
 		{
 			m_io_service.unbind_udp_socket(this, m_bound_to);
 			m_bound_to = ip::udp::endpoint();
+			m_user_bound_to = ip::udp::endpoint();
 		}
 		m_open = false;
 
