@@ -28,6 +28,7 @@ All rights reserved.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/asio/io_service.hpp>
 #include <boost/system/error_code.hpp>
 
 #include "simulator/pop_warnings.hpp"
@@ -159,8 +160,10 @@ namespace sim
 		{}
 
 		// io_control
-		using non_blocking_io = boost::asio::socket_base::non_blocking_io;
 		using reuse_address = boost::asio::socket_base::reuse_address;
+#if BOOST_VERSION >= 106600
+		using executor_type = boost::asio::ip::tcp::socket::executor_type;
+#endif
 
 		// socket options
 		using send_buffer_size = boost::asio::socket_base::send_buffer_size;
@@ -247,12 +250,12 @@ namespace sim
 		template <class IoControl>
 		void io_control(IoControl const&) {}
 
-		boost::system::error_code io_control(non_blocking_io const& ioc
+		boost::system::error_code non_blocking(bool b
 			, boost::system::error_code& ec)
-		{ m_non_blocking = ioc.get(); return ec; }
+		{ m_non_blocking = b; return ec; }
 
-		void io_control(non_blocking_io const& ioc)
-		{ m_non_blocking = ioc.get(); }
+		void non_blocking(bool b)
+		{ m_non_blocking = b; }
 
 		bool is_open() const
 		{

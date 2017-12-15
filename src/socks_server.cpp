@@ -533,7 +533,7 @@ namespace sim
 			}
 			else
 			{
-				m_udp_associate.io_control(udp::socket::non_blocking_io(true));
+				m_udp_associate.non_blocking(true);
 				m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
 					, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, _1, _2));
 			}
