@@ -17,6 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/handler_allocator.hpp"
 #include <functional>
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
@@ -30,7 +31,7 @@ namespace ip {
 
 	template<typename Protocol>
 	basic_resolver<Protocol>::basic_resolver(io_service& ios)
-		: m_ios(ios)
+		: m_ios(&ios)
 		, m_timer(ios)
 	{}
 
@@ -46,7 +47,7 @@ namespace ip {
 			m_queue.empty() ? chrono::high_resolution_clock::now() :
 			m_queue.front().completion_time;
 
-		assert(!m_ios.get_ips().empty() && "internal io service objects can only "
+		assert(!m_ios->get_ips().empty() && "internal io service objects can only "
 			"be used for timers");
 
 		// if the hostname is an IP address, resolve it immediately
@@ -64,17 +65,17 @@ namespace ip {
 				typename Protocol::endpoint(addr, static_cast<unsigned short>(port))
 				, q.host_name()
 				, q.service_name());
-			result_t res = {t, ec, iter, std::move(handler) };
+			result_t res{t, ec, std::move(iter), std::move(handler) };
 			m_queue.insert(m_queue.begin(), std::move(res));
 			m_timer.expires_at(m_queue.front().completion_time);
-			m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
+			m_timer.async_wait(aux::make_malloc(std::bind(&basic_resolver::on_lookup, this, _1)));
 			return;
 		}
 		ec.clear();
 
 		const chrono::high_resolution_clock::time_point completion_time =
 			start_time
-			+ m_ios.sim().config().hostname_lookup(m_ios.get_ips().front(), q.host_name()
+			+ m_ios->sim().config().hostname_lookup(m_ios->get_ips().front(), q.host_name()
 				, result, ec);
 
 		basic_resolver_iterator<Protocol> iter;
@@ -91,10 +92,11 @@ namespace ip {
 				, q.service_name());
 		}
 
-		m_queue.push_back({completion_time, ec, iter, std::move(handler) });
+		result_t res{ completion_time, ec, std::move(iter), std::move(handler)};
+		m_queue.emplace_back(std::move(res));
 
 		m_timer.expires_at(m_queue.front().completion_time);
-		m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
+		m_timer.async_wait(aux::make_malloc(std::bind(&basic_resolver::on_lookup, this, _1)));
 	}
 
 	template<typename Protocol>
@@ -107,12 +109,12 @@ namespace ip {
 		typename queue_t::value_type v = std::move(m_queue.front());
 		m_queue.erase(m_queue.begin());
 
-		v.handler(v.err, v.iter);
+		v.handler(v.err, std::move(v.iter));
 
 		if (m_queue.empty()) return;
 
 		m_timer.expires_at(m_queue.front().completion_time);
-		m_timer.async_wait(std::bind(&basic_resolver::on_lookup, this, _1));
+		m_timer.async_wait(aux::make_malloc(std::bind(&basic_resolver::on_lookup, this, _1)));
 	}
 
 	template<typename Protocol>
@@ -124,8 +126,8 @@ namespace ip {
 		{
 			r.err = asio::error::operation_aborted;
 			r.iter = basic_resolver_iterator<Protocol>();
-			m_timer.get_io_service().post(std::bind(std::move(r.handler)
-				, r.err, r.iter));
+			m_timer.get_io_service().post(aux::make_malloc(std::bind(std::move(r.handler)
+				, r.err, std::move(r.iter))));
 		}
 	}
 

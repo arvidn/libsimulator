@@ -115,12 +115,6 @@ namespace sim { namespace asio {
 		return 0;
 	}
 
-	void io_service::dispatch(aux::function<void()> handler)
-	{ m_sim.get_internal_service().dispatch(std::move(handler)); }
-
-	void io_service::post(aux::function<void()> handler)
-	{ m_sim.get_internal_service().post(std::move(handler)); }
-
 	// private interface
 
 	void io_service::add_timer(high_resolution_timer* t)

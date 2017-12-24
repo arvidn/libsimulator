@@ -43,6 +43,11 @@ namespace ip {
 void forward_packet(aux::packet p)
 {
 	std::shared_ptr<sink> next_hop = p.hops.pop_front();
+	if (!next_hop)
+	{
+		std::fprintf(stderr, "packet lost\n");
+		return;
+	}
 	next_hop->incoming_packet(std::move(p));
 }
 

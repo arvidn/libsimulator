@@ -245,8 +245,8 @@ namespace ip {
 		{
 		// TODO: extend pcap logging to include SYN+ACK packets
 			p.type = aux::packet::type_t::syn_ack;
-			p.channel = c;
 		}
+		p.channel = c;
 		p.overhead = 28;
 		p.hops = p.channel->hops[0];
 
