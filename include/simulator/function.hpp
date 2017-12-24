@@ -24,26 +24,89 @@ All rights reserved.
 namespace sim {
 namespace aux {
 
+	template <typename T, typename U>
+	T exchange(T& var, U&& new_val)
+	{
+		T temp = std::move(var);
+		var = std::forward<U>(new_val);
+		return temp;
+	}
+
+	template <typename T>
+	void* asio_handler_allocate(std::size_t size, T*)
+	{
+		return new char[size];
+	}
+
+	template <typename T>
+	void asio_handler_deallocate(void* ptr, std::size_t, T*)
+	{
+		delete[] static_cast<char*>(ptr);
+	}
+
+	template <typename T, typename Fun>
+	T* allocate_handler(Fun h)
+	{
+		void* ptr = asio_handler_allocate(sizeof(T), &h);
+		if (ptr == nullptr) throw std::bad_alloc();
+		try {
+			return new (ptr) T(std::move(h));
+		}
+		catch (...) {
+			asio_handler_deallocate(ptr, sizeof(T), &h);
+			throw;
+		}
+	}
+
 	// this is a std::function-like class that supports move-only function
 	// objects
 	template <typename R, typename... A>
 	struct callable
 	{
-		virtual R call(A&&...) = 0;
-		virtual ~callable() {}
+		using call_fun_t = R (*)(void*, A&&...);
+		using deallocate_fun_t = void (*)(void*);
+		call_fun_t call_fun;
+		deallocate_fun_t deallocate_fun;
 	};
 
-	template <typename Callable, typename R, typename... A>
+	template <typename Handler, typename R, typename... A>
+	R call_impl(void* mem, A&&... a);
+
+	template <typename Handler, typename R, typename... A>
+	void dealloc_impl(void* mem);
+
+	template <typename Handler, typename R, typename... A>
 	struct function_impl : callable<R, A...>
 	{
-		function_impl(Callable c) : m_callable(std::move(c)) {}
-		R call(A&&... a) override
+		function_impl(Handler h)
+			: handler(std::move(h))
 		{
-			return m_callable(std::forward<A>(a)...);
+			this->call_fun = call_impl<Handler, R, A&&...>;
+			this->deallocate_fun = dealloc_impl<Handler, R, A&&...>;
 		}
-	private:
-		Callable m_callable;
+		Handler handler;
 	};
+
+	template <typename Handler, typename R, typename... A>
+	R call_impl(void* mem, A&&... a)
+	{
+		auto* obj = static_cast<function_impl<Handler, R, A...>*>(mem);
+		Handler handler = std::move(obj->handler);
+
+		obj->~function_impl();
+		asio_handler_deallocate(mem, sizeof(*obj), &handler);
+
+		return handler(std::forward<A>(a)...);
+	}
+
+	template <typename Handler, typename R, typename... A>
+	void dealloc_impl(void* mem)
+	{
+		auto* obj = static_cast<function_impl<Handler, R, A...>*>(mem);
+		Handler h = std::move(obj->handler);
+		obj->~function_impl();
+		asio_handler_deallocate(mem, sizeof(*obj), &h);
+	}
 
 	template <typename Fun>
 	struct function;
@@ -55,38 +118,45 @@ namespace aux {
 
 		template <typename C>
 		function(C c)
-			: m_callable(new function_impl<C, R, A...>(std::move(c)))
+			: m_callable(allocate_handler<function_impl<C, R, A...>>(std::move(c)))
 		{}
-		function(function&&) = default;
-		function& operator=(function&&) = default;
+		function(function&& other) noexcept
+			: m_callable(exchange(other.m_callable, nullptr))
+		{}
+		function& operator=(function&& other) noexcept
+		{
+			if (&other == this) return *this;
+			clear();
+			m_callable = exchange(other.m_callable, nullptr);
+			return *this;
+		}
+
+		~function() { clear(); }
 
 		// boost.asio requires handlers to be copy-constructible, but it will move
 		// them, if they're movable. So we trick asio into accepting this handler.
 		// If it attempts to copy, it will cause a link error
-		function(function const&)
-#ifndef _MSC_VER
-		;
-#else
-		= default;
-#endif
+		function(function const&) { assert(false && "functions should not be copied"); }
 		function& operator=(function const&) = delete;
 
-		function() = default;
+		function() : m_callable(nullptr) {}
 		explicit operator bool() const { return bool(m_callable); }
-		function& operator=(std::nullptr_t) { m_callable.reset(); return *this; }
-		void clear() { m_callable.reset(); }
+		function& operator=(std::nullptr_t) { clear(); return *this; }
+		void clear()
+		{
+			if (m_callable == nullptr) return;
+			auto fun = m_callable->deallocate_fun;
+			fun(m_callable);
+			m_callable = nullptr;
+		}
 		R operator()(A... a)
 		{
 			assert(m_callable);
-			return m_callable->call(std::forward<A>(a)...);
+			auto fun = m_callable->call_fun;
+			return fun(exchange(m_callable, nullptr), std::forward<A>(a)...);
 		}
 	private:
-#ifdef _MSC_VER
-		// as of msvc-14.1, there's still terrible move support
-		std::shared_ptr<callable<R, A...>> m_callable;
-#else
-		std::unique_ptr<callable<R, A...>> m_callable;
-#endif
+		callable<R, A...>* m_callable;
 	};
 
 	// index sequence, to unpack tuple

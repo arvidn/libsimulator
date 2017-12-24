@@ -28,7 +28,7 @@ namespace sim
 
 	high_resolution_timer::high_resolution_timer(io_service& io_service)
 		: m_expiration_time(time_type())
-		, m_io_service(io_service)
+		, m_io_service(&io_service)
 		, m_expired(true)
 	{
 	}
@@ -36,7 +36,7 @@ namespace sim
 	high_resolution_timer::high_resolution_timer(io_service& io_service,
 		const time_type& expiry_time)
 		: m_expiration_time(time_type())
-		, m_io_service(io_service)
+		, m_io_service(&io_service)
 		, m_expired(true)
 	{
 		expires_at(expiry_time);
@@ -45,7 +45,7 @@ namespace sim
 	high_resolution_timer::high_resolution_timer(io_service& io_service,
 		const duration_type& expiry_time)
 		: m_expiration_time(time_type())
-		, m_io_service(io_service)
+		, m_io_service(&io_service)
 		, m_expired(true)
 	{
 		expires_from_now(expiry_time);
@@ -56,7 +56,7 @@ namespace sim
 		ec.clear();
 		if (m_expired) return 0;
 		m_expired = true;
-		m_io_service.remove_timer(this);
+		m_io_service->remove_timer(this);
 		if (!m_handler) return 0;
 		fire(boost::asio::error::operation_aborted);
 		return 1;
@@ -95,7 +95,7 @@ namespace sim
 		std::size_t ret = cancel(ec);
 		m_expiration_time = expiry_time;
 		m_expired = false;
-		m_io_service.add_timer(this);
+		m_io_service->add_timer(this);
 		return ret;
 	}
 
@@ -117,7 +117,7 @@ namespace sim
 		std::size_t ret = cancel(ec);
 		m_expiration_time = chrono::high_resolution_clock::now() + expiry_time;
 		m_expired = false;
-		m_io_service.add_timer(this);
+		m_io_service->add_timer(this);
 		return ret;
 	}
 
@@ -152,8 +152,9 @@ namespace sim
 	{
 		m_expired = true;
 		if (!m_handler) return;
-		m_io_service.post(std::bind(std::move(m_handler), ec));
+		auto h = std::move(m_handler);
 		m_handler = nullptr;
+		m_io_service->post(std::bind(std::move(h), ec));
 	}
 
 	} // asio

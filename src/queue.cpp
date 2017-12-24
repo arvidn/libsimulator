@@ -17,6 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/queue.hpp"
+#include "simulator/handler_allocator.hpp"
 #include <functional>
 #include <cstdio> // for printf
 
@@ -99,16 +100,16 @@ namespace sim
 		if (m_queue.front().ts > now)
 		{
 			m_forward_timer.expires_at(m_queue.front().ts);
-			m_forward_timer.async_wait(std::bind(&queue::begin_send_next_packet
-				, this));
+			m_forward_timer.async_wait(make_malloc(std::bind(&queue::begin_send_next_packet
+				, this)));
 			return;
 		}
 
 		m_last_forward = now;
 		if (m_bandwidth == 0)
 		{
-			m_forward_timer.get_io_service().post(std::bind(&queue::next_packet_sent
-				, this));
+			m_forward_timer.get_io_service().post(make_malloc(std::bind(&queue::next_packet_sent
+				, this)));
 			return;
 		}
 		const double nanoseconds_per_byte = 1000000000.0
@@ -121,8 +122,8 @@ namespace sim
 			boost::int64_t(nanoseconds_per_byte * packet_size)));
 
 		m_forward_timer.expires_at(m_last_forward);
-		m_forward_timer.async_wait(std::bind(&queue::next_packet_sent
-			, this));
+		m_forward_timer.async_wait(make_malloc(std::bind(&queue::next_packet_sent
+			, this)));
 	}
 
 	void queue::next_packet_sent()

@@ -36,6 +36,7 @@ All rights reserved.
 #include "simulator/chrono.hpp"
 #include "simulator/sink_forwarder.hpp"
 #include "simulator/function.hpp"
+#include "simulator/noexcept_movable.hpp"
 
 #include <deque>
 #include <mutex>
@@ -66,6 +67,7 @@ namespace sim
 		std::shared_ptr<sink> next_hop() const { return hops.front(); }
 		std::shared_ptr<sink> pop_front()
 		{
+			if (hops.empty()) return std::shared_ptr<sink>();
 			std::shared_ptr<sink> ret(std::move(hops.front()));
 			hops.erase(hops.begin());
 			return ret;
@@ -88,6 +90,8 @@ namespace sim
 	void forward_packet(aux::packet p);
 
 	struct simulation;
+	struct configuration;
+	struct queue;
 
 	namespace asio
 	{
@@ -114,6 +118,8 @@ namespace sim
 			const time_type& expiry_time);
 		high_resolution_timer(io_service& io_service,
 			const duration_type& expiry_time);
+		high_resolution_timer(high_resolution_timer&&) noexcept = default;
+		high_resolution_timer& operator=(high_resolution_timer&&) noexcept = default;
 
 		std::size_t cancel(boost::system::error_code& ec);
 		std::size_t cancel();
@@ -135,7 +141,7 @@ namespace sim
 
 		void async_wait(aux::function<void(boost::system::error_code const&)> handler);
 
-		io_service& get_io_service() const { return m_io_service; }
+		io_service& get_io_service() const { return *m_io_service; }
 
 	private:
 
@@ -143,7 +149,7 @@ namespace sim
 
 		time_type m_expiration_time;
 		aux::function<void(boost::system::error_code const&)> m_handler;
-		io_service& m_io_service;
+		io_service* m_io_service;
 		bool m_expired;
 	};
 
@@ -351,6 +357,10 @@ namespace sim
 		friend struct basic_resolver<Protocol>;
 
 		basic_resolver_iterator(): m_idx(-1) {}
+		basic_resolver_iterator(basic_resolver_iterator&&) noexcept = default;
+		basic_resolver_iterator& operator=(basic_resolver_iterator&&) noexcept = default;
+		basic_resolver_iterator(basic_resolver_iterator const&) = default;
+		basic_resolver_iterator& operator=(basic_resolver_iterator const&) = default;
 
 		using value_type = basic_resolver_entry<Protocol>;
 		using reference = value_type const&;
@@ -386,7 +396,7 @@ namespace sim
 
 	private:
 
-		std::vector<value_type> m_results;
+		aux::noexcept_movable<std::vector<value_type>> m_results;
 		int m_idx;
 	};
 
@@ -421,6 +431,11 @@ namespace sim
 			aux::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler);
 
+		basic_resolver(basic_resolver&&) noexcept = default;
+		basic_resolver& operator=(basic_resolver&&) noexcept = default;
+		basic_resolver(basic_resolver const&) = delete;
+		basic_resolver& operator=(basic_resolver const&) = delete;
+
 		//TODO: add remaining members
 
 	private:
@@ -434,11 +449,28 @@ namespace sim
 			basic_resolver_iterator<Protocol> iter;
 			aux::function<void(boost::system::error_code const&,
 				basic_resolver_iterator<Protocol>)> handler;
+
+			result_t(
+				chrono::high_resolution_clock::time_point ct
+				, boost::system::error_code e
+				, basic_resolver_iterator<Protocol> i
+				, aux::function<void(boost::system::error_code const&,
+					basic_resolver_iterator<Protocol>)> h)
+				: completion_time(ct)
+				, err(e)
+				, iter(std::move(i))
+				, handler(std::move(h))
+			{}
+
+			result_t(result_t&&) noexcept = default;
+			result_t& operator=(result_t&&) noexcept = default;
+			result_t(result_t const&) = delete;
+			result_t& operator=(result_t const&) = delete;
 		};
 
-		io_service& m_ios;
+		io_service* m_ios;
 		asio::high_resolution_timer m_timer;
-		using queue_t = std::vector<result_t>;
+		using queue_t = aux::noexcept_movable<std::vector<result_t>>;
 
 		queue_t m_queue;
 	};
@@ -1008,6 +1040,111 @@ namespace sim
 
 	} // ip
 
+	} // asio
+
+	struct SIMULATOR_DECL simulation
+	{
+		// it calls fire() when a timer fires
+		friend struct high_resolution_timer;
+
+		simulation(configuration& config);
+		~simulation();
+
+		std::size_t run(boost::system::error_code& ec);
+		std::size_t run();
+
+		std::size_t poll(boost::system::error_code& ec);
+		std::size_t poll();
+
+		std::size_t poll_one(boost::system::error_code& ec);
+		std::size_t poll_one();
+
+		void stop();
+		bool stopped() const;
+		void reset();
+		// private interface
+
+		void add_timer(asio::high_resolution_timer* t);
+		void remove_timer(asio::high_resolution_timer* t);
+
+		boost::asio::io_service& get_internal_service()
+		{ return m_service; }
+
+		asio::io_service& get_io_service() { return *m_internal_ios; }
+
+		asio::ip::tcp::endpoint bind_socket(asio::ip::tcp::socket* socket
+			, asio::ip::tcp::endpoint ep
+			, boost::system::error_code& ec);
+		void unbind_socket(asio::ip::tcp::socket* socket
+			, const asio::ip::tcp::endpoint& ep);
+
+		asio::ip::udp::endpoint bind_udp_socket(asio::ip::udp::socket* socket
+			, asio::ip::udp::endpoint ep
+			, boost::system::error_code& ec);
+		void unbind_udp_socket(asio::ip::udp::socket* socket
+			, const asio::ip::udp::endpoint& ep);
+
+		std::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
+			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
+
+		route find_udp_socket(
+			asio::ip::udp::socket const& socket
+			, asio::ip::udp::endpoint const& ep);
+
+		configuration& config() const { return m_config; }
+
+		void add_io_service(asio::io_service* ios);
+		void remove_io_service(asio::io_service* ios);
+		std::vector<asio::io_service*> get_all_io_services() const;
+
+		aux::pcap* get_pcap() const { return m_pcap.get(); }
+		void log_pcap(char const* filename);
+
+	private:
+		struct timer_compare
+		{
+			bool operator()(asio::high_resolution_timer const* lhs
+				, asio::high_resolution_timer const* rhs) const
+			{ return lhs->expires_at() < rhs->expires_at(); }
+		};
+
+		configuration& m_config;
+
+		std::unique_ptr<aux::pcap> m_pcap;
+
+		// all non-expired timers
+		std::mutex m_timer_queue_mutex;
+		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
+		timer_queue_t m_timer_queue;
+
+		// underlying message queue
+		boost::asio::io_service m_service;
+
+		// these are the io services that represent nodes on the network
+		std::unordered_set<asio::io_service*> m_nodes;
+
+		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
+		using listen_socket_iter_t = listen_sockets_t::iterator;
+		listen_sockets_t m_listen_sockets;
+
+		using udp_sockets_t = std::map<asio::ip::udp::endpoint, asio::ip::udp::socket*>;
+		using udp_socket_iter_t = udp_sockets_t::iterator;
+		udp_sockets_t m_udp_sockets;
+
+		// used for internal timers. this is a pimpl sine our io_service is
+		// incomplete at this point
+		std::unique_ptr<asio::io_service> m_internal_ios;
+
+		// the next port to use for an outgoing connection, where the port is not
+		// specified. We want this to be as unique as possible, to distinguish the
+		// TCP streams.
+		std::uint16_t m_next_bind_port = 2000;
+
+		bool m_stopped = false;
+	};
+
+	namespace asio {
+
 	using boost::asio::async_write;
 	using boost::asio::async_read;
 
@@ -1047,8 +1184,13 @@ namespace sim
 		bool stopped() const;
 		void reset();
 
-		void dispatch(aux::function<void()> handler);
-		void post(aux::function<void()> handler);
+		template <typename T>
+		void dispatch(T handler)
+		{ m_sim.get_internal_service().dispatch(std::move(handler)); }
+
+		template <typename T>
+		void post(T handler)
+		{ m_sim.get_internal_service().post(std::move(handler)); }
 
 		// internal interface
 		boost::asio::io_service& get_internal_service();
@@ -1113,9 +1255,6 @@ namespace sim
 
 	} // asio
 
-	struct configuration;
-	struct queue;
-
 	// user supplied configuration of the network to simulate
 	struct SIMULATOR_DECL configuration
 	{
@@ -1177,105 +1316,6 @@ namespace sim
 		std::map<asio::ip::address, std::shared_ptr<queue>> m_incoming;
 		std::map<asio::ip::address, std::shared_ptr<queue>> m_outgoing;
 		simulation* m_sim;
-	};
-
-	struct SIMULATOR_DECL simulation
-	{
-		// it calls fire() when a timer fires
-		friend struct high_resolution_timer;
-
-		simulation(configuration& config);
-		~simulation();
-
-		std::size_t run(boost::system::error_code& ec);
-		std::size_t run();
-
-		std::size_t poll(boost::system::error_code& ec);
-		std::size_t poll();
-
-		std::size_t poll_one(boost::system::error_code& ec);
-		std::size_t poll_one();
-
-		void stop();
-		bool stopped() const;
-		void reset();
-		// private interface
-
-		void add_timer(asio::high_resolution_timer* t);
-		void remove_timer(asio::high_resolution_timer* t);
-
-		boost::asio::io_service& get_internal_service()
-		{ return m_service; }
-
-		asio::io_service& get_io_service() { return m_internal_ios; }
-
-		asio::ip::tcp::endpoint bind_socket(asio::ip::tcp::socket* socket
-			, asio::ip::tcp::endpoint ep
-			, boost::system::error_code& ec);
-		void unbind_socket(asio::ip::tcp::socket* socket
-			, const asio::ip::tcp::endpoint& ep);
-
-		asio::ip::udp::endpoint bind_udp_socket(asio::ip::udp::socket* socket
-			, asio::ip::udp::endpoint ep
-			, boost::system::error_code& ec);
-		void unbind_udp_socket(asio::ip::udp::socket* socket
-			, const asio::ip::udp::endpoint& ep);
-
-		std::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
-			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
-
-		route find_udp_socket(
-			asio::ip::udp::socket const& socket
-			, asio::ip::udp::endpoint const& ep);
-
-		configuration& config() const { return m_config; }
-
-		void add_io_service(asio::io_service* ios);
-		void remove_io_service(asio::io_service* ios);
-		std::vector<asio::io_service*> get_all_io_services() const;
-
-		aux::pcap* get_pcap() const { return m_pcap.get(); }
-		void log_pcap(char const* filename);
-
-	private:
-		struct timer_compare
-		{
-			bool operator()(asio::high_resolution_timer const* lhs
-				, asio::high_resolution_timer const* rhs) const
-			{ return lhs->expires_at() < rhs->expires_at(); }
-		};
-
-		configuration& m_config;
-
-		std::unique_ptr<aux::pcap> m_pcap;
-
-		// these are the io services that represent nodes on the network
-		std::unordered_set<asio::io_service*> m_nodes;
-
-		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
-		using listen_socket_iter_t = listen_sockets_t::iterator;
-		listen_sockets_t m_listen_sockets;
-
-		using udp_sockets_t = std::map<asio::ip::udp::endpoint, asio::ip::udp::socket*>;
-		using udp_socket_iter_t = udp_sockets_t::iterator;
-		udp_sockets_t m_udp_sockets;
-
-		// all non-expired timers
-		std::mutex m_timer_queue_mutex;
-		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
-		timer_queue_t m_timer_queue;
-		// underlying message queue
-		boost::asio::io_service m_service;
-
-		// used for internal timers
-		asio::io_service m_internal_ios;
-
-		// the next port to use for an outgoing connection, where the port is not
-		// specified. We want this to be as unique as possible, to distinguish the
-		// TCP streams.
-		std::uint16_t m_next_bind_port = 2000;
-
-		bool m_stopped = false;
 	};
 
 	namespace aux

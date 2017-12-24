@@ -19,6 +19,7 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include "simulator/packet.hpp"
 #include "simulator/pcap.hpp"
+#include "simulator/handler_allocator.hpp"
 
 #include <functional>
 #include <cinttypes>
@@ -51,13 +52,23 @@ namespace ip {
 	}
 
 	boost::system::error_code tcp::socket::open(tcp protocol
-		, boost::system::error_code& ec)
+		, boost::system::error_code& ec) try
 	{
 		close(ec);
 		m_open = true;
 		m_is_v4 = (protocol == ip::tcp::v4());
 		ec.clear();
 		m_forwarder = std::make_shared<aux::sink_forwarder>(this);
+		return ec;
+	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
 		return ec;
 	}
 
@@ -88,7 +99,7 @@ namespace ip {
 	}
 
 	boost::system::error_code tcp::socket::bind(ip::tcp::endpoint const& ep
-		, boost::system::error_code& ec)
+		, boost::system::error_code& ec) try
 	{
 		if (!m_open)
 		{
@@ -108,6 +119,16 @@ namespace ip {
 		m_user_bound_to = ep;
 		return ec;
 	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
+		return ec;
+	}
 
 	void tcp::socket::bind(ip::tcp::endpoint const& ep)
 	{
@@ -119,10 +140,12 @@ namespace ip {
 	boost::system::error_code tcp::socket::close()
 	{
 		boost::system::error_code ec;
-		return close(ec);
+		if (ec) throw boost::system::system_error(ec);
+		close(ec);
+		return ec;
 	}
 
-	boost::system::error_code tcp::socket::close(boost::system::error_code& ec)
+	boost::system::error_code tcp::socket::close(boost::system::error_code& ec) try
 	{
 		if (m_channel)
 		{
@@ -179,6 +202,16 @@ namespace ip {
 		ec.clear();
 		return ec;
 	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
+		return ec;
+	}
 
 	std::size_t tcp::socket::available(boost::system::error_code& ec) const
 	{
@@ -229,8 +262,8 @@ namespace ip {
 
 		if (m_connect_handler)
 		{
-			m_io_service.post(std::bind(std::move(m_connect_handler)
-				, boost::system::error_code(error::operation_aborted)));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(m_connect_handler)
+				, boost::system::error_code(error::operation_aborted))));
 			m_connect_handler = nullptr;
 		}
 
@@ -293,7 +326,7 @@ namespace ip {
 				, endpoint, ec);
 			if (ec)
 			{
-				m_io_service.post(std::bind(std::move(h), ec));
+				m_io_service.post(aux::make_malloc(std::bind(std::move(h), ec)));
 				return;
 			}
 			m_bound_to = addr;
@@ -301,8 +334,8 @@ namespace ip {
 		}
 		if (m_bound_to.address().is_v4() != target.address().is_v4())
 		{
-			m_io_service.post(std::bind(std::move(h),
-					boost::system::error_code(error::address_family_not_supported)));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(h),
+				boost::system::error_code(error::address_family_not_supported))));
 			return;
 		}
 		m_channel = m_io_service.internal_connect(this, target, ec);
@@ -313,7 +346,7 @@ namespace ip {
 			m_channel.reset();
 			// TODO: ask the policy object what the round-trip to this endpoint is
 			m_connect_timer.expires_from_now(chrono::milliseconds(50));
-			m_connect_timer.async_wait(std::bind(std::move(h), ec));
+			m_connect_timer.async_wait(aux::make_malloc(std::bind(std::move(h), ec)));
 			return;
 		}
 
@@ -325,8 +358,8 @@ namespace ip {
 
 	void tcp::socket::abort_recv_handler()
 	{
-		m_io_service.post(std::bind(std::move(m_recv_handler)
-			, boost::system::error_code(error::operation_aborted), 0));
+		m_io_service.post(aux::make_malloc(std::bind(std::move(m_recv_handler)
+			, boost::system::error_code(error::operation_aborted), 0)));
 		m_recv_timer.cancel();
 		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
@@ -335,8 +368,8 @@ namespace ip {
 
 	void tcp::socket::abort_send_handler()
 	{
-		m_io_service.post(std::bind(std::move(m_send_handler)
-			, boost::system::error_code(error::operation_aborted), 0));
+		m_io_service.post(aux::make_malloc(std::bind(std::move(m_send_handler)
+			, boost::system::error_code(error::operation_aborted), 0)));
 		m_send_handler = nullptr;
 		m_send_buffer.clear();
 		m_send_null_buffers = false;
@@ -360,15 +393,15 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(handler), ec, 0)));
 			m_send_handler = nullptr;
 			m_send_buffer.clear();
 			return;
 		}
 
 		boost::system::error_code no_error;
-		m_io_service.post(std::bind(std::move(handler), no_error
-			, bytes_transferred));
+		m_io_service.post(aux::make_malloc(std::bind(std::move(handler), no_error
+			, bytes_transferred)));
 		m_send_handler = nullptr;
 		m_send_buffer.clear();
 	}
@@ -574,13 +607,13 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(handler), ec, 0)));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			return;
 		}
 
-		m_io_service.post(std::bind(std::move(handler), ec, bytes_transferred));
+		m_io_service.post(aux::make_malloc(std::bind(std::move(handler), ec, bytes_transferred)));
 		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
 	}
@@ -594,7 +627,7 @@ namespace ip {
 		int const bytes = int(available(ec));
 		if (ec)
 		{
-			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(handler), ec, 0)));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			return;
@@ -602,7 +635,7 @@ namespace ip {
 
 		if (bytes > 0)
 		{
-			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_io_service.post(aux::make_malloc(std::bind(std::move(handler), ec, 0)));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			return;
@@ -743,7 +776,7 @@ namespace ip {
 			{
 				assert(m_connect_handler);
 				boost::system::error_code ec;
-				m_io_service.post(std::bind(std::move(m_connect_handler), ec));
+				m_io_service.post(aux::make_malloc(std::bind(std::move(m_connect_handler), ec)));
 				m_connect_handler = nullptr;
 				if (ec) m_channel.reset();
 				else maybe_wakeup_writer();

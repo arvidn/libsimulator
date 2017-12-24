@@ -19,6 +19,7 @@ All rights reserved.
 #include "simulator/simulator.hpp"
 #include "simulator/packet.hpp"
 #include "simulator/pcap.hpp"
+#include "simulator/handler_allocator.hpp"
 
 #include <functional>
 
@@ -54,7 +55,7 @@ namespace ip {
 	}
 
 	boost::system::error_code udp::socket::bind(ip::udp::endpoint const& ep
-		, boost::system::error_code& ec)
+		, boost::system::error_code& ec) try
 	{
 		if (!m_open)
 		{
@@ -74,6 +75,16 @@ namespace ip {
 		m_user_bound_to = ep;
 		return ec;
 	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
+		return ec;
+	}
 
 	void udp::socket::bind(ip::udp::endpoint const& ep)
 	{
@@ -83,7 +94,7 @@ namespace ip {
 	}
 
 	boost::system::error_code udp::socket::open(udp protocol
-		, boost::system::error_code& ec)
+		, boost::system::error_code& ec) try
 	{
 		// TODO: what if it's already open?
 		close(ec);
@@ -91,6 +102,16 @@ namespace ip {
 		m_is_v4 = (protocol == ip::udp::v4());
 		ec.clear();
 		m_forwarder = std::make_shared<aux::sink_forwarder>(this);
+		return ec;
+	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
 		return ec;
 	}
 
@@ -104,10 +125,12 @@ namespace ip {
 	boost::system::error_code udp::socket::close()
 	{
 		boost::system::error_code ec;
-		return close(ec);
+		close(ec);
+		if (ec) throw boost::system::system_error(ec);
+		return ec;
 	}
 
-	boost::system::error_code udp::socket::close(boost::system::error_code& ec)
+	boost::system::error_code udp::socket::close(boost::system::error_code& ec) try
 	{
 		if (m_bound_to != ip::udp::endpoint())
 		{
@@ -126,7 +149,16 @@ namespace ip {
 
 		cancel(ec);
 
-		ec.clear();
+		return ec;
+	}
+	catch (std::bad_alloc const&)
+	{
+		ec = make_error_code(boost::system::errc::not_enough_memory);
+		return ec;
+	}
+	catch (boost::system::system_error const& err)
+	{
+		ec = err.code();
 		return ec;
 	}
 
@@ -149,8 +181,8 @@ namespace ip {
 
 	void udp::socket::abort_send_handler()
 	{
-		m_io_service.post(std::bind(std::move(m_send_handler)
-			, boost::system::error_code(error::operation_aborted), 0));
+		m_io_service.post(make_malloc(std::bind(std::move(m_send_handler)
+			, boost::system::error_code(error::operation_aborted), 0)));
 		m_send_timer.cancel();
 		m_send_handler = nullptr;
 //		m_send_buffer.clear();
@@ -158,8 +190,8 @@ namespace ip {
 
 	void udp::socket::abort_recv_handler()
 	{
-		m_io_service.post(std::bind(std::move(m_recv_handler)
-			, boost::system::error_code(error::operation_aborted), 0));
+		m_io_service.post(make_malloc(std::bind(std::move(m_recv_handler)
+			, boost::system::error_code(error::operation_aborted), 0)));
 		m_recv_timer.cancel();
 		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
@@ -181,14 +213,14 @@ namespace ip {
 
 			// this additional layer of binder is here to make sure the last bound
 			// argument (handler) is moved into the function call
-			m_recv_timer.async_wait(aux::move_bind<void>(std::bind(&udp::socket::async_send
-				, this, bufs, _1), std::move(handler)));
+			m_recv_timer.async_wait(make_malloc(aux::move_bind<void>(std::bind(&udp::socket::async_send
+				, this, bufs, _1), std::move(handler))));
 			return;
 		}
 
 		// the socket is writable, post the completion handler immediately
 		boost::system::error_code no_error;
-		m_io_service.post(std::bind(std::move(handler), no_error, 0));
+		m_io_service.post(make_malloc(std::bind(std::move(handler), no_error, 0)));
 	}
 
 	std::size_t udp::socket::receive_from_impl(
@@ -243,21 +275,21 @@ namespace ip {
 	{
 		if (!m_open)
 		{
-			m_io_service.post(std::bind(std::move(handler)
-				, boost::system::error_code(error::bad_descriptor), 0));
+			m_io_service.post(make_malloc(std::bind(std::move(handler)
+				, boost::system::error_code(error::bad_descriptor), 0)));
 			return;
 		}
 
 		if (m_bound_to == udp::endpoint())
 		{
-			m_io_service.post(std::bind(std::move(handler)
-				, boost::system::error_code(error::invalid_argument), 0));
+			m_io_service.post(make_malloc(std::bind(std::move(handler)
+				, boost::system::error_code(error::invalid_argument), 0)));
 			return;
 		}
 
 		if (!m_incoming_queue.empty())
 		{
-			m_io_service.post(std::bind(std::move(handler), boost::system::error_code(), 0));
+			m_io_service.post(make_malloc(std::bind(std::move(handler), boost::system::error_code(), 0)));
 			return;
 		}
 
@@ -289,7 +321,7 @@ namespace ip {
 
 		if (ec)
 		{
-			m_io_service.post(std::bind(std::move(handler), ec, 0));
+			m_io_service.post(make_malloc(std::bind(std::move(handler), ec, 0)));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			m_recv_sender = nullptr;
@@ -297,7 +329,7 @@ namespace ip {
 			return;
 		}
 
-		m_io_service.post(std::bind(std::move(handler), ec, bytes_transferred));
+		m_io_service.post(make_malloc(std::bind(std::move(handler), ec, bytes_transferred)));
 		m_recv_handler = nullptr;
 		m_recv_buffer.clear();
 		m_recv_sender = nullptr;
