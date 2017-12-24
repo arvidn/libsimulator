@@ -104,7 +104,7 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 	outgoing.open(udp::v4(), ec);
 	REQUIRE(!ec);
 
-	outgoing.io_control(udp::socket::non_blocking_io(true), ec);
+	outgoing.non_blocking(true);
 	REQUIRE(!ec);
 
 	// send a packet to the IPv4 address

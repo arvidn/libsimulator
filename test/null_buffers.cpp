@@ -116,7 +116,7 @@ void incoming_connection(boost::system::error_code const& ec
 	CHECK(remote_endpoint.port() != 0);
 	CHECK(remote_endpoint.address().to_string() == "10.20.30.40");
 
-	sock.io_control(sim::asio::ip::tcp::socket::non_blocking_io(true), err);
+	sock.non_blocking(true);
 	if (err) std::printf("[%4d] ioctl failed: %s\n", millis, err.message().c_str());
 
 	sock.async_read_some(sim::asio::null_buffers()
