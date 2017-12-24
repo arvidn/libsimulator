@@ -92,7 +92,7 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 			sizeof(receive_buf)), remote_endpoint, std::bind(&on_receive, _1, _2
 			, std::ref(incoming), std::ref(remote_endpoint)));
 
-	outgoing.io_control(udp::socket::non_blocking_io(true), ec);
+	outgoing.non_blocking(true);
 	REQUIRE(!ec);
 
 	for (int i = 1; i < 10; ++i)
