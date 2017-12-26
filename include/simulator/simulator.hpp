@@ -1117,9 +1117,6 @@ namespace sim
 		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
 		timer_queue_t m_timer_queue;
 
-		// underlying message queue
-		boost::asio::io_service m_service;
-
 		// these are the io services that represent nodes on the network
 		std::unordered_set<asio::io_service*> m_nodes;
 
@@ -1141,6 +1138,9 @@ namespace sim
 		std::uint16_t m_next_bind_port = 2000;
 
 		bool m_stopped = false;
+
+		// underlying message queue
+		boost::asio::io_service m_service;
 	};
 
 	namespace asio {
