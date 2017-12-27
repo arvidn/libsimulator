@@ -73,16 +73,10 @@ namespace ip {
 		m_queue_size_limit = -1;
 		cancel(ec);
 		return socket::close(ec);
+
 	}
 
 	void tcp::acceptor::close()
-	{
-		boost::system::error_code ec;
-		close(ec);
-		if (ec) throw boost::system::system_error(ec);
-	}
-
-	boost::system::error_code tcp::acceptor::cancel(boost::system::error_code& ec)
 	{
 		if (m_accept_handler)
 		{
@@ -90,8 +84,29 @@ namespace ip {
 				, boost::system::error_code(error::operation_aborted)));
 			m_accept_handler = nullptr;
 		}
+	}
 
+	boost::system::error_code tcp::acceptor::cancel(boost::system::error_code& ec)
+	{
 		ec.clear();
+		if (m_accept_handler)
+		{
+			try
+			{
+				m_io_service.post(std::bind(std::move(m_accept_handler)
+					, boost::system::error_code(error::operation_aborted)));
+				m_accept_handler = nullptr;
+			}
+			catch (std::bad_alloc const&)
+			{
+				ec = error::no_memory;
+			}
+			catch (std::exception const&)
+			{
+				ec = error::no_memory;
+			}
+		}
+
 		return ec;
 	}
 

@@ -58,14 +58,31 @@ namespace sim
 		m_expired = true;
 		m_io_service->remove_timer(this);
 		if (!m_handler) return 0;
-		fire(boost::asio::error::operation_aborted);
+		try
+		{
+			fire(boost::asio::error::operation_aborted);
+		}
+		catch (std::bad_alloc const&)
+		{
+			ec = boost::asio::error::no_memory;
+			return 0;
+		}
+		catch (std::exception const&)
+		{
+			ec = make_error_code(boost::system::errc::operation_canceled);
+			return 0;
+		}
 		return 1;
 	}
 
 	std::size_t high_resolution_timer::cancel()
 	{
-		boost::system::error_code ec;
-		return cancel(ec);
+		if (m_expired) return 0;
+		m_expired = true;
+		m_io_service->remove_timer(this);
+		if (!m_handler) return 0;
+		fire(boost::asio::error::operation_aborted);
+		return 1;
 	}
 
 	std::size_t high_resolution_timer::cancel_one()
