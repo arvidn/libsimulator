@@ -139,8 +139,8 @@ namespace aux {
 		function(function const&) { assert(false && "functions should not be copied"); }
 		function& operator=(function const&) = delete;
 
-		function() : m_callable(nullptr) {}
-		explicit operator bool() const { return bool(m_callable); }
+		function() = default;
+		explicit operator bool() const { return m_callable != nullptr; }
 		function& operator=(std::nullptr_t) { clear(); return *this; }
 		void clear()
 		{
@@ -156,7 +156,7 @@ namespace aux {
 			return fun(exchange(m_callable, nullptr), std::forward<A>(a)...);
 		}
 	private:
-		callable<R, A...>* m_callable;
+		callable<R, A...>* m_callable = nullptr;
 	};
 
 	// index sequence, to unpack tuple

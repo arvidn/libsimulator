@@ -17,6 +17,7 @@ All rights reserved.
 */
 
 #include "simulator/simulator.hpp"
+#include "simulator/handler_allocator.hpp"
 
 #include <functional>
 #include <boost/system/error_code.hpp>
@@ -171,7 +172,7 @@ namespace sim
 		if (!m_handler) return;
 		auto h = std::move(m_handler);
 		m_handler = nullptr;
-		m_io_service->post(std::bind(std::move(h), ec));
+		m_io_service->post(make_malloc(std::bind(std::move(h), ec)));
 	}
 
 	} // asio
