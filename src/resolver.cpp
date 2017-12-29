@@ -109,9 +109,12 @@ namespace ip {
 		typename queue_t::value_type v = std::move(m_queue.front());
 		m_queue.erase(m_queue.begin());
 
+		// once the handler is called, it's possible the last reference keeping
+		// this object (basic_resolver) alive is released and we're deleted. Make
+		// sure to not touch any members after the handler in that case.
+		bool const empty = m_queue.empty();
 		v.handler(v.err, std::move(v.iter));
-
-		if (m_queue.empty()) return;
+		if (empty) return;
 
 		m_timer.expires_at(m_queue.front().completion_time);
 		m_timer.async_wait(aux::make_malloc(std::bind(&basic_resolver::on_lookup, this, _1)));
