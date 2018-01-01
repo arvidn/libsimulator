@@ -79,8 +79,6 @@ lib simulator
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
 
-	<toolset>gcc:<cxxflags>-std=c++11
-
 	: # default build
 	<warnings>all
 	<warnings-as-errors>on
@@ -90,7 +88,6 @@ lib simulator
 	<define>BOOST_ASIO_HAS_MOVE
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
-	<toolset>gcc:<cxxflags>-std=c++11
 	;
 
 project

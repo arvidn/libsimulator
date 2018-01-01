@@ -169,6 +169,11 @@ namespace sim
 		using reuse_address = boost::asio::socket_base::reuse_address;
 #if BOOST_VERSION >= 106600
 		using executor_type = boost::asio::ip::tcp::socket::executor_type;
+
+		executor_type get_executor()
+		{
+			return m_io_service.get_executor();
+		}
 #endif
 
 		// socket options
@@ -1163,6 +1168,16 @@ namespace sim
 		io_service(sim::simulation& sim, std::vector<ip::address> const& ips);
 		io_service();
 		~io_service();
+
+#if BOOST_VERSION >= 106600
+		using executor_type = boost::asio::io_service::executor_type;
+
+		executor_type get_executor()
+		{
+			return get_internal_service().get_executor();
+		}
+#endif
+
 
 		// not copyable and non movable (it's not movable because we currently
 		// keep pointers to the io_service instances in the simulator object)
