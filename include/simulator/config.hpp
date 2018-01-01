@@ -31,7 +31,7 @@ All rights reserved.
 #define SIMULATOR_DECL
 #endif
 
-#if !defined _MSC_VER || _MSC_VER > 1900
+#if !defined _MSC_VER || _MSC_VER > 1912
 #define LIBSIMULATOR_USE_MOVE 1
 #else
 #define LIBSIMULATOR_USE_MOVE 0
