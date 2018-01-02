@@ -63,6 +63,16 @@ namespace sim { namespace asio {
 		return m_sim.config().path_mtu(source, dest);
 	}
 
+	void io_service::dispatch(aux::function<void()> handler)
+	{
+		get_internal_service().dispatch(std::move(handler));
+	}
+
+	void io_service::post(aux::function<void()> handler)
+	{
+		get_internal_service().post(std::move(handler));
+	}
+
 	void io_service::stop()
 	{
 		// TODO: cancel all outstanding handler associated with this io_service
