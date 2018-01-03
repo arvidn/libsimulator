@@ -1199,8 +1199,13 @@ namespace sim
 		bool stopped() const;
 		void reset();
 
-		void dispatch(aux::function<void()> handler);
-		void post(aux::function<void()> handler);
+		template <typename Handler>
+		void dispatch(Handler handler)
+		{ get_internal_service().dispatch(std::move(handler)); }
+
+		template <typename Handler>
+		void post(Handler handler)
+		{ get_internal_service().post(std::move(handler)); }
 
 		// internal interface
 		boost::asio::io_service& get_internal_service();
