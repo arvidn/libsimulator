@@ -36,9 +36,6 @@ else
 		<include>/usr/sfw/include
 	;
 
-	lib boost_chrono : : <name>boost_chrono $(boost-lib-search-path)
-		: : $(boost-include-path) ;
-
 	lib boost_system : : <name>boost_system $(boost-lib-search-path)
 		: : $(boost-include-path) ;
 }
@@ -68,13 +65,20 @@ lib simulator
 
 	: # requirements
 	<include>include
-	<library>boost_chrono
 	<library>boost_system
 	<target-os>windows:<library>ws2_32
 	<target-os>windows:<library>wsock32
+	<threading>multi
 
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
 	<define>_CRT_SECURE_NO_WARNINGS
+
+	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
+	<define>BOOST_ASIO_HAS_MOVE
+	<define>BOOST_ASIO_ENABLE_CANCELIO
+
+	# make sure asio uses std::chrono
+	<define>BOOST_ASIO_HAS_STD_CHRONO
 
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
@@ -82,10 +86,19 @@ lib simulator
 	: # default build
 	<warnings>all
 	<warnings-as-errors>on
+	# boost.asio has a global tss_ptr which is the head of a
+	# linked list of all invocations of run on that thread. This
+	# determines whether dispatch() will run the handler immediately
+	# not. The simulator relies on this. On windows each DLL will have
+	# its own copy of this variable, effectively causing a deadlock
+	# in the simulator. So, default to static linking
+	<link>static
 
 	: # usage requirements
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
 	<define>BOOST_ASIO_HAS_MOVE
+	<define>BOOST_ASIO_ENABLE_CANCELIO
+	<threading>multi
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
 	;
