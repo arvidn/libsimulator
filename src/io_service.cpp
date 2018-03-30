@@ -55,6 +55,13 @@ namespace sim { namespace asio {
 		assert(false);
 	}
 
+#if BOOST_VERSION >= 106600
+	io_service::executor_type io_service::get_executor()
+	{
+		return get_internal_service().get_executor();
+	}
+#endif
+
 	int io_service::get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const
 	{
 		// TODO: it would be nice to actually traverse the virtual network nodes
