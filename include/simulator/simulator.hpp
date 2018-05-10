@@ -162,11 +162,7 @@ namespace sim
 		using reuse_address = boost::asio::socket_base::reuse_address;
 #if BOOST_VERSION >= 106600
 		using executor_type = boost::asio::ip::tcp::socket::executor_type;
-
-		executor_type get_executor()
-		{
-			return m_io_service.get_executor();
-		}
+		executor_type get_executor();
 #endif
 
 		// socket options
@@ -999,11 +995,7 @@ namespace sim
 
 #if BOOST_VERSION >= 106600
 		using executor_type = boost::asio::io_service::executor_type;
-
-		executor_type get_executor()
-		{
-			return get_internal_service().get_executor();
-		}
+		executor_type get_executor();
 #endif
 
 #if LIBSIMULATOR_USE_MOVE
@@ -1076,6 +1068,15 @@ namespace sim
 
 		bool m_stopped = false;
 	};
+
+#if BOOST_VERSION >= 106600
+	template <typename Protocol>
+	typename socket_base<Protocol>::executor_type
+	socket_base<Protocol>::get_executor()
+	{
+		return m_io_service.get_executor();
+	}
+#endif
 
 	template <typename Protocol>
 	route socket_base<Protocol>::get_incoming_route()
