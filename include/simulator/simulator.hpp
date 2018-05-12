@@ -181,16 +181,16 @@ namespace sim
 			, boost::system::error_code& ec)
 		{
 #ifdef IP_DONTFRAG
-			if (opt.name() == IP_DONTFRAG)
-				m_dont_fragment = *opt.data() != 0;
+			if (opt.name(Protocol()) == IP_DONTFRAG)
+				m_dont_fragment = *opt.data(Protocol()) != 0;
 #endif
 #ifdef IP_DONTFRAGMENT
-			if (opt.name() == IP_DONTFRAGMENT)
-				m_dont_fragment = *opt.data() != 0;
+			if (opt.name(Protocol()) == IP_DONTFRAGMENT)
+				m_dont_fragment = *opt.data(Protocol()) != 0;
 #endif
 #ifdef IP_MTU_DISCOVER
-			if (opt.name() == IP_MTU_DISCOVER)
-				m_dont_fragment = *opt.data() == IP_PMTUDISC_DO;
+			if (opt.name(Protocol()) == IP_MTU_DISCOVER)
+				m_dont_fragment = *opt.data(Protocol()) == IP_PMTUDISC_DO;
 #endif
 			return ec;
 		}
