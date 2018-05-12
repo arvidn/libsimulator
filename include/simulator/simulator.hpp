@@ -177,8 +177,23 @@ namespace sim
 		using receive_buffer_size = boost::asio::socket_base::receive_buffer_size;
 
 		template <class Option>
-		boost::system::error_code set_option(Option const&
-			, boost::system::error_code& ec) { return ec; }
+		boost::system::error_code set_option(Option const& opt
+			, boost::system::error_code& ec)
+		{
+#ifdef IP_DONTFRAG
+			if (opt.name() == IP_DONTFRAG)
+				m_dont_fragment = *opt.data() != 0;
+#endif
+#ifdef IP_DONTFRAGMENT
+			if (opt.name() == IP_DONTFRAGMENT)
+				m_dont_fragment = *opt.data() != 0;
+#endif
+#ifdef IP_MTU_DISCOVER
+			if (opt.name() == IP_MTU_DISCOVER)
+				m_dont_fragment = *opt.data() == IP_PMTUDISC_DO;
+#endif
+			return ec;
+		}
 
 		boost::system::error_code set_option(receive_buffer_size const& op
 			, boost::system::error_code& ec)
@@ -301,6 +316,9 @@ namespace sim
 
 		// true if the socket is set to non-blocking mode
 		bool m_non_blocking = false;
+
+		// when true, the MTU limit is in effect
+		bool m_dont_fragment = false;
 
 		// the max size of the incoming queue. This is to emulate the send and
 		// receive buffers. This should also depend on the bandwidth, to not
