@@ -48,6 +48,10 @@ All rights reserved.
 #include <list>
 #include <functional>
 
+#ifndef IP_DONTFRAGMENT
+#define IP_DONTFRAGMENT 1
+#endif
+
 namespace sim
 {
 	namespace aux
@@ -180,17 +184,19 @@ namespace sim
 		boost::system::error_code set_option(Option const& opt
 			, boost::system::error_code& ec)
 		{
+			Protocol const p = Protocol::v4();
+			(void)p;
 #ifdef IP_DONTFRAG
-			if (opt.name(Protocol()) == IP_DONTFRAG)
-				m_dont_fragment = *opt.data(Protocol()) != 0;
+			if (opt.name(p) == IP_DONTFRAG)
+				m_dont_fragment = *reinterpret_cast<int const*>(opt.data(p)) != 0;
 #endif
 #ifdef IP_DONTFRAGMENT
-			if (opt.name(Protocol()) == IP_DONTFRAGMENT)
-				m_dont_fragment = *opt.data(Protocol()) != 0;
+			if (opt.name(p) == IP_DONTFRAGMENT)
+				m_dont_fragment = *reinterpret_cast<int const*>(opt.data(p)) != 0;
 #endif
 #ifdef IP_MTU_DISCOVER
-			if (opt.name(Protocol()) == IP_MTU_DISCOVER)
-				m_dont_fragment = *opt.data(Protocol()) == IP_PMTUDISC_DO;
+			if (opt.name(p) == IP_MTU_DISCOVER)
+				m_dont_fragment = *reinterpret_cast<int const*>(opt.data(p)) == IP_PMTUDISC_DO;
 #endif
 			return ec;
 		}
