@@ -57,6 +57,7 @@ SOURCES =
 	http_proxy
 	sink_forwarder
 	pcap
+	nat
 	;
 
 lib simulator

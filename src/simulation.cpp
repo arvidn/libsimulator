@@ -246,6 +246,9 @@ namespace sim
 		c->ep[0] = s->local_bound_to(ec);
 		c->ep[1] = remote->local_bound_to(ec);
 
+		c->visible_ep[0] = s->local_bound_to(ec);
+		c->visible_ep[1] = remote->local_bound_to(ec);
+
 		aux::packet p;
 		p.type = aux::packet::type_t::syn;
 		p.overhead = 28;

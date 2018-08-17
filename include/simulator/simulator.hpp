@@ -1382,16 +1382,20 @@ namespace sim
 			// index 1 may be empty while the connection is half-open
 			route hops[2];
 
-			// the endpoint of each end of the channel
+			// the actual endpoint of each end of the channel
 			asio::ip::tcp::endpoint ep[2];
+
+			// observable endpoint of each side of the channel. This is not how you
+			// see yourself, just the other end
+			asio::ip::tcp::endpoint visible_ep[2];
 
 			// the number of bytes sent from respective direction
 			// this is used to simulate the TCP sequence number, so it deliberately
 			// is meant to wrap at 32 bits
 			std::uint32_t bytes_sent[2];
 
-			int remote_idx(const asio::ip::tcp::endpoint& self) const;
-			int self_idx(const asio::ip::tcp::endpoint& self) const;
+			int remote_idx(asio::ip::tcp::endpoint const& self) const;
+			int self_idx(asio::ip::tcp::endpoint const& self) const;
 		};
 
 	} // aux
