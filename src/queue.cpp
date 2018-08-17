@@ -84,7 +84,7 @@ namespace sim
 			return;
 		}
 
-		time_point now = chrono::high_resolution_clock::now();
+		time_point const now = chrono::high_resolution_clock::now();
 
 		m_queue.emplace_back(now + m_forwarding_latency, std::move(p));
 		m_queue_size += packet_size;

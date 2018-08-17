@@ -26,6 +26,7 @@ set(SIMULATOR_SRC_FILES
   ${SRC_DIR}/queue.cpp
   ${SRC_DIR}/simulator.cpp
   ${SRC_DIR}/tcp_socket.cpp
+  ${SRC_DIR}/nat.cpp
 )
 
 add_library(simulator ${SIMULATOR_SRC_FILES})

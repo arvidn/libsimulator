@@ -149,7 +149,7 @@ namespace ip {
 	{
 		if (m_channel)
 		{
-			int remote = m_channel->remote_idx(m_bound_to);
+			int const remote = m_channel->remote_idx(m_bound_to);
 			route hops = m_channel->hops[remote];
 
 			// if m_connect_handler is still set, it means the connection hasn't
@@ -292,8 +292,8 @@ namespace ip {
 			return tcp::endpoint();
 		}
 
-		int remote = m_channel->remote_idx(m_bound_to);
-		return m_channel->ep[remote];
+		int const remote = m_channel->remote_idx(m_bound_to);
+		return m_channel->visible_ep[remote];
 	}
 
 	tcp::endpoint tcp::socket::remote_endpoint() const
@@ -429,7 +429,7 @@ namespace ip {
 			return 0;
 		}
 
-		int remote = m_channel->remote_idx(m_bound_to);
+		int const remote = m_channel->remote_idx(m_bound_to);
 		route hops = m_channel->hops[remote];
 		if (hops.empty())
 		{
