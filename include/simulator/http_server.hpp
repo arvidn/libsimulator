@@ -63,7 +63,7 @@ struct SIMULATOR_DECL http_server
 		keep_alive = 1
 	};
 
-	http_server(asio::io_service& ios, unsigned short listen_port
+	http_server(asio::io_context& ios, unsigned short listen_port
 		, int flags = http_server::keep_alive);
 
 	void stop();
@@ -87,7 +87,7 @@ private:
 		, bool close);
 	void close_connection();
 
-	asio::io_service& m_ios;
+	asio::io_context& m_ios;
 
 	asio::ip::tcp::acceptor m_listen_socket;
 

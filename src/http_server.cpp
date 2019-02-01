@@ -121,7 +121,7 @@ namespace sim
 		return ret;
 	}
 
-	http_server::http_server(io_service& ios, unsigned short listen_port, int flags)
+	http_server::http_server(io_context& ios, unsigned short listen_port, int flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
 		, m_connection(ios)
@@ -218,7 +218,7 @@ namespace sim
 			m_recv_buffer.resize((std::max)(500, m_bytes_used * 2));
 		}
 		assert(int(m_recv_buffer.size()) > m_bytes_used);
-		m_connection.async_read_some(asio::mutable_buffers_1(&m_recv_buffer[m_bytes_used]
+		m_connection.async_read_some(asio::buffer(&m_recv_buffer[m_bytes_used]
 				, m_recv_buffer.size() - m_bytes_used)
 			, std::bind(&http_server::on_read, this, _1, _2));
 	}
@@ -329,7 +329,7 @@ namespace sim
 
 		bool close = lower_case(req.headers["connection"]) == "close";
 
-		async_write(m_connection, asio::const_buffers_1(m_send_buffer.data()
+		async_write(m_connection, asio::buffer(m_send_buffer.data()
 			, m_send_buffer.size()), std::bind(&http_server::on_write
 			, this, _1, _2, close));
 	}
@@ -355,7 +355,7 @@ namespace sim
 		if (!close && (m_flags & keep_alive))
 		{
 			// try to read another request out of the buffer
-			m_ios.post(std::bind(&http_server::on_read, this, error_code(), 0));
+			post(m_ios, std::bind(&http_server::on_read, this, error_code(), 0));
 		}
 		else
 		{

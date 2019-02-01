@@ -34,7 +34,7 @@ namespace sim
 {
 	using namespace aux;
 
-	socks_server::socks_server(io_service& ios, unsigned short listen_port, int version
+	socks_server::socks_server(io_context& ios, unsigned short listen_port, int version
 		, std::uint32_t const flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
@@ -92,7 +92,7 @@ namespace sim
 		m_listen_socket.close();
 	}
 
-	socks_connection::socks_connection(asio::io_service& ios
+	socks_connection::socks_connection(asio::io_context& ios
 		, int version, std::array<int, 3>& cmd_counts, std::uint32_t const flags)
 		: m_ios(ios)
 		, m_resolver(m_ios)
@@ -114,11 +114,11 @@ namespace sim
 	{
 		if (m_version == 4)
 		{
-			asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 9)
+			asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 9)
 				, std::bind(&socks_connection::on_request1, shared_from_this(), _1, _2));
 		} else {
 			// read protocol version and number of auth-methods
-			asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 2)
+			asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 2)
 				, std::bind(&socks_connection::on_handshake1, shared_from_this(), _1, _2));
 		}
 	}
@@ -144,7 +144,7 @@ namespace sim
 		int num_methods = unsigned(m_out_buffer[1]);
 
 		// read list of auth-methods
-		asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0],
+		asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0],
 				num_methods)
 			, std::bind(&socks_connection::on_handshake2, shared_from_this()
 				, _1, _2));
@@ -170,7 +170,7 @@ namespace sim
 		m_in_buffer[0] = 5; // socks version
 		m_in_buffer[1] = 0; // auth-method (no-auth)
 
-		asio::async_write(m_client_connection, asio::const_buffers_1(&m_in_buffer[0], 2)
+		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], 2)
 			, std::bind(&socks_connection::on_handshake3, shared_from_this()
 				, _1, _2));
 	}
@@ -185,7 +185,7 @@ namespace sim
 			return;
 		}
 
-		asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[0], 10)
+		asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 10)
 			, std::bind(&socks_connection::on_request1, shared_from_this()
 				, _1, _2));
 	}
@@ -356,7 +356,7 @@ namespace sim
 				// address. Now, with a domain name, one of those bytes was the
 				// length-prefix, but we still read 3 bytes already.
 				const int additional_bytes = len - 3;
-				asio::async_read(m_client_connection, asio::mutable_buffers_1(&m_out_buffer[10], additional_bytes)
+				asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[10], additional_bytes)
 					, std::bind(&socks_connection::on_request_domain_name
 						, shared_from_this(), _1, _2));
 				break;
@@ -396,16 +396,15 @@ namespace sim
 
 		char port_str[10];
 		std::snprintf(port_str, sizeof(port_str), "%d", port);
-		asio::ip::tcp::resolver::query q(hostname, port_str);
-		m_resolver.async_resolve(q
+		m_resolver.async_resolve(hostname, port_str
 			, std::bind(&socks_connection::on_request_domain_lookup
 				, shared_from_this(), _1, _2));
 	}
 
 	void socks_connection::on_request_domain_lookup(boost::system::error_code const& ec
-		, const asio::ip::tcp::resolver::iterator& iter)
+		, asio::ip::tcp::resolver::results_type const ips)
 	{
-		if (ec || iter == asio::ip::tcp::resolver::iterator())
+		if (ec || ips.empty())
 		{
 			if (ec)
 			{
@@ -434,7 +433,7 @@ namespace sim
 
 			auto self = shared_from_this();
 			asio::async_write(m_client_connection
-				, asio::const_buffers_1(&m_in_buffer[0], 10)
+				, asio::buffer(&m_in_buffer[0], 10)
 				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
@@ -444,9 +443,9 @@ namespace sim
 
 		std::printf("socks_connection::on_request_domain_lookup(%s): connecting to: %s port: %d\n"
 			, command()
-			, iter->endpoint().address().to_string().c_str()
-			, iter->endpoint().port());
-		open_forward_connection(iter->endpoint());
+			, ips.front().endpoint().address().to_string().c_str()
+			, ips.front().endpoint().port());
+		open_forward_connection(ips.front().endpoint());
 	}
 
 	void socks_connection::open_forward_connection(const asio::ip::tcp::endpoint& target)
@@ -494,7 +493,7 @@ namespace sim
 			auto self = shared_from_this();
 
 			asio::async_write(m_client_connection
-				, asio::const_buffers_1(&m_in_buffer[0], len)
+				, asio::buffer(&m_in_buffer[0], len)
 				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
@@ -504,7 +503,7 @@ namespace sim
 
 		// send response
 		asio::async_write(m_client_connection
-			, asio::const_buffers_1(&m_in_buffer[0], len)
+			, asio::buffer(&m_in_buffer[0], len)
 			, std::bind(&socks_connection::start_accept, shared_from_this(), _1));
 	}
 
@@ -548,7 +547,7 @@ namespace sim
 			auto self = shared_from_this();
 
 			asio::async_write(m_client_connection
-				, asio::const_buffers_1(&m_in_buffer[0], len)
+				, asio::buffer(&m_in_buffer[0], len)
 				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
@@ -580,7 +579,7 @@ namespace sim
 		}
 
 		m_client_connection.async_read_some(
-			asio::buffer(m_out_buffer, sizeof(m_out_buffer))
+			asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::wait_for_eof, shared_from_this()
 				, _1, _2));
 	}
@@ -639,7 +638,7 @@ namespace sim
 		else
 		{
 			// add UDP ASSOCIATE header and forward to client
-			std::uint32_t const from_addr = m_udp_from.address().to_v4().to_ulong();
+			std::uint32_t const from_addr = m_udp_from.address().to_v4().to_uint();
 			std::uint16_t const from_port = m_udp_from.port();
 			std::array<char, 10> header;
 			header[0] = 0; // RSV
@@ -682,7 +681,7 @@ namespace sim
 				, shared_from_this(), _1));
 
 		m_client_connection.async_read_some(
-			sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
+			sim::asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::on_client_receive, shared_from_this()
 				, _1, _2));
 	}
@@ -767,7 +766,7 @@ namespace sim
 			auto self = shared_from_this();
 
 			asio::async_write(m_client_connection
-				, asio::const_buffers_1(&m_in_buffer[0], len)
+				, asio::buffer(&m_in_buffer[0], len)
 				, [=](boost::system::error_code const&, size_t)
 				{
 					self->close_connection();
@@ -778,7 +777,7 @@ namespace sim
 		auto self = shared_from_this();
 
 		asio::async_write(m_client_connection
-			, asio::const_buffers_1(&m_in_buffer[0], len)
+			, asio::buffer(&m_in_buffer[0], len)
 			, [=](boost::system::error_code const& ec, size_t)
 			{
 				if (ec)
@@ -790,11 +789,11 @@ namespace sim
 
 			// read from the client and from the server
 			self->m_server_connection.async_read_some(
-				sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
+				sim::asio::buffer(m_in_buffer)
 				, std::bind(&socks_connection::on_server_receive, self
 					, _1, _2));
 			self->m_client_connection.async_read_some(
-				sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
+				sim::asio::buffer(m_out_buffer)
 				, std::bind(&socks_connection::on_client_receive, self
 					, _1, _2));
 			});
@@ -818,7 +817,7 @@ namespace sim
 			close_connection();
 			return;
 		}
-		asio::async_write(m_server_connection, asio::const_buffers_1(&m_out_buffer[0], bytes_transferred)
+		asio::async_write(m_server_connection, asio::buffer(&m_out_buffer[0], bytes_transferred)
 			, std::bind(&socks_connection::on_client_forward, shared_from_this()
 				, _1, _2));
 	}
@@ -835,7 +834,7 @@ namespace sim
 		}
 
 		m_client_connection.async_read_some(
-			sim::asio::mutable_buffers_1(m_out_buffer, sizeof(m_out_buffer))
+			sim::asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::on_client_receive, shared_from_this()
 				, _1, _2));
 	}
@@ -852,7 +851,7 @@ namespace sim
 			return;
 		}
 
-		asio::async_write(m_client_connection, asio::const_buffers_1(&m_in_buffer[0], bytes_transferred)
+		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], bytes_transferred)
 			, std::bind(&socks_connection::on_server_forward, shared_from_this()
 				, _1, _2));
 	}
@@ -869,7 +868,7 @@ namespace sim
 		}
 
 		m_server_connection.async_read_some(
-			sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
+			sim::asio::buffer(m_in_buffer)
 			, std::bind(&socks_connection::on_server_receive, shared_from_this()
 				, _1, _2));
 	}

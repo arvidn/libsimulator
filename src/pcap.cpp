@@ -102,8 +102,8 @@ namespace {
 			200, // ttl
 			std::uint8_t(protocol), // protocol
 			0, // checksum
-			htonl(std::uint32_t(source.to_ulong())), // source ip
-			htonl(std::uint32_t(dest.to_ulong())) // destination ip
+			htonl(std::uint32_t(source.to_uint())), // source ip
+			htonl(std::uint32_t(dest.to_uint())) // destination ip
 		};
 
 		write(file, header);

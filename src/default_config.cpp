@@ -34,7 +34,7 @@ namespace sim {
 	{
 		// 0 bandwidth and 0 queue means infinite. The network itself only adds
 		// 50 ms latency
-		m_network = std::make_shared<queue>(std::ref(sim.get_io_service())
+		m_network = std::make_shared<queue>(std::ref(sim.get_io_context())
 			, 0, duration_cast<duration>(milliseconds(30)), 0, "network");
 		m_sim = &sim;
 	}
@@ -53,7 +53,7 @@ namespace sim {
 		auto it = m_incoming.find(ip);
 		if (it != m_incoming.end()) return route().append(it->second);
 		it = m_incoming.insert(it, std::make_pair(ip, std::make_shared<queue>(
-			std::ref(m_sim->get_io_service()), 800 * 1000
+			std::ref(m_sim->get_io_context()), 800 * 1000
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem in")));
 		return route().append(it->second);
 	}
@@ -74,7 +74,7 @@ namespace sim {
 		auto it = m_outgoing.find(ip);
 		if (it != m_outgoing.end()) return route().append(it->second);
 		it = m_outgoing.insert(it, std::make_pair(ip, std::make_shared<queue>(
-			std::ref(m_sim->get_io_service()), 200 * 1000
+			std::ref(m_sim->get_io_context()), 200 * 1000
 			, duration_cast<duration>(milliseconds(1)), 200 * 1000, "DSL modem out")));
 		return route().append(it->second);
 	}
@@ -87,8 +87,8 @@ namespace sim {
 	{
 		if (hostname == "localhost")
 		{
-			result = { address_v6::from_string("::1")
-				, address_v4::from_string("127.0.0.1") };
+			result = { asio::ip::make_address_v6("::1")
+				, asio::ip::make_address_v4("127.0.0.1") };
 			return duration_cast<duration>(chrono::microseconds(1));
 		}
 

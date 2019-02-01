@@ -53,7 +53,7 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 
 	if (num_sent < 1000000)
 	{
-		sock.async_write_some(sim::asio::const_buffers_1(send_buffer
+		sock.async_write_some(sim::asio::buffer(send_buffer
 				, (std::min)(1000000 - num_sent, int(sizeof(send_buffer))))
 			, std::bind(&on_sent, _1, _2, std::ref(sock)));
 		return;
@@ -62,8 +62,7 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 	sock.close();
 }
 
-void on_receive(boost::system::error_code const& ec
-	, std::size_t bytes_transferred, ip::tcp::socket& sock)
+void on_receive(boost::system::error_code const& ec, ip::tcp::socket& sock)
 {
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
@@ -74,7 +73,7 @@ void on_receive(boost::system::error_code const& ec
 	}
 
 	boost::system::error_code err;
-	bytes_transferred = sock.read_some(sim::asio::mutable_buffers_1(
+	std::size_t bytes_transferred = sock.read_some(sim::asio::buffer(
 			recv_buffer, sizeof(recv_buffer)), err);
 	if (err && err != boost::system::error_code(error::would_block))
 	{
@@ -87,8 +86,8 @@ void on_receive(boost::system::error_code const& ec
 	std::printf("[%4d] received %d bytes (total: %d)\n"
 		, millis, int(bytes_transferred), num_received);
 
-	sock.async_read_some(sim::asio::null_buffers()
-		, std::bind(&on_receive, _1, _2, std::ref(sock)));
+	sock.async_wait(ip::tcp::socket::wait_read
+		, std::bind(&on_receive, _1, std::ref(sock)));
 }
 
 void incoming_connection(boost::system::error_code const& ec
@@ -119,8 +118,8 @@ void incoming_connection(boost::system::error_code const& ec
 	sock.non_blocking(true);
 	if (err) std::printf("[%4d] ioctl failed: %s\n", millis, err.message().c_str());
 
-	sock.async_read_some(sim::asio::null_buffers()
-		, std::bind(&on_receive, _1, _2, std::ref(sock)));
+	sock.async_wait(ip::tcp::socket::wait_read
+		, std::bind(&on_receive, _1, std::ref(sock)));
 }
 
 void on_connected(boost::system::error_code const& ec
@@ -150,7 +149,7 @@ void on_connected(boost::system::error_code const& ec
 	CHECK(local_endpoint.address().to_string() == "10.20.30.40");
 
 	std::printf("sending %d bytes\n", int(sizeof(send_buffer)));
-	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
+	sock.async_write_some(sim::asio::buffer(send_buffer, sizeof(send_buffer))
 		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
 
@@ -158,8 +157,8 @@ TEST_CASE("receive null_buffers", "[null_buffers]")
 {
 	default_config cfg;
 	simulation sim(cfg);
-	io_service incoming_ios(sim, ip::address_v4::from_string("40.30.20.10"));
-	io_service outgoing_ios(sim, ip::address_v4::from_string("10.20.30.40"));
+	io_context incoming_ios(sim, ip::make_address_v4("40.30.20.10"));
+	io_context outgoing_ios(sim, ip::make_address_v4("10.20.30.40"));
 	ip::tcp::acceptor listener(incoming_ios);
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
@@ -185,7 +184,7 @@ TEST_CASE("receive null_buffers", "[null_buffers]")
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	if (ec) std::printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
-	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
+	outgoing.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);

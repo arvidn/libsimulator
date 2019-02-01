@@ -38,7 +38,7 @@ namespace aux {
 		virtual std::string label() const = 0;
 
 		virtual std::string attributes() const { return "shape=box"; }
-		virtual ~sink() {}
+		virtual ~sink() = default;
 	};
 
 } // sim

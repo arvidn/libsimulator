@@ -53,11 +53,11 @@ void forward_packet(aux::packet p)
 
 namespace
 {
-	// this is a dummy sink for endpoints, wrapping an io_service
+	// this is a dummy sink for endpoints, wrapping an io_context
 	struct endpoint : sink
 	{
-		endpoint(asio::io_service& ios)
-			: m_ios(ios)
+		endpoint(asio::io_context& ioc)
+			: m_ioc(ioc)
 		{}
 
 		virtual void incoming_packet(aux::packet p) override final { assert(false); }
@@ -65,7 +65,7 @@ namespace
 		virtual std::string label() const override final
 		{
 			std::string ret;
-			for (auto const& ip : m_ios.get_ips())
+			for (auto const& ip : m_ioc.get_ips())
 			{
 				ret += ip.to_string();
 				ret += " ";
@@ -79,7 +79,7 @@ namespace
 		}
 
 	private:
-		asio::io_service& m_ios;
+		asio::io_context& m_ioc;
 	};
 }
 
@@ -117,18 +117,18 @@ void dump_network_graph(simulation const& s, const std::string& filename)
 	// local nodes (subgrapgs)
 	std::vector<std::unordered_set<std::shared_ptr<sink>>> local_nodes;
 
-	const std::vector<asio::io_service*> io_services = s.get_all_io_services();
+	const std::vector<asio::io_context*> io_services = s.get_all_io_services();
 
-	for (auto ios : io_services)
+	for (auto ioc : io_services)
 	{
-		std::shared_ptr<sink> ep = std::make_shared<endpoint>(*ios);
+		std::shared_ptr<sink> ep = std::make_shared<endpoint>(*ioc);
 		local_nodes.push_back(std::unordered_set<std::shared_ptr<sink>>());
 		local_nodes.back().insert(ep);
 
-		for (auto const& ip : ios->get_ips())
+		for (auto const& ip : ioc->get_ips())
 		{
-			route in = ios->get_incoming_route(ip);
-			route out = ios->get_outgoing_route(ip);
+			route in = ioc->get_incoming_route(ip);
+			route out = ioc->get_outgoing_route(ip);
 
 			// this is the outgoing node for this endpoint. This is
 			// how it connects to the network.

@@ -39,7 +39,7 @@ enum socks_flag
 
 struct SIMULATOR_DECL socks_connection : std::enable_shared_from_this<socks_connection>
 {
-	socks_connection(asio::io_service& ios, int version, std::array<int, 3>& cmd_counts
+	socks_connection(asio::io_context& ios, int version, std::array<int, 3>& cmd_counts
 		, std::uint32_t flags);
 
 	asio::ip::tcp::socket& socket() { return m_client_connection; }
@@ -63,7 +63,7 @@ private:
 	void on_connected(boost::system::error_code const& ec);
 	void on_request_domain_name(boost::system::error_code const& ec, size_t bytes_transferred);
 	void on_request_domain_lookup(boost::system::error_code const& ec
-		, const asio::ip::tcp::resolver::iterator& iter);
+		, const asio::ip::tcp::resolver::results_type ips);
 
 	void open_forward_connection(asio::ip::tcp::endpoint const& target);
 	void bind_connection(asio::ip::tcp::endpoint const& target);
@@ -85,7 +85,7 @@ private:
 
 	char const* command() const;
 
-	asio::io_service& m_ios;
+	asio::io_context& m_ios;
 
 	asio::ip::tcp::resolver m_resolver;
 
@@ -131,7 +131,7 @@ private:
 // concurrent connection
 struct SIMULATOR_DECL socks_server
 {
-	socks_server(asio::io_service& ios, unsigned short listen_port
+	socks_server(asio::io_context& ios, unsigned short listen_port
 		, int version = 5, std::uint32_t flags = 0);
 
 	void stop();
@@ -145,7 +145,7 @@ private:
 
 	void on_accept(boost::system::error_code const& ec);
 
-	asio::io_service& m_ios;
+	asio::io_context& m_ios;
 
 	asio::ip::tcp::acceptor m_listen_socket;
 

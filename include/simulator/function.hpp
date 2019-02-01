@@ -25,7 +25,7 @@ namespace sim {
 namespace aux {
 
 	template <typename T, typename U>
-	T exchange(T& var, U&& new_val)
+	T exchange_(T& var, U&& new_val)
 	{
 		T temp = std::move(var);
 		var = std::forward<U>(new_val);
@@ -121,13 +121,13 @@ namespace aux {
 			: m_callable(allocate_handler<function_impl<C, R, A...>>(std::move(c)))
 		{}
 		function(function&& other) noexcept
-			: m_callable(exchange(other.m_callable, nullptr))
+			: m_callable(exchange_(other.m_callable, nullptr))
 		{}
 		function& operator=(function&& other) noexcept
 		{
 			if (&other == this) return *this;
 			clear();
-			m_callable = exchange(other.m_callable, nullptr);
+			m_callable = exchange_(other.m_callable, nullptr);
 			return *this;
 		}
 
@@ -153,7 +153,7 @@ namespace aux {
 		{
 			assert(m_callable);
 			auto fun = m_callable->call_fun;
-			return fun(exchange(m_callable, nullptr), std::forward<A>(a)...);
+			return fun(exchange_(m_callable, nullptr), std::forward<A>(a)...);
 		}
 	private:
 		callable<R, A...>* m_callable = nullptr;

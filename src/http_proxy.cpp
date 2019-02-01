@@ -33,7 +33,7 @@ namespace sim
 {
 	using namespace aux;
 
-	http_proxy::http_proxy(io_service& ios, unsigned short const listen_port)
+	http_proxy::http_proxy(io_context& ios, unsigned short const listen_port)
 		: m_resolver(ios)
 		, m_listen_socket(ios)
 		, m_client_connection(ios)
@@ -78,7 +78,7 @@ namespace sim
 			m_ep.address().to_string().c_str(), m_ep.port());
 
 		// read http request
-		m_client_connection.async_read_some(asio::mutable_buffers_1(
+		m_client_connection.async_read_some(asio::buffer(
 			&m_client_in_buffer[0], sizeof(m_client_in_buffer))
 			, std::bind(&http_proxy::on_read_request, this, _1, _2));
 	}
@@ -114,7 +114,7 @@ namespace sim
 		}
 
 		// read more from the client
-		m_client_connection.async_read_some(asio::mutable_buffers_1(
+		m_client_connection.async_read_some(asio::buffer(
 			&m_client_in_buffer[m_num_client_in_bytes]
 			, sizeof(m_client_in_buffer) - m_num_client_in_bytes)
 			, std::bind(&http_proxy::on_read_request, this, _1, _2));
@@ -188,14 +188,13 @@ namespace sim
 		if (!m_server_connection.is_open())
 		{
 			boost::system::error_code err;
-			tcp::endpoint target(address::from_string(host.c_str(), err)
+			tcp::endpoint target(make_address(host.c_str(), err)
 				, static_cast<unsigned short>(port));
 			if (err)
 			{
 				char port_str[10];
 				std::snprintf(port_str, sizeof(port_str), "%d", port);
-				asio::ip::tcp::resolver::query q(host, port_str);
-				m_resolver.async_resolve(q
+				m_resolver.async_resolve(host, port_str
 					, std::bind(&http_proxy::on_domain_lookup, this, _1, _2));
 				return;
 			}
@@ -210,9 +209,9 @@ namespace sim
 	}
 
 	void http_proxy::on_domain_lookup(boost::system::error_code const& ec
-		, const asio::ip::tcp::resolver::iterator& iter)
+		, const asio::ip::tcp::resolver::results_type ips)
 	{
-		if (ec || iter == asio::ip::tcp::resolver::iterator())
+		if (ec || ips.empty())
 		{
 			if (ec)
 			{
@@ -226,7 +225,7 @@ namespace sim
 			error(503, "Resource Temporarily Unavailable");
 			return;
 		}
-		open_forward_connection(iter->endpoint());
+		open_forward_connection(ips.front().endpoint());
 	}
 
 	void http_proxy::open_forward_connection(const asio::ip::tcp::endpoint& target)
@@ -243,7 +242,7 @@ namespace sim
 	{
 		std::string send_buffer = send_response(code, message);
 		memcpy(m_in_buffer, send_buffer.data(), send_buffer.size());
-		asio::async_write(m_client_connection, asio::const_buffers_1(
+		asio::async_write(m_client_connection, asio::buffer(
 			&m_in_buffer[0], send_buffer.size())
 			, std::bind(&http_proxy::close_connection, this));
 	}
@@ -263,7 +262,7 @@ namespace sim
 		write_server_send_buffer();
 
 		m_server_connection.async_read_some(
-			sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
+			asio::buffer(m_in_buffer, sizeof(m_in_buffer))
 			, std::bind(&http_proxy::on_server_receive, this, _1, _2));
 	}
 
@@ -271,7 +270,7 @@ namespace sim
 	{
 		if (m_writing_to_server) return;
 		m_writing_to_server = true;
-		m_server_connection.async_write_some(asio::const_buffers_1(
+		m_server_connection.async_write_some(asio::buffer(
 			&m_server_out_buffer[0], m_num_server_out_bytes)
 			, std::bind(&http_proxy::on_server_write, this, _1, _2));
 	}
@@ -307,7 +306,7 @@ namespace sim
 			return;
 		}
 
-		asio::async_write(m_client_connection, asio::const_buffers_1(&m_in_buffer[0], bytes_transferred)
+		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], bytes_transferred)
 			, std::bind(&http_proxy::on_server_forward, this, _1, _2));
 	}
 
@@ -323,7 +322,7 @@ namespace sim
 		}
 
 		m_server_connection.async_read_some(
-			sim::asio::mutable_buffers_1(m_in_buffer, sizeof(m_in_buffer))
+			sim::asio::buffer(m_in_buffer, sizeof(m_in_buffer))
 			, std::bind(&http_proxy::on_server_receive, this, _1, _2));
 	}
 

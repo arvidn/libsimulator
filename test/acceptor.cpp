@@ -71,7 +71,7 @@ void on_receive(boost::system::error_code const& ec
 
 	std::printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
 
-	sock.async_read_some(sim::asio::mutable_buffers_1(recv_buffer, sizeof(recv_buffer))
+	sock.async_read_some(sim::asio::buffer(recv_buffer, sizeof(recv_buffer))
 		, std::bind(&on_receive, _1, _2, std::ref(sock)));
 }
 
@@ -100,7 +100,7 @@ void incoming_connection(boost::system::error_code const& ec
 	CHECK(remote_endpoint.port() != 0);
 	CHECK(remote_endpoint.address().to_string() == "10.20.30.40");
 
-	sock.async_read_some(sim::asio::mutable_buffers_1(recv_buffer, sizeof(recv_buffer))
+	sock.async_read_some(sim::asio::buffer(recv_buffer, sizeof(recv_buffer))
 		, std::bind(&on_receive, _1, _2, std::ref(sock)));
 }
 
@@ -132,7 +132,7 @@ void on_connected(boost::system::error_code const& ec
 	CHECK(local_endpoint.address().to_string() == "10.20.30.40");
 
 	std::printf("sending %d bytes\n", int(sizeof(send_buffer)));
-	sock.async_write_some(sim::asio::const_buffers_1(send_buffer, sizeof(send_buffer))
+	sock.async_write_some(sim::asio::buffer(send_buffer, sizeof(send_buffer))
 		, std::bind(&on_sent, _1, _2, std::ref(sock)));
 }
 
@@ -142,8 +142,8 @@ TEST_CASE("accept incoming connection on acceptor socket", "[acceptor]")
 {
 	default_config cfg;
 	simulation sim(cfg);
-	io_service incoming_ios(sim, ip::address_v4::from_string("40.30.20.10"));
-	io_service outgoing_ios(sim, ip::address_v4::from_string("10.20.30.40"));
+	io_context incoming_ios(sim, ip::make_address_v4("40.30.20.10"));
+	io_context outgoing_ios(sim, ip::make_address_v4("10.20.30.40"));
 	ip::tcp::acceptor listener(incoming_ios);
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
@@ -169,7 +169,7 @@ TEST_CASE("accept incoming connection on acceptor socket", "[acceptor]")
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	REQUIRE(!ec);
-	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
+	outgoing.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);

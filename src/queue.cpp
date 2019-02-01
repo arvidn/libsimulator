@@ -28,7 +28,7 @@ namespace sim
 {
 	using namespace aux;
 
-	queue::queue(asio::io_service& ios
+	queue::queue(asio::io_context& ios
 		, int bandwidth
 		, chrono::high_resolution_clock::duration propagation_delay
 		, int max_queue_size
@@ -108,7 +108,7 @@ namespace sim
 		m_last_forward = now;
 		if (m_bandwidth == 0)
 		{
-			m_forward_timer.get_io_service().post(make_malloc(std::bind(&queue::next_packet_sent
+			post(m_forward_timer.get_executor(), make_malloc(std::bind(&queue::next_packet_sent
 				, this)));
 			return;
 		}

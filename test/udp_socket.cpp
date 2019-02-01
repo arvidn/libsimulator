@@ -61,7 +61,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 
 	if (bytes_transferred == 100 * 10) return;
 
-	s.async_receive_from(asio::mutable_buffers_1(receive_buf
+	s.async_receive_from(asio::buffer(receive_buf
 		, sizeof(receive_buf)), ep, std::bind(&on_receive, _1, _2
 		, std::ref(s), std::ref(ep)));
 }
@@ -72,8 +72,8 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 {
 	default_config cfg;
 	simulation sim(cfg);
-	asio::io_service incoming_ios(sim, address_v4::from_string("40.30.20.10"));
-	asio::io_service outgoing_ios(sim, address_v4::from_string("10.20.30.40"));
+	asio::io_context incoming_ios(sim, make_address_v4("40.30.20.10"));
+	asio::io_context outgoing_ios(sim, make_address_v4("10.20.30.40"));
 
 	udp::socket incoming(incoming_ios);
 	udp::socket outgoing(outgoing_ios);
@@ -88,7 +88,7 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 	REQUIRE(!ec);
 
 	udp::endpoint remote_endpoint;
-	incoming.async_receive_from(asio::mutable_buffers_1(receive_buf,
+	incoming.async_receive_from(asio::buffer(receive_buf,
 			sizeof(receive_buf)), remote_endpoint, std::bind(&on_receive, _1, _2
 			, std::ref(incoming), std::ref(remote_endpoint)));
 
@@ -97,8 +97,8 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 
 	for (int i = 1; i < 10; ++i)
 	{
-		num_sent += outgoing.send_to(asio::mutable_buffers_1(send_buf, 100 * i)
-			, udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), 0, ec);
+		num_sent += outgoing.send_to(asio::buffer(send_buf, 100 * i)
+			, udp::endpoint(make_address_v4("40.30.20.10"), 1337), 0, ec);
 		REQUIRE(!ec);
 	}
 

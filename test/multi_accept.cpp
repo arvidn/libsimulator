@@ -81,7 +81,7 @@ void on_connected(boost::system::error_code const& ec
 	boost::system::error_code err;
 	sock.open(ip::tcp::v4(), err);
 	if (err) std::printf("[%4d] open failed: %s\n", millis, err.message().c_str());
-	sock.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
+	sock.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(sock)));
 }
 
@@ -91,8 +91,8 @@ TEST_CASE("accept a connection multiple times on the same socket", "[accept]")
 {
 	default_config cfg;
 	simulation sim(cfg);
-	io_service incoming_ios(sim, ip::address_v4::from_string("40.30.20.10"));
-	io_service outgoing_ios(sim, ip::address_v4::from_string("10.20.30.40"));
+	io_context incoming_ios(sim, ip::make_address_v4("40.30.20.10"));
+	io_context outgoing_ios(sim, ip::make_address_v4("10.20.30.40"));
 	ip::tcp::acceptor listener(incoming_ios);
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
@@ -115,7 +115,7 @@ TEST_CASE("accept a connection multiple times on the same socket", "[accept]")
 	ip::tcp::socket outgoing(outgoing_ios);
 	outgoing.open(ip::tcp::v4(), ec);
 	if (ec) std::printf("[%4d] open failed: %s\n", millis, ec.message().c_str());
-	outgoing.async_connect(ip::tcp::endpoint(ip::address::from_string("40.30.20.10")
+	outgoing.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
 	sim.run(ec);
