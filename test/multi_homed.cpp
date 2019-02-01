@@ -74,10 +74,10 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 	simulation sim(cfg);
 
 	// the machine receiving packets has two IP addresses
-	asio::io_service incoming_ios(sim, {
-		address_v4::from_string("40.30.20.10"),
-		address_v6::from_string("ff::dead:beef:1337")} );
-	asio::io_service outgoing_ios(sim, address_v4::from_string("10.20.30.40"));
+	asio::io_context incoming_ios(sim, {
+		make_address_v4("40.30.20.10"),
+		make_address_v6("ff::dead:beef:1337")} );
+	asio::io_context outgoing_ios(sim, make_address_v4("10.20.30.40"));
 
 	// we create two sockets for it, one for each interface
 	udp::socket incoming_v4(incoming_ios);
@@ -87,17 +87,17 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 	boost::system::error_code ec;
 	incoming_v4.open(udp::v4(), ec);
 	REQUIRE(!ec);
-	incoming_v4.bind(udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), ec);
+	incoming_v4.bind(udp::endpoint(make_address_v4("40.30.20.10"), 1337), ec);
 	REQUIRE(!ec);
-	incoming_v4.async_receive(asio::mutable_buffers_1(receive_buf
+	incoming_v4.async_receive(asio::buffer(receive_buf
 		, sizeof(receive_buf)), std::bind(&on_receive, _1, _2
 		, std::ref(incoming_v4)));
 
 	incoming_v6.open(udp::v6(), ec);
 	REQUIRE(!ec);
-	incoming_v6.bind(udp::endpoint(address_v6::from_string("ff::dead:beef:1337"), 1337), ec);
+	incoming_v6.bind(udp::endpoint(make_address_v6("ff::dead:beef:1337"), 1337), ec);
 	REQUIRE(!ec);
-	incoming_v6.async_receive(asio::mutable_buffers_1(receive_buf
+	incoming_v6.async_receive(asio::buffer(receive_buf
 		, sizeof(receive_buf)), std::bind(&on_receive, _1, _2
 		, std::ref(incoming_v6)));
 
@@ -108,13 +108,13 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 	REQUIRE(!ec);
 
 	// send a packet to the IPv4 address
-	outgoing.send_to(asio::mutable_buffers_1(send_buf, sizeof(send_buf))
-		, udp::endpoint(address_v4::from_string("40.30.20.10"), 1337), 0, ec);
+	outgoing.send_to(asio::buffer(send_buf, sizeof(send_buf))
+		, udp::endpoint(make_address_v4("40.30.20.10"), 1337), 0, ec);
 	REQUIRE(!ec);
 
 	// and a packet to the IPv6 address
-	outgoing.send_to(asio::mutable_buffers_1(send_buf, sizeof(send_buf))
-		, udp::endpoint(address_v6::from_string("ff::dead:beef:1337"), 1337), 0, ec);
+	outgoing.send_to(asio::buffer(send_buf, sizeof(send_buf))
+		, udp::endpoint(make_address_v6("ff::dead:beef:1337"), 1337), 0, ec);
 	REQUIRE(!ec);
 
 	sim.run(ec);
@@ -137,14 +137,14 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 	const unsigned short listen_port = 4242;
 
 	// the machine receiving packets has two IP addresses
-	asio::io_service incoming_ios(sim, {
-		address_v4::from_string("40.30.20.10"),
-		address_v6::from_string("ff::dead:beef:1337")} );
+	asio::io_context incoming_ios(sim, {
+		make_address_v4("40.30.20.10"),
+		make_address_v6("ff::dead:beef:1337")} );
 
 	// the machine sending packets has two IP addresses
-	asio::io_service outgoing_ios(sim, {
-		address_v4::from_string("10.20.30.40"),
-		address_v6::from_string("ff::abad:cafe:1337")
+	asio::io_context outgoing_ios(sim, {
+		make_address_v4("10.20.30.40"),
+		make_address_v6("ff::abad:cafe:1337")
 	});
 
 	// we create two acceptors for it, one for each interface
@@ -174,14 +174,14 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 	tcp::socket incoming_socket(incoming_ios);
 	incoming_v4.async_accept(incoming_socket, [&] (boost::system::error_code ec) {
 		REQUIRE(!ec);
-		CHECK(incoming_socket.remote_endpoint().address() == address_v4::from_string("10.20.30.40"));
+		CHECK(incoming_socket.remote_endpoint().address() == make_address_v4("10.20.30.40"));
 		num_incoming_v4++;
 		incoming_socket.close();
 	});
 
 	incoming_v6.async_accept(incoming_socket, [&] (boost::system::error_code ec) {
 		REQUIRE(!ec);
-		CHECK(incoming_socket.remote_endpoint().address() == address_v6::from_string("ff::abad:cafe:1337"));
+		CHECK(incoming_socket.remote_endpoint().address() == make_address_v6("ff::abad:cafe:1337"));
 		num_incoming_v6++;
 		incoming_socket.close();
 	});
@@ -189,7 +189,7 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 	// connect via ipv4
 	outgoing_v4.open(tcp::v4(), ec);
 	REQUIRE(!ec);
-	auto endpoint_v4 = asio::ip::tcp::endpoint(asio::ip::address::from_string("40.30.20.10"), listen_port);
+	auto endpoint_v4 = asio::ip::tcp::endpoint(asio::ip::make_address("40.30.20.10"), listen_port);
 	outgoing_v4.async_connect(endpoint_v4, [] (boost::system::error_code ec) {
 		REQUIRE(!ec);
 	});
@@ -202,7 +202,7 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 	// connect via ipv6
 	outgoing_v6.open(tcp::v6(), ec);
 	REQUIRE(!ec);
-	auto endpoint_v6 = asio::ip::tcp::endpoint(asio::ip::address::from_string("ff::dead:beef:1337"), listen_port);
+	auto endpoint_v6 = asio::ip::tcp::endpoint(asio::ip::make_address("ff::dead:beef:1337"), listen_port);
 	outgoing_v6.async_connect(endpoint_v6, [] (boost::system::error_code ec) {
 		REQUIRE(!ec);
 	});

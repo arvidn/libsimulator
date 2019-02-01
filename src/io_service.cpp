@@ -23,15 +23,15 @@ All rights reserved.
 
 namespace sim { namespace asio {
 
-	io_service::io_service(sim::simulation& sim)
-		: io_service(sim, std::vector<asio::ip::address>())
+	io_context::io_context(sim::simulation& sim)
+		: io_context(sim, std::vector<asio::ip::address>())
 	{}
 
-	io_service::io_service(sim::simulation& sim, asio::ip::address const& ip)
-		: io_service(sim, std::vector<asio::ip::address>{ip})
+	io_context::io_context(sim::simulation& sim, asio::ip::address const& ip)
+		: io_context(sim, std::vector<asio::ip::address>{ip})
 	{}
 
-	io_service::io_service(sim::simulation& sim, std::vector<asio::ip::address> const& ips)
+	io_context::io_context(sim::simulation& sim, std::vector<asio::ip::address> const& ips)
 		: m_sim(sim)
 		, m_ips(ips)
 		, m_stopped(false)
@@ -44,79 +44,72 @@ namespace sim { namespace asio {
 		m_sim.add_io_service(this);
 	}
 
-	io_service::~io_service()
+	io_context::~io_context()
 	{
 		m_sim.remove_io_service(this);
 	}
 
-	io_service::io_service()
+	io_context::io_context()
 		: m_sim(*reinterpret_cast<sim::simulation*>(0))
 	{
 		assert(false);
 	}
 
-#if BOOST_VERSION >= 106600
-	io_service::executor_type io_service::get_executor()
-	{
-		return get_internal_service().get_executor();
-	}
-#endif
-
-	int io_service::get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const
+	int io_context::get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const
 	{
 		// TODO: it would be nice to actually traverse the virtual network nodes
 		// and ask for their MTU instead
-		assert(std::count(m_ips.begin(), m_ips.end(), source) > 0 && "source address must be a local address to this node/io_service");
+		assert(std::count(m_ips.begin(), m_ips.end(), source) > 0 && "source address must be a local address to this node/io_context");
 		return m_sim.config().path_mtu(source, dest);
 	}
 
-	void io_service::stop()
+	void io_context::stop()
 	{
-		// TODO: cancel all outstanding handler associated with this io_service
+		// TODO: cancel all outstanding handler associated with this io_context
 		m_stopped = true;
 	}
 
-	bool io_service::stopped() const
+	bool io_context::stopped() const
 	{
 		return m_stopped;
 	}
 
-	void io_service::reset()
+	void io_context::restart()
 	{
 		m_stopped = false;
 	}
 
-	std::size_t io_service::run()
+	std::size_t io_context::run()
 	{
 		assert(false);
 		return 0;
 	}
 
-	std::size_t io_service::run(boost::system::error_code&)
+	std::size_t io_context::run(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
 	}
 
-	std::size_t io_service::poll()
+	std::size_t io_context::poll()
 	{
 		assert(false);
 		return 0;
 	}
 
-	std::size_t io_service::poll(boost::system::error_code&)
+	std::size_t io_context::poll(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
 	}
 
-	std::size_t io_service::poll_one()
+	std::size_t io_context::poll_one()
 	{
 		assert(false);
 		return 0;
 	}
 
-	std::size_t io_service::poll_one(boost::system::error_code&)
+	std::size_t io_context::poll_one(boost::system::error_code&)
 	{
 		assert(false);
 		return 0;
@@ -124,23 +117,23 @@ namespace sim { namespace asio {
 
 	// private interface
 
-	void io_service::add_timer(high_resolution_timer* t)
+	void io_context::add_timer(high_resolution_timer* t)
 	{
 		m_sim.add_timer(t);
 	}
 
-	void io_service::remove_timer(high_resolution_timer* t)
+	void io_context::remove_timer(high_resolution_timer* t)
 	{
 		m_sim.remove_timer(t);
 	}
 
-	boost::asio::io_service& io_service::get_internal_service()
+	boost::asio::io_context& io_context::get_internal_service()
 	{ return m_sim.get_internal_service(); }
 
-	ip::tcp::endpoint io_service::bind_socket(ip::tcp::socket* socket
+	ip::tcp::endpoint io_context::bind_socket(ip::tcp::socket* socket
 		, ip::tcp::endpoint ep, boost::system::error_code& ec)
 	{
-		assert(!m_ips.empty() && "you cannot use an internal io_service (one without an IP address) for creating and binding sockets");
+		assert(!m_ips.empty() && "you cannot use an internal io_context (one without an IP address) for creating and binding sockets");
 		if (ep.address() == ip::address_v4::any())
 		{
 			auto it = std::find_if(m_ips.begin(), m_ips.end()
@@ -181,16 +174,16 @@ namespace sim { namespace asio {
 		return m_sim.bind_socket(socket, ep, ec);
 	}
 
-	void io_service::unbind_socket(ip::tcp::socket* socket
+	void io_context::unbind_socket(ip::tcp::socket* socket
 		, const ip::tcp::endpoint& ep)
 	{
 		m_sim.unbind_socket(socket, ep);
 	}
 
-	ip::udp::endpoint io_service::bind_udp_socket(ip::udp::socket* socket
+	ip::udp::endpoint io_context::bind_udp_socket(ip::udp::socket* socket
 		, ip::udp::endpoint ep, boost::system::error_code& ec)
 	{
-		assert(!m_ips.empty() && "you cannot use an internal io_service (one without an IP address) for creating and binding sockets");
+		assert(!m_ips.empty() && "you cannot use an internal io_context (one without an IP address) for creating and binding sockets");
 		if (ep.address() == ip::address_v4::any())
 		{
 			auto it = std::find_if(m_ips.begin(), m_ips.end()
@@ -231,19 +224,19 @@ namespace sim { namespace asio {
 		return m_sim.bind_udp_socket(socket, ep, ec);
 	}
 
-	void io_service::unbind_udp_socket(ip::udp::socket* socket
+	void io_context::unbind_udp_socket(ip::udp::socket* socket
 		, const ip::udp::endpoint& ep)
 	{
 		m_sim.unbind_udp_socket(socket, ep);
 	}
 
-	std::shared_ptr<aux::channel> io_service::internal_connect(ip::tcp::socket* s
+	std::shared_ptr<aux::channel> io_context::internal_connect(ip::tcp::socket* s
 		, ip::tcp::endpoint const& target, boost::system::error_code& ec)
 	{
 		return m_sim.internal_connect(s, target, ec);
 	}
 
-	route io_service::find_udp_socket(asio::ip::udp::socket const& socket
+	route io_context::find_udp_socket(asio::ip::udp::socket const& socket
 		, ip::udp::endpoint const& ep)
 	{
 		return m_sim.find_udp_socket(socket, ep);

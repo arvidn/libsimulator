@@ -31,7 +31,7 @@ namespace sim {
 namespace asio {
 namespace ip {
 
-	tcp::acceptor::acceptor(io_service& ios)
+	tcp::acceptor::acceptor(io_context& ios)
 		: socket(ios)
 		, m_queue_size_limit(-1)
 	{}
@@ -68,32 +68,31 @@ namespace ip {
 		ec.clear();
 	}
 
-	boost::system::error_code tcp::acceptor::close(boost::system::error_code& ec)
+	void tcp::acceptor::close(boost::system::error_code& ec)
 	{
 		m_queue_size_limit = -1;
 		cancel(ec);
-		return socket::close(ec);
-
+		socket::close(ec);
 	}
 
 	void tcp::acceptor::close()
 	{
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(std::move(m_accept_handler)
+			post(m_io_service, std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
 			m_accept_handler = nullptr;
 		}
 	}
 
-	boost::system::error_code tcp::acceptor::cancel(boost::system::error_code& ec)
+	void tcp::acceptor::cancel(boost::system::error_code& ec)
 	{
 		ec.clear();
 		if (m_accept_handler)
 		{
 			try
 			{
-				m_io_service.post(std::bind(std::move(m_accept_handler)
+				post(m_io_service, std::bind(std::move(m_accept_handler)
 					, boost::system::error_code(error::operation_aborted)));
 				m_accept_handler = nullptr;
 			}
@@ -106,8 +105,6 @@ namespace ip {
 				ec = error::no_memory;
 			}
 		}
-
-		return ec;
 	}
 
 	void tcp::acceptor::cancel()
@@ -120,7 +117,7 @@ namespace ip {
 	void tcp::acceptor::async_accept(ip::tcp::socket& peer
 		, aux::function<void(boost::system::error_code const&)> h)
 	{
-		// TODO: assert that the io_service we use is the same as the one peer use
+		// TODO: assert that the io_context we use is the same as the one peer use
 		if (peer.is_open())
 		{
 			boost::system::error_code ec;
@@ -129,7 +126,7 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(std::move(m_accept_handler)
+			post(m_io_service, std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
 			m_accept_handler = nullptr;
 		}
@@ -152,7 +149,7 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			m_io_service.post(std::bind(std::move(m_accept_handler)
+			post(m_io_service, std::bind(std::move(m_accept_handler)
 				, boost::system::error_code(error::operation_aborted)));
 			m_accept_handler = nullptr;
 		}
@@ -174,14 +171,14 @@ namespace ip {
 		switch (p.type)
 		{
 			case aux::packet::type_t::syn:
-				m_incoming_queue.push_back(p.channel);
+				m_incoming_conns.push_back(p.channel);
 				check_accept_queue();
 				return;
 			case aux::packet::type_t::error:
 				assert(false); // something is not wired up correctly
 				if (m_accept_handler)
 				{
-					m_io_service.post(std::bind(std::move(m_accept_handler)
+					post(m_io_service, std::bind(std::move(m_accept_handler)
 						, boost::system::error_code(error::operation_aborted)));
 					m_accept_handler = nullptr;
 					m_accept_into = nullptr;
@@ -205,7 +202,7 @@ namespace ip {
 		{
 			// if the acceptor socket is closed. Any potential socket in the queue
 			// should be closed too.
-			for (auto const& incoming : m_incoming_queue)
+			for (auto const& incoming : m_incoming_conns)
 			{
 				aux::packet p;
 				*p.from = asio::ip::udp::endpoint(
@@ -217,11 +214,11 @@ namespace ip {
 
 				forward_packet(std::move(p));
 			}
-			m_incoming_queue.clear();
+			m_incoming_conns.clear();
 
 			if (m_accept_handler)
 			{
-				m_io_service.post(std::bind(std::move(m_accept_handler)
+				post(m_io_service, std::bind(std::move(m_accept_handler)
 					, boost::system::error_code(error::operation_aborted)));
 				m_accept_handler = nullptr;
 				m_accept_into = nullptr;
@@ -233,10 +230,10 @@ namespace ip {
 		// in checking the queue
 		if (!m_accept_handler) return;
 
-		if (m_incoming_queue.empty()) return;
+		if (m_incoming_conns.empty()) return;
 
-		std::shared_ptr<aux::channel> c = std::move(m_incoming_queue.front());
-		m_incoming_queue.erase(m_incoming_queue.begin());
+		std::shared_ptr<aux::channel> c = std::move(m_incoming_conns.front());
+		m_incoming_conns.erase(m_incoming_conns.begin());
 
 		// this was initiated at least one 3-way handshake ago.
 		// we can pick it up and consider it connected
@@ -268,7 +265,7 @@ namespace ip {
 		forward_packet(std::move(p));
 
 		assert(m_accept_handler);
-		m_io_service.post(std::bind(std::move(m_accept_handler), ec));
+		post(m_io_service, std::bind(std::move(m_accept_handler), ec));
 		m_accept_handler = nullptr;
 		m_accept_into = nullptr;
 		m_remote_endpoint = nullptr;

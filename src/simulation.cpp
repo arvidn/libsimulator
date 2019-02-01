@@ -30,7 +30,7 @@ namespace sim
 {
 	simulation::simulation(configuration& config)
 		: m_config(config)
-		, m_internal_ios(new asio::io_service(*this))
+		, m_internal_ios(new asio::io_context(*this))
 	{
 		m_config.build(*this);
 	}
@@ -49,8 +49,8 @@ namespace sim
 		std::size_t last_executed = 0;
 		do {
 
-			m_service.reset();
-			last_executed = m_service.poll(ec);
+			m_service.restart();
+			last_executed = m_service.poll();
 			ret += last_executed;
 
 			chrono::high_resolution_clock::time_point now
@@ -59,12 +59,12 @@ namespace sim
 			std::lock_guard<std::mutex> l(m_timer_queue_mutex);
 			if (!m_timer_queue.empty()) {
 				asio::high_resolution_timer* next_timer = *m_timer_queue.begin();
-				chrono::high_resolution_clock::fast_forward(next_timer->expires_at() - now);
+				chrono::high_resolution_clock::fast_forward(next_timer->expiry() - now);
 
 				now = chrono::high_resolution_clock::now();
 
 				while (!m_timer_queue.empty()
-					&& (*m_timer_queue.begin())->expires_at() <= now) {
+					&& (*m_timer_queue.begin())->expiry() <= now) {
 
 					next_timer = *m_timer_queue.begin();
 					m_timer_queue.erase(m_timer_queue.begin());
@@ -85,11 +85,11 @@ namespace sim
 
 	void simulation::stop() { m_stopped = true; }
 	bool simulation::stopped() const { return m_stopped; }
-	void simulation::reset() { m_stopped = false; }
+	void simulation::restart() { m_stopped = false; }
 
 	void simulation::add_timer(asio::high_resolution_timer* t)
 	{
-		if (t->expires_at() == sim::chrono::high_resolution_clock::now())
+		if (t->expiry() == sim::chrono::high_resolution_clock::now())
 		{
 			std::fprintf(stderr, "WARNING: timer scheduled for current time!\n");
 		}
@@ -279,27 +279,27 @@ namespace sim
 		return network_route;
 	}
 
-	void simulation::add_io_service(asio::io_service* ios)
+	void simulation::add_io_service(asio::io_context* ios)
 	{
 		bool added = m_nodes.insert(ios).second;
 		(void)added;
 		assert(added);
 	}
 
-	void simulation::remove_io_service(asio::io_service* ios)
+	void simulation::remove_io_service(asio::io_context* ios)
 	{
 		auto it = m_nodes.find(ios);
 		assert(it != m_nodes.end());
 		m_nodes.erase(it);
 	}
 
-	std::vector<io_service*> simulation::get_all_io_services() const
+	std::vector<io_context*> simulation::get_all_io_services() const
 	{
-		std::vector<io_service*> ret;
+		std::vector<io_context*> ret;
 		ret.reserve(m_nodes.size());
 		std::remove_copy_if(
 			m_nodes.begin(), m_nodes.end(), std::back_inserter(ret)
-			, [](io_service* ios) { return ios->get_ips().empty(); });
+			, [](io_context* ios) { return ios->get_ips().empty(); });
 		return ret;
 	}
 

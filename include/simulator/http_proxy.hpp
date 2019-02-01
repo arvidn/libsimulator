@@ -35,7 +35,7 @@ namespace sim
 // concurrent connection
 struct SIMULATOR_DECL http_proxy
 {
-	http_proxy(asio::io_service& ios, unsigned short listen_port);
+	http_proxy(asio::io_context& ios, unsigned short listen_port);
 
 	void stop();
 
@@ -49,7 +49,7 @@ private:
 	void on_connected(boost::system::error_code const& ec);
 
 	void on_domain_lookup(boost::system::error_code const& ec
-		, const asio::ip::tcp::resolver::iterator& iter);
+		, const asio::ip::tcp::resolver::results_type ips);
 
 	void write_server_send_buffer();
 	void on_server_write(boost::system::error_code const& ec, size_t bytes_transferred);

@@ -46,7 +46,7 @@ namespace sim {
 	// this is a queue. It can be configured to contrain
 	struct SIMULATOR_DECL queue : sink
 	{
-		queue(asio::io_service& ios, int bandwidth
+		queue(asio::io_context& ios, int bandwidth
 			, chrono::high_resolution_clock::duration propagation_delay
 			, int max_queue_size, std::string name = "queue");
 

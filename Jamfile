@@ -67,6 +67,7 @@ lib simulator
 	: # requirements
 	<include>include
 	<library>boost_system
+	<library>boost_chrono
 	<target-os>windows:<library>ws2_32
 	<target-os>windows:<library>wsock32
 	<threading>multi
@@ -111,6 +112,7 @@ project
 	<define>BOOST_ALL_NO_LIB
 	: default-build
 	<link>static
+	<threading>multi
 	;
 
 test-suite simulator-tests : [ run

@@ -28,8 +28,14 @@ All rights reserved.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/asio/read.hpp>
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/asio/ip/network_v4.hpp>
+#include <boost/asio/buffers_iterator.hpp>
+
+#include <boost/asio/post.hpp>
+#include <boost/asio/defer.hpp>
+#include <boost/asio/dispatch.hpp>
 
 #include "simulator/pop_warnings.hpp"
 
@@ -101,14 +107,44 @@ namespace sim
 	{
 
 	using boost::asio::buffer_size;
-	using boost::asio::buffer_cast;
 	using boost::asio::const_buffer;
 	using boost::asio::mutable_buffer;
-	using boost::asio::const_buffers_1;
-	using boost::asio::mutable_buffers_1;
 	using boost::asio::buffer;
 
-	struct io_service;
+	using boost::asio::post;
+	using boost::asio::dispatch;
+	using boost::asio::defer;
+
+	struct io_context;
+
+	struct io_executor
+	{
+		io_executor(io_context& ctx) : m_ctx(&ctx) {}
+		io_context& context() const { return *m_ctx; }
+
+		template <typename Handler, typename Allocator>
+		void dispatch(Handler handler, Allocator const& a) const;
+
+		template <typename Handler, typename Allocator>
+		void post(Handler handler, Allocator const& a) const;
+
+		template <typename Handler, typename Allocator>
+		void defer(Handler handler, Allocator const& a) const;
+
+		void on_work_finished() const {}
+		void on_work_started() const {}
+
+		bool running_in_this_thread() const { return true; }
+
+		friend bool operator==(io_executor const& lhs, io_executor const& rhs)
+		{ return lhs.m_ctx == rhs.m_ctx; }
+
+		friend bool operator!=(io_executor const& lhs, io_executor const& rhs)
+		{ return lhs.m_ctx != rhs.m_ctx; }
+
+	private:
+		io_context* m_ctx;
+	};
 
 	struct SIMULATOR_DECL high_resolution_timer
 	{
@@ -117,35 +153,28 @@ namespace sim
 		using time_type = chrono::high_resolution_clock::time_point;
 		using duration_type = chrono::high_resolution_clock::duration;
 
-		explicit high_resolution_timer(io_service& io_service);
-		high_resolution_timer(io_service& io_service,
+		using executor_type = io_executor;
+		executor_type get_executor();
+
+		explicit high_resolution_timer(io_context& io_context);
+		high_resolution_timer(io_context& io_context,
 			const time_type& expiry_time);
-		high_resolution_timer(io_service& io_service,
+		high_resolution_timer(io_context& io_context,
 			const duration_type& expiry_time);
 		high_resolution_timer(high_resolution_timer&&) noexcept = default;
 		high_resolution_timer& operator=(high_resolution_timer&&) noexcept = default;
 
-		std::size_t cancel(boost::system::error_code& ec);
 		std::size_t cancel();
 		std::size_t cancel_one();
-		std::size_t cancel_one(boost::system::error_code& ec);
 
-		time_type expires_at() const;
+		time_type expiry() const;
 		std::size_t expires_at(const time_type& expiry_time);
-		std::size_t expires_at(const time_type& expiry_time
-			, boost::system::error_code& ec);
-
-		duration_type expires_from_now() const;
-		std::size_t expires_from_now(const duration_type& expiry_time);
-		std::size_t expires_from_now(const duration_type& expiry_time
-			, boost::system::error_code& ec);
+		std::size_t expires_after(const duration_type& expiry_time);
 
 		void wait();
 		void wait(boost::system::error_code& ec);
 
 		void async_wait(aux::function<void(boost::system::error_code const&)> handler);
-
-		io_service& get_io_service() const { return *m_io_service; }
 
 	private:
 
@@ -153,28 +182,30 @@ namespace sim
 
 		time_type m_expiration_time;
 		aux::function<void(boost::system::error_code const&)> m_handler;
-		io_service* m_io_service;
+		io_context* m_io_service;
 		bool m_expired;
 	};
 
 	using waitable_timer = high_resolution_timer;
 
 	namespace error = boost::asio::error;
-	using null_buffers = boost::asio::null_buffers;
 
 	template <typename Protocol>
 	struct socket_base
 	{
-		socket_base(io_service& ios)
+		socket_base(io_context& ios)
 			: m_io_service(ios)
 		{}
 
+		enum wait_type_t
+		{
+			wait_read, wait_write, wait_error
+		};
+
 		// io_control
 		using reuse_address = boost::asio::socket_base::reuse_address;
-#if BOOST_VERSION >= 106600
-		using executor_type = boost::asio::ip::tcp::socket::executor_type;
+		using executor_type = io_executor;
 		executor_type get_executor();
-#endif
 
 		// socket options
 		using send_buffer_size = boost::asio::socket_base::send_buffer_size;
@@ -290,8 +321,6 @@ namespace sim
 			return m_open;
 		}
 
-		io_service& get_io_service() const { return m_io_service; }
-
 		using message_flags = int;
 
 		// internal interface
@@ -301,7 +330,7 @@ namespace sim
 
 	protected:
 
-		io_service& m_io_service;
+		io_context& m_io_service;
 
 		typename Protocol::endpoint m_bound_to;
 
@@ -327,7 +356,7 @@ namespace sim
 		bool m_dont_fragment = false;
 
 		// the max size of the incoming queue. This is to emulate the send and
-		// receive buffers. This should also depend on the bandwidth, to not
+		// receive buffer. This should also depend on the bandwidth, to not
 		// make the queue size not grow too long in time.
 		int m_max_receive_queue_size = 64 * 1024;
 	};
@@ -337,6 +366,12 @@ namespace sim
 	using boost::asio::ip::address;
 	using boost::asio::ip::address_v4;
 	using boost::asio::ip::address_v6;
+
+	using boost::asio::ip::make_address_v4;
+	using boost::asio::ip::make_address_v6;
+	using boost::asio::ip::make_address;
+
+	using boost::asio::ip::make_network_v4;
 
 	template<typename Protocol>
 	struct basic_endpoint : boost::asio::ip::basic_endpoint<Protocol>
@@ -374,87 +409,18 @@ namespace sim
 	};
 
 	template<typename Protocol>
-	struct basic_resolver;
-
-	template<typename Protocol>
-	struct basic_resolver_iterator
-	{
-		friend struct basic_resolver<Protocol>;
-
-		basic_resolver_iterator(): m_idx(-1) {}
-		basic_resolver_iterator(basic_resolver_iterator&&) noexcept = default;
-		basic_resolver_iterator& operator=(basic_resolver_iterator&&) noexcept = default;
-		basic_resolver_iterator(basic_resolver_iterator const&) = default;
-		basic_resolver_iterator& operator=(basic_resolver_iterator const&) = default;
-
-		using value_type = basic_resolver_entry<Protocol>;
-		using reference = value_type const&;
-
-		bool operator!=(basic_resolver_iterator const& rhs) const
-		{
-			return !this->operator==(rhs);
-		}
-
-		bool operator==(basic_resolver_iterator const& rhs) const
-		{
-			// if the indices are identical, the iterators are too.
-			// if they are different though, the iterators may still be identical,
-			// if it's the end iterator
-			if (m_idx == rhs.m_idx) return true;
-
-			bool const lhs_end = (m_idx == -1) || (m_idx == int(m_results.size()));
-			bool const rhs_end = (rhs.m_idx == -1) || (rhs.m_idx == int(rhs.m_results.size()));
-
-			return lhs_end == rhs_end;
-		}
-
-		value_type operator*() const { assert(m_idx >= 0); return m_results[static_cast<std::size_t>(m_idx)]; }
-		value_type const* operator->() const { assert(m_idx >= 0); return &m_results[static_cast<std::size_t>(m_idx)]; }
-
-		basic_resolver_iterator& operator++() { ++m_idx; return *this; }
-		basic_resolver_iterator operator++(int)
-		{
-			basic_resolver_iterator tmp(*this);
-			++m_idx;
-			return tmp;
-		}
-
-	private:
-
-		aux::noexcept_movable<std::vector<value_type>> m_results;
-		int m_idx;
-	};
-
-	template <typename Protocol>
-	struct basic_resolver_query
-	{
-		basic_resolver_query(std::string const& hostname, char const* service)
-			: m_hostname(hostname)
-			, m_service(service)
-		{}
-
-		std::string const& host_name() const { return m_hostname; }
-		std::string const& service_name() const { return m_service; }
-
-	private:
-		std::string m_hostname;
-		std::string m_service;
-	};
-
-	template<typename Protocol>
 	struct SIMULATOR_DECL basic_resolver
 	{
-		basic_resolver(io_service& ios);
+		basic_resolver(io_context& ios);
 
 		using protocol_type = Protocol;
-		using iterator = basic_resolver_iterator<Protocol>;
-		using query = basic_resolver_query<Protocol>;
+		using results_type = std::vector<basic_resolver_entry<Protocol>>;
 
 		void cancel();
 
-		void async_resolve(basic_resolver_query<Protocol> q,
-			aux::function<void(boost::system::error_code const&,
-				basic_resolver_iterator<Protocol>)> handler);
+		void async_resolve(std::string hostname, char const* service
+			, aux::function<void(boost::system::error_code const&,
+				results_type)> handler);
 
 		basic_resolver(basic_resolver&&) noexcept = default;
 		basic_resolver& operator=(basic_resolver&&) noexcept = default;
@@ -471,19 +437,19 @@ namespace sim
 		{
 			chrono::high_resolution_clock::time_point completion_time;
 			boost::system::error_code err;
-			basic_resolver_iterator<Protocol> iter;
+			results_type ips;
 			aux::function<void(boost::system::error_code const&,
-				basic_resolver_iterator<Protocol>)> handler;
+				results_type)> handler;
 
 			result_t(
 				chrono::high_resolution_clock::time_point ct
 				, boost::system::error_code e
-				, basic_resolver_iterator<Protocol> i
-				, aux::function<void(boost::system::error_code const&,
-					basic_resolver_iterator<Protocol>)> h)
+				, results_type ips_
+				, aux::function<void(boost::system::error_code const&
+					, results_type)> h)
 				: completion_time(ct)
 				, err(e)
-				, iter(std::move(i))
+				, ips(std::move(ips_))
 				, handler(std::move(h))
 			{}
 
@@ -493,7 +459,7 @@ namespace sim
 			result_t& operator=(result_t const&) = delete;
 		};
 
-		io_service* m_ios;
+		io_context* m_ios;
 		asio::high_resolution_timer m_timer;
 		using queue_t = aux::noexcept_movable<std::vector<result_t>>;
 
@@ -513,8 +479,8 @@ namespace sim
 			using protocol_type = ip::udp;
 			using lowest_layer_type = socket;
 
-			socket(io_service& ios);
-			virtual ~socket();
+			socket(io_context& ios);
+			~socket() override;
 
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
@@ -522,17 +488,17 @@ namespace sim
 
 			lowest_layer_type& lowest_layer() { return *this; }
 
-			boost::system::error_code bind(ip::udp::endpoint const& ep
+			void bind(ip::udp::endpoint const& ep
 				, boost::system::error_code& ec);
 			void bind(ip::udp::endpoint const& ep);
 
-			boost::system::error_code close();
-			boost::system::error_code close(boost::system::error_code& ec);
+			void close();
+			void close(boost::system::error_code& ec);
 
-			boost::system::error_code cancel(boost::system::error_code& ec);
+			void cancel(boost::system::error_code& ec);
 			void cancel();
 
-			boost::system::error_code open(udp protocol, boost::system::error_code& ec);
+			void open(udp protocol, boost::system::error_code& ec);
 			void open(udp protocol);
 
 			template<typename ConstBufferSequence>
@@ -541,8 +507,9 @@ namespace sim
 				, socket_base::message_flags flags
 				, boost::system::error_code& ec)
 			{
-				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
-				if (m_send_handler) abort_send_handler();
+				std::vector<asio::const_buffer> b(buffer_sequence_begin(bufs)
+					, buffer_sequence_end(bufs));
+				abort_send_handlers();
 				return send_to_impl(b, destination, flags, ec);
 			}
 
@@ -550,57 +517,26 @@ namespace sim
 			std::size_t send_to(ConstBufferSequence const& bufs
 				, udp::endpoint const& destination)
 			{
-				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
-				if (m_send_handler) abort_send_handler();
+				std::vector<asio::const_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_send_handlers();
 				boost::system::error_code ec;
 				std::size_t ret = send_to_impl(b, destination, 0, ec);
 				if (ec) throw boost::system::system_error(ec);
 				return ret;
 			}
 
-			void async_send(asio::null_buffers const& bufs
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler);
-
-			void async_receive(asio::null_buffers const&
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler)
-			{
-				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(nullptr, std::move(handler));
-			}
+			void async_wait(socket_base::wait_type_t w
+				, aux::function<void(boost::system::error_code const&)> handler);
 
 			template <class BufferSequence>
 			void async_receive(BufferSequence const& bufs
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
-				if (m_recv_handler) abort_recv_handler();
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_recv_handlers();
 
 				async_receive_from_impl(b, nullptr, 0, std::move(handler));
-			}
-
-
-			void async_receive_from(asio::null_buffers const&
-				, udp::endpoint& sender
-				, socket_base::message_flags /* flags */
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler)
-			{
-				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(&sender, std::move(handler));
-			}
-
-			void async_receive_from(asio::null_buffers const&
-				, udp::endpoint& sender
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler)
-			{
-				// TODO: does it make sense to receive null_buffers and still have a
-				// sender argument?
-				if (m_recv_handler) abort_recv_handler();
-				async_receive_null_buffers_impl(&sender, std::move(handler));
 			}
 
 			template <class BufferSequence>
@@ -609,8 +545,8 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
-				if (m_recv_handler) abort_recv_handler();
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_recv_handlers();
 
 				async_receive_from_impl(b, &sender, 0, std::move(handler));
 			}
@@ -622,8 +558,8 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
-				if (m_recv_handler) abort_recv_handler();
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_recv_handlers();
 
 				async_receive_from_impl(b, &sender, flags, std::move(handler));
 			}
@@ -632,7 +568,7 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				if (m_recv_handler) abort_recv_handler();
+				abort_recv_handlers();
 				async_read_some_null_buffers_impl(std::move(handler));
 			}
 */
@@ -641,9 +577,9 @@ namespace sim
 			std::size_t receive_from(BufferSequence const& bufs
 				, udp::endpoint& sender)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
 				assert(!b.empty());
-				if (m_recv_handler) abort_recv_handler();
+				abort_recv_handlers();
 				boost::system::error_code ec;
 				std::size_t ret = receive_from_impl(b, &sender, 0, ec);
 				if (ec) throw boost::system::system_error(ec);
@@ -655,9 +591,9 @@ namespace sim
 				, udp::endpoint& sender
 				, socket_base::message_flags)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
 				assert(!b.empty());
-				if (m_recv_handler) abort_recv_handler();
+				abort_recv_handlers();
 				boost::system::error_code ec;
 				std::size_t ret = receive_from_impl(b, &sender, 0, ec);
 				if (ec) throw boost::system::system_error(ec);
@@ -670,9 +606,9 @@ namespace sim
 				, socket_base::message_flags
 				, boost::system::error_code& ec)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
 				assert(!b.empty());
-				if (m_recv_handler) abort_recv_handler();
+				abort_recv_handlers();
 				return receive_from_impl(b, &sender, 0, ec);
 			}
 
@@ -697,16 +633,15 @@ namespace sim
 				, socket_base::message_flags flags
 				, boost::system::error_code& ec);
 
-			void async_receive_null_buffers_impl(
+			void async_wait_receive_impl(
 				udp::endpoint* sender
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler);
+				, aux::function<void(boost::system::error_code const&)> handler);
 
 		private:
 
 			void maybe_wakeup_reader();
-			void abort_send_handler();
-			void abort_recv_handler();
+			void abort_send_handlers();
+			void abort_recv_handlers();
 
 			std::size_t send_to_impl(std::vector<asio::const_buffer> const& b
 				, udp::endpoint const& dst, message_flags flags
@@ -722,11 +657,15 @@ namespace sim
 			// handler that should be called once we're done sending
 			aux::function<void(boost::system::error_code const&, std::size_t)>
 				m_send_handler;
+			aux::function<void(boost::system::error_code const&)>
+				m_wait_send_handler;
 
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
 			aux::function<void(boost::system::error_code const&, std::size_t)>
 				m_recv_handler;
+			aux::function<void(boost::system::error_code const&)>
+				m_wait_recv_handler;
 
 			// if we have an outstanding read operation, this is the buffer to
 			// receive into
@@ -751,10 +690,7 @@ namespace sim
 			bool m_is_v4;
 		};
 
-		struct SIMULATOR_DECL resolver : basic_resolver<udp>
-		{
-			resolver(io_service& ios) : basic_resolver(ios) {}
-		};
+		using resolver = basic_resolver<udp>;
 
 		int family() const { return m_family; }
 
@@ -792,7 +728,7 @@ namespace sim
 			using protocol_type = ip::tcp;
 			using lowest_layer_type = socket;
 
-			explicit socket(io_service& ios);
+			explicit socket(io_context& ios);
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
 // TODO: sockets are not movable right now unfortunately, because channels keep
@@ -801,13 +737,13 @@ namespace sim
 			socket(socket&&) = default;
 			socket& operator=(socket&&) = default;
 */
-			virtual ~socket();
+			~socket() override;
 
-			boost::system::error_code close();
-			boost::system::error_code close(boost::system::error_code& ec);
-			boost::system::error_code open(tcp protocol, boost::system::error_code& ec);
+			void close();
+			void close(boost::system::error_code& ec);
+			void open(tcp protocol, boost::system::error_code& ec);
 			void open(tcp protocol);
-			boost::system::error_code bind(ip::tcp::endpoint const& ep
+			void bind(ip::tcp::endpoint const& ep
 				, boost::system::error_code& ec);
 			void bind(ip::tcp::endpoint const& ep);
 			tcp::endpoint remote_endpoint(boost::system::error_code& ec) const;
@@ -823,26 +759,24 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
-				if (m_send_handler) abort_send_handler();
+				std::vector<asio::const_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_send_handlers();
 				async_write_some_impl(b, std::move(handler));
 			}
 
-			void LIBSIMULATOR_NO_RETURN async_write_some(null_buffers const&
-				, aux::function<void(boost::system::error_code const&
-				, std::size_t)> /* handler */)
+			void async_wait(socket_base::wait_type_t const w
+				, aux::function<void(boost::system::error_code const&)> handler)
 			{
-				if (m_send_handler) abort_send_handler();
-				assert(false && "not supported yet");
-//				async_write_some_null_buffers_impl(b, std::move(handler));
-			}
-
-			void async_read_some(null_buffers const&
-				, aux::function<void(boost::system::error_code const&
-					, std::size_t)> handler)
-			{
-				if (m_recv_handler) abort_recv_handler();
-				async_read_some_null_buffers_impl(std::move(handler));
+				if (w == socket_base::wait_type_t::wait_write)
+				{
+					abort_send_handlers();
+					assert(false && "not supported yet");
+				}
+				else if (w == socket_base::wait_type_t::wait_read)
+				{
+					abort_recv_handlers();
+					async_wait_read_impl(std::move(handler));
+				}
 			}
 
 			template <class BufferSequence>
@@ -850,7 +784,7 @@ namespace sim
 				, boost::system::error_code& ec)
 			{
 				assert(m_non_blocking && "blocking operations not supported");
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
 				return read_some_impl(b, ec);
 			}
 
@@ -859,7 +793,7 @@ namespace sim
 				, boost::system::error_code& ec)
 			{
 				assert(m_non_blocking && "blocking operations not supported");
-				std::vector<asio::const_buffer> b(bufs.begin(), bufs.end());
+				std::vector<asio::const_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
 				return write_some_impl(b, ec);
 			}
 
@@ -868,8 +802,8 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&
 					, std::size_t)> handler)
 			{
-				std::vector<asio::mutable_buffer> b(bufs.begin(), bufs.end());
-				if (m_recv_handler) abort_recv_handler();
+				std::vector<asio::mutable_buffer> b(buffer_sequence_begin(bufs), buffer_sequence_end(bufs));
+				abort_recv_handlers();
 
 				async_read_some_impl(b, std::move(handler));
 			}
@@ -877,7 +811,7 @@ namespace sim
 			std::size_t available(boost::system::error_code & ec) const;
 			std::size_t available() const;
 
-			boost::system::error_code cancel(boost::system::error_code& ec);
+			void cancel(boost::system::error_code& ec);
 			void cancel();
 
 			using socket_base::set_option;
@@ -895,8 +829,8 @@ namespace sim
 				, std::shared_ptr<aux::channel> const& c
 				, boost::system::error_code& ec);
 
-			void abort_send_handler();
-			void abort_recv_handler();
+			void abort_send_handlers();
+			void abort_recv_handlers();
 
 			virtual bool internal_is_listening();
 		protected:
@@ -908,8 +842,8 @@ namespace sim
 				, aux::function<void(boost::system::error_code const&, std::size_t)> handler);
 			void async_read_some_impl(std::vector<asio::mutable_buffer> const& bufs
 				, aux::function<void(boost::system::error_code const&, std::size_t)> handler);
-			void async_read_some_null_buffers_impl(
-				aux::function<void(boost::system::error_code const&, std::size_t)> handler);
+			void async_wait_read_impl(
+				aux::function<void(boost::system::error_code const&)> handler);
 			std::size_t write_some_impl(std::vector<asio::const_buffer> const& bufs
 				, boost::system::error_code& ec);
 			std::size_t read_some_impl(std::vector<asio::mutable_buffer> const& bufs
@@ -931,6 +865,7 @@ namespace sim
 			// while we're blocked in an async_write_some operation, this is the
 			// handler that should be called once we're done sending
 			aux::function<void(boost::system::error_code const&, std::size_t)> m_send_handler;
+			aux::function<void(boost::system::error_code const&)> m_wait_send_handler;
 
 			std::vector<asio::const_buffer> m_send_buffer;
 
@@ -943,8 +878,9 @@ namespace sim
 			// if we have an outstanding read on this socket, this is set to the
 			// handler.
 			aux::function<void(boost::system::error_code const&, std::size_t)> m_recv_handler;
+			aux::function<void(boost::system::error_code const&)> m_wait_recv_handler;
 
-			// if we have an outstanding buffers to receive into, these are them
+			// if we have an outstanding buffer to receive into, these are them
 			std::vector<asio::mutable_buffer> m_recv_buffer;
 
 			asio::high_resolution_timer m_recv_timer;
@@ -989,10 +925,10 @@ namespace sim
 
 		struct SIMULATOR_DECL acceptor : socket
 		{
-			acceptor(io_service& ios);
-			virtual ~acceptor();
+			explicit acceptor(io_context& ios);
+			~acceptor() override;
 
-			boost::system::error_code cancel(boost::system::error_code& ec);
+			void cancel(boost::system::error_code& ec);
 			void cancel();
 
 			void listen(int qs = -1);
@@ -1004,7 +940,7 @@ namespace sim
 				, ip::tcp::endpoint& peer_endpoint
 				, aux::function<void(boost::system::error_code const&)> h);
 
-			boost::system::error_code close(boost::system::error_code& ec);
+			void close(boost::system::error_code& ec);
 			void close();
 
 			// private interface
@@ -1030,7 +966,7 @@ namespace sim
 			// completely connected. When accepting a connection, this queue is
 			// checked first before waiting for a connection attempt.
 			using incoming_conns_t = std::vector<std::shared_ptr<aux::channel> >;
-			incoming_conns_t m_incoming_queue;
+			incoming_conns_t m_incoming_conns;
 
 			// the socket to accept a connection into
 			tcp::socket* m_accept_into;
@@ -1043,10 +979,7 @@ namespace sim
 			acceptor& operator=(acceptor const&);
 		};
 
-		struct SIMULATOR_DECL resolver : basic_resolver<tcp>
-		{
-			resolver(io_service& ios) : basic_resolver(ios) {}
-		};
+		using resolver = basic_resolver<tcp>;
 
 		friend bool operator==(tcp const& lhs, tcp const& rhs)
 		{ return lhs.m_family == rhs.m_family; }
@@ -1086,16 +1019,17 @@ namespace sim
 
 		void stop();
 		bool stopped() const;
-		void reset();
+		void restart();
 		// private interface
 
 		void add_timer(asio::high_resolution_timer* t);
 		void remove_timer(asio::high_resolution_timer* t);
 
-		boost::asio::io_service& get_internal_service()
+		boost::asio::io_context& get_internal_service()
 		{ return m_service; }
 
-		asio::io_service& get_io_service() { return *m_internal_ios; }
+		asio::io_context& get_io_context()
+		{ return *m_internal_ios; }
 
 		asio::ip::tcp::endpoint bind_socket(asio::ip::tcp::socket* socket
 			, asio::ip::tcp::endpoint ep
@@ -1118,9 +1052,9 @@ namespace sim
 
 		configuration& config() const { return m_config; }
 
-		void add_io_service(asio::io_service* ios);
-		void remove_io_service(asio::io_service* ios);
-		std::vector<asio::io_service*> get_all_io_services() const;
+		void add_io_service(asio::io_context* ios);
+		void remove_io_service(asio::io_context* ios);
+		std::vector<asio::io_context*> get_all_io_services() const;
 
 		aux::pcap* get_pcap() const { return m_pcap.get(); }
 		void log_pcap(char const* filename);
@@ -1130,7 +1064,7 @@ namespace sim
 		{
 			bool operator()(asio::high_resolution_timer const* lhs
 				, asio::high_resolution_timer const* rhs) const
-			{ return lhs->expires_at() < rhs->expires_at(); }
+			{ return lhs->expiry() < rhs->expiry(); }
 		};
 
 		configuration& m_config;
@@ -1143,7 +1077,7 @@ namespace sim
 		timer_queue_t m_timer_queue;
 
 		// these are the io services that represent nodes on the network
-		std::unordered_set<asio::io_service*> m_nodes;
+		std::unordered_set<asio::io_context*> m_nodes;
 
 		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
 		using listen_socket_iter_t = listen_sockets_t::iterator;
@@ -1153,9 +1087,9 @@ namespace sim
 		using udp_socket_iter_t = udp_sockets_t::iterator;
 		udp_sockets_t m_udp_sockets;
 
-		// used for internal timers. this is a pimpl sine our io_service is
+		// used for internal timers. this is a pimpl sine our io_context is
 		// incomplete at this point
-		std::unique_ptr<asio::io_service> m_internal_ios;
+		std::unique_ptr<asio::io_context> m_internal_ios;
 
 		// the next port to use for an outgoing connection, where the port is not
 		// specified. We want this to be as unique as possible, to distinguish the
@@ -1165,7 +1099,7 @@ namespace sim
 		bool m_stopped = false;
 
 		// underlying message queue
-		boost::asio::io_service m_service;
+		boost::asio::io_context m_service;
 	};
 
 	namespace asio {
@@ -1173,34 +1107,22 @@ namespace sim
 	using boost::asio::async_write;
 	using boost::asio::async_read;
 
-	// boost.asio compatible io_service class that simulates the network
+	// boost.asio compatible io_context class that simulates the network
 	// and time.
-	struct SIMULATOR_DECL io_service
+	struct SIMULATOR_DECL io_context : boost::asio::execution_context
 	{
-		struct work : boost::asio::io_service::work
-		{
-			work(io_service& ios) :
-				boost::asio::io_service::work(ios.get_internal_service()) {}
-		};
-
-		io_service(sim::simulation& sim);
-		io_service(sim::simulation& sim, ip::address const& ip);
-		io_service(sim::simulation& sim, std::vector<ip::address> const& ips);
-		io_service();
-		~io_service();
-
-#if BOOST_VERSION >= 106600
-		using executor_type = boost::asio::io_service::executor_type;
-		executor_type get_executor();
-#endif
-
+		io_context(sim::simulation& sim);
+		io_context(sim::simulation& sim, ip::address const& ip);
+		io_context(sim::simulation& sim, std::vector<ip::address> const& ips);
+		io_context();
+		~io_context();
 
 		// not copyable and non movable (it's not movable because we currently
-		// keep pointers to the io_service instances in the simulator object)
-		io_service(io_service const&) = delete;
-		io_service(io_service&&) = delete;
-		io_service& operator=(io_service const&) = delete;
-		io_service& operator=(io_service&&) = delete;
+		// keep pointers to the io_context instances in the simulator object)
+		io_context(io_context const&) = delete;
+		io_context(io_context&&) = delete;
+		io_context& operator=(io_context const&) = delete;
+		io_context& operator=(io_context&&) = delete;
 
 		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
@@ -1213,18 +1135,22 @@ namespace sim
 
 		void stop();
 		bool stopped() const;
-		void reset();
+		void restart();
 
-		template <typename Handler>
-		void dispatch(Handler handler)
-		{ get_internal_service().dispatch(std::move(handler)); }
+		template <typename Handler, typename Allocator>
+		void dispatch_impl(Handler handler, Allocator const& a)
+		{ get_internal_service().get_executor().dispatch(std::move(handler), a); }
 
-		template <typename Handler>
-		void post(Handler handler)
-		{ get_internal_service().post(std::move(handler)); }
+		template <typename Handler, typename Allocator>
+		void post_impl(Handler handler, Allocator const& a)
+		{ get_internal_service().get_executor().post(std::move(handler), a); }
+
+		template <typename Handler, typename Allocator>
+		void defer_impl(Handler handler, Allocator const& a)
+		{ get_internal_service().get_executor().defer(std::move(handler), a); }
 
 		// internal interface
-		boost::asio::io_service& get_internal_service();
+		boost::asio::io_context& get_internal_service();
 
 		void add_timer(high_resolution_timer* t);
 		void remove_timer(high_resolution_timer* t);
@@ -1256,6 +1182,9 @@ namespace sim
 
 		sim::simulation& sim() { return m_sim; }
 
+		using executor_type = io_executor;
+		executor_type get_executor() { return executor_type(*this); }
+
 	private:
 
 		sim::simulation& m_sim;
@@ -1269,14 +1198,23 @@ namespace sim
 		bool m_stopped = false;
 	};
 
-#if BOOST_VERSION >= 106600
+	template <typename Handler, typename Allocator>
+	void io_executor::dispatch(Handler handler, Allocator const& a) const
+	{ m_ctx->dispatch_impl(std::move(handler), a); }
+
+	template <typename Handler, typename Allocator>
+	void io_executor::post(Handler handler, Allocator const& a) const
+	{ m_ctx->post_impl(std::move(handler), a); }
+
+	template <typename Handler, typename Allocator>
+	void io_executor::defer(Handler handler, Allocator const& a) const
+	{ m_ctx->defer_impl(std::move(handler), a); }
+
+
 	template <typename Protocol>
-	typename socket_base<Protocol>::executor_type
+	io_executor
 	socket_base<Protocol>::get_executor()
-	{
-		return m_io_service.get_executor();
-	}
-#endif
+	{ return io_executor(m_io_service); }
 
 	template <typename Protocol>
 	route socket_base<Protocol>::get_incoming_route()

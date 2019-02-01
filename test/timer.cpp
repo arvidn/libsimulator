@@ -63,7 +63,7 @@ void print_time(high_resolution_timer& timer
 	++counter;
 	if (counter < 5)
 	{
-		timer.expires_from_now(seconds(counter));
+		timer.expires_after(seconds(counter));
 		timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 	}
 }
@@ -72,16 +72,16 @@ TEST_CASE("wait for timers", "[timer]")
 {
 	default_config cfg;
 	simulation sim(cfg);
-	io_service ios(sim, ip::address_v4::from_string("1.2.3.4"));
+	io_context ios(sim, ip::make_address_v4("1.2.3.4"));
 	high_resolution_timer timer(ios);
 
 	start = high_resolution_clock::now();
 
-	timer.expires_from_now(seconds(10));
+	timer.expires_after(seconds(10));
 	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 	timer.cancel();
-	timer.expires_from_now(seconds(1));
+	timer.expires_after(seconds(1));
 	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
 	boost::system::error_code ec;

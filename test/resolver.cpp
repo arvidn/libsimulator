@@ -29,6 +29,7 @@ All rights reserved.
 using namespace std::placeholders;
 using namespace sim;
 
+using asio::ip::make_address_v4;
 using asio::ip::address_v4;
 using duration = chrono::high_resolution_clock::duration;
 using chrono::duration_cast;
@@ -37,7 +38,7 @@ using chrono::milliseconds;
 int num_lookups = 0;
 
 void on_name_lookup(boost::system::error_code const& ec
-	, asio::ip::tcp::resolver::iterator iter)
+	, asio::ip::tcp::resolver::results_type ips)
 {
 	++num_lookups;
 
@@ -45,19 +46,18 @@ void on_name_lookup(boost::system::error_code const& ec
 		.time_since_epoch()).count());
 
 	std::vector<address_v4> expect = {
-		address_v4::from_string("1.2.3.4")
-			, address_v4::from_string("1.2.3.5")
-			, address_v4::from_string("1.2.3.6")
-			, address_v4::from_string("1.2.3.7") };
+		make_address_v4("1.2.3.4")
+		, make_address_v4("1.2.3.5")
+		, make_address_v4("1.2.3.6")
+		, make_address_v4("1.2.3.7") };
 
 	auto expect_it = expect.begin();
 
-	while (iter != asio::ip::tcp::resolver::iterator())
+	for (auto const ip : ips)
 	{
-		assert(iter->endpoint().address() == *expect_it);
-		assert(iter->endpoint().port() == 8080);
+		assert(ip.endpoint().address() == *expect_it);
+		assert(ip.endpoint().port() == 8080);
 
-		++iter;
 		++expect_it;
 	}
 
@@ -65,7 +65,7 @@ void on_name_lookup(boost::system::error_code const& ec
 }
 
 void on_failed_name_lookup(boost::system::error_code const& ec
-	, asio::ip::tcp::resolver::iterator iter)
+	, asio::ip::tcp::resolver::results_type ips)
 {
 	++num_lookups;
 
@@ -86,10 +86,10 @@ struct sim_config : sim::default_config
 		if (hostname == "test.com")
 		{
 			result = {
-				address_v4::from_string("1.2.3.4")
-				, address_v4::from_string("1.2.3.5")
-				, address_v4::from_string("1.2.3.6")
-				, address_v4::from_string("1.2.3.7")
+				make_address_v4("1.2.3.4")
+				, make_address_v4("1.2.3.5")
+				, make_address_v4("1.2.3.6")
+				, make_address_v4("1.2.3.7")
 			};
 			return duration_cast<duration>(chrono::milliseconds(50));
 		}
@@ -105,11 +105,11 @@ TEST_CASE("resolve multiple IPv4 addresses", "[resolver]") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+	asio::io_context ios(sim, make_address_v4("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
-	asio::ip::tcp::resolver::query q("test.com", "8080");
-	resolver.async_resolve(q, std::bind(&on_name_lookup, _1, _2));
+	resolver.async_resolve("test.com", "8080"
+		, std::bind(&on_name_lookup, _1, _2));
 
 	boost::system::error_code ec;
 	sim.run(ec);
@@ -130,11 +130,11 @@ TEST_CASE("resolve non-existent hostname", "[resolver]") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+	asio::io_context ios(sim, make_address_v4("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
-	asio::ip::tcp::resolver::query q("non-existent.com", "8080");
-	resolver.async_resolve(q, std::bind(&on_failed_name_lookup, _1, _2));
+	resolver.async_resolve("non-existent.com", "8080"
+		, std::bind(&on_failed_name_lookup, _1, _2));
 
 	boost::system::error_code ec;
 	sim.run(ec);
@@ -155,13 +155,11 @@ TEST_CASE("lookups resolve serially, compounding the latency", "[resolver]") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+	asio::io_context ios(sim, make_address_v4("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
-	asio::ip::tcp::resolver::query q1("non-existent.com", "8080");
-	asio::ip::tcp::resolver::query q2("non-existent.com", "8080");
-	resolver.async_resolve(q1, std::bind(&on_failed_name_lookup, _1, _2));
-	resolver.async_resolve(q2, std::bind(&on_failed_name_lookup, _1, _2));
+	resolver.async_resolve("non-existent.com", "8080", std::bind(&on_failed_name_lookup, _1, _2));
+	resolver.async_resolve("non-existent.com", "8080", std::bind(&on_failed_name_lookup, _1, _2));
 
 	boost::system::error_code ec;
 	sim.run(ec);
@@ -182,22 +180,20 @@ TEST_CASE("resolve an IP address", "[resolver]") {
 	chrono::high_resolution_clock::time_point start = chrono::high_resolution_clock::now();
 	num_lookups = 0;
 
-	asio::io_service ios(sim, address_v4::from_string("40.30.20.10"));
+	asio::io_context ios(sim, make_address_v4("40.30.20.10"));
 
 	asio::ip::tcp::resolver resolver(ios);
-	asio::ip::tcp::resolver::query q("10.10.10.10", "8080");
-	resolver.async_resolve(q, [](boost::system::error_code const& ec, asio::ip::tcp::resolver::iterator iter)
+	resolver.async_resolve("10.10.10.10", "8080"
+		, [](boost::system::error_code const& ec, asio::ip::tcp::resolver::results_type ips)
 	{
 		++num_lookups;
-		std::vector<address_v4> expect = { address_v4::from_string("10.10.10.10") };
+		std::vector<address_v4> expect = { make_address_v4("10.10.10.10") };
 
 		auto expect_it = expect.begin();
-		while (iter != asio::ip::tcp::resolver::iterator())
+		for (auto const ip : ips)
 		{
-			assert(iter->endpoint().address() == *expect_it);
-			assert(iter->endpoint().port() == 8080);
-
-			++iter;
+			assert(ip.endpoint().address() == *expect_it);
+			assert(ip.endpoint().port() == 8080);
 			++expect_it;
 		}
 
