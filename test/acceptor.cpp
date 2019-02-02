@@ -172,12 +172,10 @@ TEST_CASE("accept incoming connection on acceptor socket", "[acceptor]")
 	outgoing.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
-	sim.run(ec);
+	sim.run();
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 
 	CHECK(num_received == num_sent);
 	CHECK(num_received > 0);

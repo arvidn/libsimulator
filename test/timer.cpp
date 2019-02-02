@@ -84,13 +84,7 @@ TEST_CASE("wait for timers", "[timer]")
 	timer.expires_after(seconds(1));
 	timer.async_wait(std::bind(&print_time, std::ref(timer), _1));
 
-	boost::system::error_code ec;
-	sim.run(ec);
-
-	std::printf("sim::run() returned: %s at: %d\n"
-		, ec.message().c_str()
-		, int(duration_cast<milliseconds>(high_resolution_clock::now()
-				.time_since_epoch()).count()));
+	sim.run();
 
 	CHECK(counter == 5);
 }
