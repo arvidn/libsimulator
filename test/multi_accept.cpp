@@ -118,15 +118,12 @@ TEST_CASE("accept a connection multiple times on the same socket", "[accept]")
 	outgoing.async_connect(ip::tcp::endpoint(ip::make_address("40.30.20.10")
 		, 1337), std::bind(&on_connected, _1, std::ref(outgoing)));
 
-	sim.run(ec);
+	sim.run();
 
 	CHECK(num_incoming == 6);
 	CHECK(num_connected == 6);
 
 	millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 

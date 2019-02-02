@@ -117,16 +117,13 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 		, udp::endpoint(make_address_v6("ff::dead:beef:1337"), 1337), 0, ec);
 	REQUIRE(!ec);
 
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
 	CHECK(num_ipv4 == 1);
 	CHECK(num_ipv6 == 1);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 
 TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
@@ -193,8 +190,7 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 	outgoing_v4.async_connect(endpoint_v4, [] (boost::system::error_code ec) {
 		REQUIRE(!ec);
 	});
-	sim.run(ec);
-	REQUIRE(!ec);
+	sim.run();
 
 	CHECK(num_incoming_v4 == 1);
 	CHECK(num_incoming_v6 == 0);
@@ -207,8 +203,7 @@ TEST_CASE("one node can have multiple addresses (TCP)", "[multi-homed]")
 		REQUIRE(!ec);
 	});
 
-	sim.run(ec);
-	REQUIRE(!ec);
+	sim.run();
 
 	CHECK(num_incoming_v4 == 1);
 	CHECK(num_incoming_v6 == 1);

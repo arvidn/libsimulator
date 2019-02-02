@@ -102,15 +102,12 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 		REQUIRE(!ec);
 	}
 
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
 	CHECK(num_sent == num_received);
 	CHECK(num_sent == 100 * 45);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 

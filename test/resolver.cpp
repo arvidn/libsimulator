@@ -111,16 +111,12 @@ TEST_CASE("resolve multiple IPv4 addresses", "[resolver]") {
 	resolver.async_resolve("test.com", "8080"
 		, std::bind(&on_name_lookup, _1, _2));
 
-	boost::system::error_code ec;
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
 
 	CHECK(millis == 50);
 	CHECK(num_lookups == 1);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 
 TEST_CASE("resolve non-existent hostname", "[resolver]") {
@@ -136,16 +132,12 @@ TEST_CASE("resolve non-existent hostname", "[resolver]") {
 	resolver.async_resolve("non-existent.com", "8080"
 		, std::bind(&on_failed_name_lookup, _1, _2));
 
-	boost::system::error_code ec;
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
 
 	CHECK(millis == 100);
 	CHECK(num_lookups == 1);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 
 TEST_CASE("lookups resolve serially, compounding the latency", "[resolver]") {
@@ -161,16 +153,12 @@ TEST_CASE("lookups resolve serially, compounding the latency", "[resolver]") {
 	resolver.async_resolve("non-existent.com", "8080", std::bind(&on_failed_name_lookup, _1, _2));
 	resolver.async_resolve("non-existent.com", "8080", std::bind(&on_failed_name_lookup, _1, _2));
 
-	boost::system::error_code ec;
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
 
 	CHECK(millis == 200);
 	CHECK(num_lookups == 2);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 
 TEST_CASE("resolve an IP address", "[resolver]") {
@@ -200,15 +188,11 @@ TEST_CASE("resolve an IP address", "[resolver]") {
 		assert(expect_it == expect.end());
 	});
 
-	boost::system::error_code ec;
-	sim.run(ec);
+	sim.run();
 
 	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now() - start).count());
 
 	CHECK(millis == 0);
 	CHECK(num_lookups == 1);
-
-	std::printf("[%4d] simulation::run() returned: %s\n"
-		, millis, ec.message().c_str());
 }
 

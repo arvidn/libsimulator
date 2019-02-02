@@ -39,12 +39,6 @@ namespace sim
 
 	std::size_t simulation::run()
 	{
-		boost::system::error_code ec;
-		return run(ec);
-	}
-
-	std::size_t simulation::run(boost::system::error_code& ec)
-	{
 		std::size_t ret = 0;
 		std::size_t last_executed = 0;
 		do {

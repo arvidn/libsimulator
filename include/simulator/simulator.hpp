@@ -454,7 +454,7 @@ namespace sim
 			{}
 
 			result_t(result_t&&) noexcept = default;
-			result_t& operator=(result_t&&) noexcept = default;
+			result_t& operator=(result_t&&) = default;
 			result_t(result_t const&) = delete;
 			result_t& operator=(result_t const&) = delete;
 		};
@@ -1008,7 +1008,6 @@ namespace sim
 		simulation(configuration& config);
 		~simulation();
 
-		std::size_t run(boost::system::error_code& ec);
 		std::size_t run();
 
 		std::size_t poll(boost::system::error_code& ec);
