@@ -1210,7 +1210,6 @@ namespace sim
 	void io_executor::defer(Handler handler, Allocator const& a) const
 	{ m_ctx->defer_impl(std::move(handler), a); }
 
-
 	template <typename Protocol>
 	io_executor
 	socket_base<Protocol>::get_executor()
