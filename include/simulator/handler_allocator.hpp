@@ -24,13 +24,34 @@ namespace sim
 namespace aux
 {
 
+template <typename T>
+struct malloc_allocator
+{
+	using value_type = T;
+	using size_type = std::size_t;
+
+	friend bool operator==(malloc_allocator, malloc_allocator) { return true; }
+	friend bool operator!=(malloc_allocator, malloc_allocator) { return false; }
+
+	template <class U>
+	struct rebind { using other = malloc_allocator<U>; };
+
+	malloc_allocator() = default;
+	template <typename U>
+	malloc_allocator(malloc_allocator<U> const&) {}
+
+	T* allocate(std::size_t size) { return static_cast<T*>(std::malloc(size * sizeof(T))); }
+	void deallocate(T* pointer, std::size_t) { std::free(pointer); }
+	using is_always_equal = std::true_type;
+};
+
 // this is a handler wrapper that customizes the asio handler allocator to use
 // malloc instead of new. The purpose is to distinguish allocations that are
 // internal to the simulator and allocations part of the program under test.
 template <typename Handler>
-struct malloc_allocator
+struct malloc_wrapper
 {
-	malloc_allocator(Handler h) : m_handler(std::move(h)) {}
+	malloc_wrapper(Handler h) : m_handler(std::move(h)) {}
 
 	template <typename... Args>
 	void operator()(Args&&... a)
@@ -38,26 +59,19 @@ struct malloc_allocator
 		m_handler(std::forward<Args>(a)...);
 	}
 
-	friend void* asio_handler_allocate(
-		std::size_t size, malloc_allocator<Handler>*)
-	{
-		return std::malloc(size);
-	}
+	using allocator_type = malloc_allocator<malloc_wrapper<Handler>>;
 
-	friend void asio_handler_deallocate(
-		void* ptr, std::size_t, malloc_allocator<Handler>*)
-	{
-		std::free(ptr);
-	}
+	allocator_type get_allocator() const noexcept
+	{ return allocator_type{}; }
 
 private:
 	Handler m_handler;
 };
 
 template <typename T>
-malloc_allocator<T> make_malloc(T h)
+malloc_wrapper<T> make_malloc(T h)
 {
-	return malloc_allocator<T>(std::move(h));
+	return malloc_wrapper<T>(std::move(h));
 }
 
 }
