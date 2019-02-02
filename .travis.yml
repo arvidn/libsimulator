@@ -23,18 +23,30 @@ cache:
 addons:
   apt:
     sources:
-    - boost-latest
+    - sourceline: ppa:mhier/libboost-latest
     - ubuntu-toolchain-r-test
     packages:
-    - libboost1.55-all-dev
-    - libboost1.55-tools-dev
+    - libboost1.68-dev
     - g++-4.8
     - cmake
 
 install:
+
+  # on linux, pull down a recent version of boost and build boost-build
+  - 'if [[ $TRAVIS_OS_NAME == "linux" ]]; then
+    cd ..;
+    wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.zip;
+    unzip -qq boost_1_68_0.zip;
+    export BOOST_ROOT=$PWD/boost_1_68_0;
+    (cd boost_1_68_0/tools/build/src/engine; ./build.sh);
+    export BOOST_BUILD_PATH=$BOOST_ROOT/tools/build;
+    export PATH=$BOOST_BUILD_PATH/src/engine/bin.linuxx86_64:$PATH;
+    cd libsimulator;
+    fi'
+
   - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam; export CXX="g++-4.8" CXXFLAGS="-std=c++11"; fi'
   - 'if [ $TRAVIS_OS_NAME == "osx" ]; then echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam; fi'
-  - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install --quiet ccache boost-build && brew upgrade --quiet cmake ; fi
+  - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install ccache boost-build && brew upgrade cmake ; fi
   - ccache -V && ccache --show-stats && ccache --zero-stats
 
 script:

@@ -16,7 +16,6 @@ lib ws2_32 : : <name>ws2_32 <link>shared ;
 if $(BOOST_ROOT)
 {
 	use-project /boost : $(BOOST_ROOT) ;
-	alias boost_chrono : /boost/chrono//boost_chrono ;
 	alias boost_system : /boost/system//boost_system ;
 }
 else
@@ -67,7 +66,6 @@ lib simulator
 	: # requirements
 	<include>include
 	<library>boost_system
-	<library>boost_chrono
 	<target-os>windows:<library>ws2_32
 	<target-os>windows:<library>wsock32
 	<threading>multi
