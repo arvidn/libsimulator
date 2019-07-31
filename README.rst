@@ -10,7 +10,7 @@ libsimulator
 *This is still in initial development, some of this README represents ambitions
 rather than the current state*
 
-libsimulator is a library for running descreet event simulations, implementing
+libsimulator is a library for running discrete event simulations, implementing
 the ``boost.asio`` API (or a somewhat faithful emulation of a subset of it,
 patches are welcome). This makes it practical to be used as a testing tool of
 real implementations of network software as well as for writing simulators that
