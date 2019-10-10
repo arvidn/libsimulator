@@ -1,4 +1,5 @@
 language: cpp
+dist: bionic
 
 os:
   - linux
@@ -32,6 +33,12 @@ addons:
 
 install:
 
+  - 'if [[ $TRAVIS_OS_NAME != "osx" ]]; then
+      export B2=bjam;
+    else
+      export B2=b2;
+    fi'
+
   # on linux, pull down a recent version of boost and build boost-build
   - 'if [[ $TRAVIS_OS_NAME == "linux" ]]; then
     cd ..;
@@ -52,7 +59,7 @@ install:
 script:
 # until we have a version of boost-build that's new enough, disable warnings
 # as errors
-  - bjam --hash -j3 variant=$variant -l900 warnings-as-errors=off $toolset $target
+  - ${B2} --hash -j3 variant=$variant -l900 warnings-as-errors=off $toolset $target
   - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=$variant .. && make -j3 && make test
   - ccache --show-stats
 
