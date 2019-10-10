@@ -67,15 +67,15 @@ namespace sim {
 
 		// the queue can't hold more than this number of bytes. Once it's full,
 		// any new packets arriving will be dropped (tail drop)
-		const int m_max_queue_size;
+		int m_max_queue_size;
 
 		// the amount of time it takes to forward a packet. Every packet is
 		// delayed by at least this much before being forwarded
-		const chrono::high_resolution_clock::duration m_forwarding_latency;
+		chrono::high_resolution_clock::duration m_forwarding_latency;
 
 		// the number of bytes per second that can be sent. This includes the
 		// packet overhead
-		const int m_bandwidth;
+		int m_bandwidth;
 
 		// the number of bytes currently in the packet queue
 		int m_queue_size;

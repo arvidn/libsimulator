@@ -46,7 +46,29 @@ namespace ip {
 		, m_is_v4(true)
 	{}
 
-	udp::socket::socket(socket&&) = default;
+	udp::socket::socket(socket&& s)
+		: socket_base(std::move(s))
+		, m_next_send(std::move(s.m_next_send))
+		, m_send_handler(std::move(s.m_send_handler))
+		, m_wait_send_handler(std::move(s.m_wait_send_handler))
+		, m_recv_handler(std::move(s.m_recv_handler))
+		, m_wait_recv_handler(std::move(s.m_wait_recv_handler))
+		, m_recv_buffer(std::move(s.m_recv_buffer))
+		, m_recv_sender(std::move(s.m_recv_sender))
+		, m_recv_timer(std::move(s.m_recv_timer))
+		, m_send_timer(std::move(s.m_send_timer))
+		, m_incoming_queue(std::move(s.m_incoming_queue))
+		, m_recv_null_buffers(std::move(s.m_recv_null_buffers))
+		, m_queue_size(std::move(s.m_queue_size))
+		, m_is_v4(s.m_is_v4)
+	{
+		if (m_forwarder) m_forwarder->reset(this);
+		s.m_forwarder.reset();
+		s.m_open = false;
+		s.m_bound_to = ip::udp::endpoint();
+		if (m_bound_to != ip::udp::endpoint())
+			m_io_service.rebind_udp_socket(this, m_bound_to);
+	}
 
 	udp::socket::~socket()
 	{
@@ -135,7 +157,7 @@ namespace ip {
 		// prevent any more packets from being delivered to this socket
 		if (m_forwarder)
 		{
-			m_forwarder->clear();
+			m_forwarder->reset();
 			m_forwarder.reset();
 		}
 

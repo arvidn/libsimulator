@@ -36,9 +36,9 @@ namespace sim { namespace aux {
 		return m_dst ? m_dst->label() : "";
 	}
 
-	void sink_forwarder::clear()
+	void sink_forwarder::reset(sink* s)
 	{
-		m_dst = nullptr;
+		m_dst = s;
 	}
 
 }}

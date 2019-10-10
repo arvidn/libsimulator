@@ -45,14 +45,49 @@ namespace ip {
 		, m_recv_timer(ios)
 	{}
 
+	tcp::socket::socket(socket&& s)
+		: socket_base(std::move(s))
+		, m_connect_handler(std::move(s.m_connect_handler))
+		, m_connect_timer(std::move(s.m_connect_timer))
+		, m_mss(s.m_mss)
+		, m_send_handler(std::move(s.m_send_handler))
+		, m_wait_send_handler(std::move(s.m_wait_send_handler))
+		, m_send_buffer(std::move(s.m_send_buffer))
+		, m_incoming_queue(std::move(s.m_incoming_queue))
+		, m_queue_size(std::move(s.m_queue_size))
+		, m_recv_handler(std::move(s.m_recv_handler))
+		, m_wait_recv_handler(std::move(s.m_wait_recv_handler))
+		, m_recv_buffer(std::move(s.m_recv_buffer))
+		, m_recv_timer(std::move(s.m_recv_timer))
+		, m_is_v4(std::move(s.m_is_v4))
+		, m_recv_null_buffers(std::move(s.m_recv_null_buffers))
+		, m_send_null_buffers(std::move(s.m_send_null_buffers))
+		, m_channel(std::move(s.m_channel))
+		, m_next_outgoing_seq(std::move(s.m_next_outgoing_seq))
+		, m_next_incoming_seq(std::move(s.m_next_incoming_seq))
+		, m_last_drop_seq(std::move(s.m_last_drop_seq))
+		, m_cwnd(std::move(s.m_cwnd))
+		, m_bytes_in_flight(std::move(s.m_bytes_in_flight))
+		, m_reorder_buffer(std::move(s.m_reorder_buffer))
+		, m_outstanding_packet_sizes(std::move(s.m_outstanding_packet_sizes))
+		, m_outgoing_packets(std::move(s.m_outgoing_packets))
+	{
+		if (m_forwarder) m_forwarder->reset(this);
+		s.m_forwarder.reset();
+		s.m_open = false;
+		s.m_bound_to = ip::tcp::endpoint();
+
+		if (m_bound_to != ip::tcp::endpoint())
+			m_io_service.rebind_socket(this, m_bound_to);
+	}
+
 	tcp::socket::~socket()
 	{
 		boost::system::error_code ec;
 		close(ec);
 	}
 
-	void tcp::socket::open(tcp protocol
-		, boost::system::error_code& ec) try
+	void tcp::socket::open(tcp protocol, boost::system::error_code& ec) try
 	{
 		close(ec);
 		m_open = true;
@@ -174,7 +209,7 @@ namespace ip {
 		// prevent any more packets from being delivered to this socket
 		if (m_forwarder)
 		{
-			m_forwarder->clear();
+			m_forwarder->reset();
 			m_forwarder.reset();
 		}
 
