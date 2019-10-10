@@ -104,6 +104,13 @@ namespace sim
 		m_timer_queue.erase(begin);
 	}
 
+	void simulation::rebind_socket(ip::tcp::socket* s, ip::tcp::endpoint ep)
+	{
+		auto i = m_listen_sockets.find(ep);
+		assert(i != m_listen_sockets.end());
+		i->second = s;
+	}
+
 	ip::tcp::endpoint simulation::bind_socket(ip::tcp::socket* socket
 		, ip::tcp::endpoint ep, boost::system::error_code& ec)
 	{
@@ -155,6 +162,13 @@ namespace sim
 		listen_socket_iter_t i = m_listen_sockets.find(ep);
 		if (i == m_listen_sockets.end() || i->second != socket) return;
 		m_listen_sockets.erase(i);
+	}
+
+	void simulation::rebind_udp_socket(ip::udp::socket* socket, ip::udp::endpoint ep)
+	{
+		auto i = m_udp_sockets.find(ep);
+		assert(i != m_udp_sockets.end());
+		i->second = socket;
 	}
 
 	ip::udp::endpoint simulation::bind_udp_socket(ip::udp::socket* socket

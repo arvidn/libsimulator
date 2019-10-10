@@ -197,6 +197,8 @@ namespace sim
 			: m_io_service(ios)
 		{}
 
+		socket_base(socket_base&& s) = default;
+
 		enum wait_type_t
 		{
 			wait_read, wait_write, wait_error
@@ -212,8 +214,7 @@ namespace sim
 		using receive_buffer_size = boost::asio::socket_base::receive_buffer_size;
 
 		template <class Option>
-		boost::system::error_code set_option(Option const& opt
-			, boost::system::error_code& ec)
+		void set_option(Option const& opt, boost::system::error_code&)
 		{
 			Protocol const p = Protocol::v4();
 			(void)p;
@@ -229,28 +230,21 @@ namespace sim
 			if (opt.name(p) == IP_MTU_DISCOVER)
 				m_dont_fragment = *reinterpret_cast<int const*>(opt.data(p)) == IP_PMTUDISC_DO;
 #endif
-			return ec;
 		}
 
-		boost::system::error_code set_option(receive_buffer_size const& op
-			, boost::system::error_code& ec)
+		void set_option(receive_buffer_size const& op, boost::system::error_code&)
 		{
 			m_max_receive_queue_size = op.value();
-			return ec;
 		}
 
-		boost::system::error_code set_option(send_buffer_size const&
-			, boost::system::error_code& ec)
+		void set_option(send_buffer_size const&, boost::system::error_code&)
 		{
 			// TODO: implement
-			return ec;
 		}
 
-		boost::system::error_code set_option(reuse_address const&
-			, boost::system::error_code& ec)
+		void set_option(reuse_address const&, boost::system::error_code&)
 		{
 			// TODO: implement
-			return ec;
 		}
 
 		typename Protocol::endpoint local_endpoint(boost::system::error_code& ec) const
@@ -292,26 +286,21 @@ namespace sim
 		}
 
 		template <class Option>
-		boost::system::error_code get_option(Option&
-			, boost::system::error_code& ec) { return ec; }
+		void get_option(Option&, boost::system::error_code&) { }
 
-		boost::system::error_code get_option(receive_buffer_size& op
-			, boost::system::error_code& ec)
+		void get_option(receive_buffer_size& op, boost::system::error_code&)
 		{
 			op = m_max_receive_queue_size;
-			return ec;
 		}
 
 		template <class IoControl>
-		boost::system::error_code io_control(IoControl const&
-			, boost::system::error_code& ec) { return ec; }
+		void io_control(IoControl const&, boost::system::error_code&) { }
 
 		template <class IoControl>
 		void io_control(IoControl const&) {}
 
-		boost::system::error_code non_blocking(bool b
-			, boost::system::error_code& ec)
-		{ m_non_blocking = b; return ec; }
+		void non_blocking(bool b, boost::system::error_code&)
+		{ m_non_blocking = b; }
 
 		void non_blocking(bool b)
 		{ m_non_blocking = b; }
@@ -731,12 +720,9 @@ namespace sim
 			explicit socket(io_context& ios);
 			socket(socket const&) = delete;
 			socket& operator=(socket const&) = delete;
-// TODO: sockets are not movable right now unfortunately, because channels keep
-// pointers to the socke object to deliver new packets.
-/*
-			socket(socket&&) = default;
-			socket& operator=(socket&&) = default;
-*/
+			socket(socket&&);
+			socket& operator=(socket&&);
+
 			~socket() override;
 
 			void close();
@@ -926,6 +912,7 @@ namespace sim
 		struct SIMULATOR_DECL acceptor : socket
 		{
 			explicit acceptor(io_context& ios);
+			acceptor(acceptor&&);
 			~acceptor() override;
 
 			void cancel(boost::system::error_code& ec);
@@ -1037,13 +1024,15 @@ namespace sim
 			, asio::ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_socket(asio::ip::tcp::socket* socket
-			, const asio::ip::tcp::endpoint& ep);
+			, asio::ip::tcp::endpoint const& ep);
+		void rebind_socket(asio::ip::tcp::socket* s, asio::ip::tcp::endpoint ep);
 
 		asio::ip::udp::endpoint bind_udp_socket(asio::ip::udp::socket* socket
 			, asio::ip::udp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_udp_socket(asio::ip::udp::socket* socket
-			, const asio::ip::udp::endpoint& ep);
+			, asio::ip::udp::endpoint const& ep);
+		void rebind_udp_socket(asio::ip::udp::socket* socket, asio::ip::udp::endpoint ep);
 
 		std::shared_ptr<aux::channel> internal_connect(asio::ip::tcp::socket* s
 			, asio::ip::tcp::endpoint const& target, boost::system::error_code& ec);
@@ -1160,12 +1149,14 @@ namespace sim
 		ip::tcp::endpoint bind_socket(ip::tcp::socket* socket, ip::tcp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_socket(ip::tcp::socket* socket
-			, const ip::tcp::endpoint& ep);
+			, ip::tcp::endpoint const& ep);
+		void rebind_socket(asio::ip::tcp::socket* s, asio::ip::tcp::endpoint ep);
 
 		ip::udp::endpoint bind_udp_socket(ip::udp::socket* socket, ip::udp::endpoint ep
 			, boost::system::error_code& ec);
 		void unbind_udp_socket(ip::udp::socket* socket
-			, const ip::udp::endpoint& ep);
+			, ip::udp::endpoint const& ep);
+		void rebind_udp_socket(asio::ip::udp::socket* socket, asio::ip::udp::endpoint ep);
 
 		std::shared_ptr<aux::channel> internal_connect(ip::tcp::socket* s
 			, ip::tcp::endpoint const& target, boost::system::error_code& ec);

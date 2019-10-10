@@ -31,7 +31,7 @@ namespace sim { namespace aux {
 		sink_forwarder(sink* dst);
 		void incoming_packet(packet p) override;
 		std::string label() const override;
-		void clear();
+		void reset(sink* s = nullptr);
 
 	private:
 		sink* m_dst;

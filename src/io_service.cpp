@@ -180,6 +180,11 @@ namespace sim { namespace asio {
 		m_sim.unbind_socket(socket, ep);
 	}
 
+	void io_context::rebind_socket(asio::ip::tcp::socket* s, asio::ip::tcp::endpoint ep)
+	{
+		m_sim.rebind_socket(s, ep);
+	}
+
 	ip::udp::endpoint io_context::bind_udp_socket(ip::udp::socket* socket
 		, ip::udp::endpoint ep, boost::system::error_code& ec)
 	{
@@ -228,6 +233,11 @@ namespace sim { namespace asio {
 		, const ip::udp::endpoint& ep)
 	{
 		m_sim.unbind_udp_socket(socket, ep);
+	}
+
+	void io_context::rebind_udp_socket(asio::ip::udp::socket* socket, asio::ip::udp::endpoint ep)
+	{
+		m_sim.rebind_udp_socket(socket, ep);
 	}
 
 	std::shared_ptr<aux::channel> io_context::internal_connect(ip::tcp::socket* s

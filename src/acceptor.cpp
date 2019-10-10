@@ -36,6 +36,8 @@ namespace ip {
 		, m_queue_size_limit(-1)
 	{}
 
+	tcp::acceptor::acceptor(acceptor&&) = default;
+
 	tcp::acceptor::~acceptor()
 	{
 		boost::system::error_code ec;
