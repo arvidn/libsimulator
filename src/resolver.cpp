@@ -36,6 +36,12 @@ namespace ip {
 	{}
 
 	template<typename Protocol>
+	basic_resolver<Protocol>::basic_resolver(basic_resolver<Protocol>&&) noexcept = default;
+
+	template<typename Protocol>
+	basic_resolver<Protocol>& basic_resolver<Protocol>::operator=(basic_resolver<Protocol>&&) noexcept = default;
+
+	template<typename Protocol>
 	void basic_resolver<Protocol>::async_resolve(std::string hostname, char const* service
 		, aux::function<void(boost::system::error_code const&, results_type)> handler)
 	{
