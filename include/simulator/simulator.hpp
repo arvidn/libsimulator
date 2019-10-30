@@ -411,8 +411,8 @@ namespace sim
 			, aux::function<void(boost::system::error_code const&,
 				results_type)> handler);
 
-		basic_resolver(basic_resolver&&) noexcept = default;
-		basic_resolver& operator=(basic_resolver&&) noexcept = default;
+		basic_resolver(basic_resolver&&) noexcept;
+		basic_resolver& operator=(basic_resolver&&) noexcept;
 		basic_resolver(basic_resolver const&) = delete;
 		basic_resolver& operator=(basic_resolver const&) = delete;
 
