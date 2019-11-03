@@ -926,6 +926,7 @@ namespace sim
 			void async_accept(ip::tcp::socket& peer
 				, ip::tcp::endpoint& peer_endpoint
 				, aux::function<void(boost::system::error_code const&)> h);
+			void async_accept(aux::function<void(boost::system::error_code const&, ip::tcp::socket peer)> h);
 
 			void close(boost::system::error_code& ec);
 			void close();
@@ -943,6 +944,7 @@ namespace sim
 			void do_check_accept_queue(boost::system::error_code const& ec);
 
 			aux::function<void(boost::system::error_code const&)> m_accept_handler;
+			aux::function<void(boost::system::error_code const&, ip::tcp::socket)> m_accept_handler2;
 
 			// the number of half-open incoming connections this listen socket can
 			// hold. If this is -1, this socket is not yet listening and incoming

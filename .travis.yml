@@ -28,7 +28,7 @@ addons:
     - ubuntu-toolchain-r-test
     packages:
     - libboost1.68-dev
-    - g++-4.8
+    - g++-8
     - cmake
 
 install:
@@ -51,15 +51,15 @@ install:
     cd libsimulator;
     fi'
 
-  - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-4.8 : <cflags>-std=c11 <cxxflags>-std=c++11 ;" > ~/user-config.jam; export CXX="g++-4.8" CXXFLAGS="-std=c++11"; fi'
-  - 'if [ $TRAVIS_OS_NAME == "osx" ]; then echo "using darwin : : ccache clang++ : <cflags>-std=c11 <cxxflags>-std=c++11 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam; fi'
+  - 'if [ $TRAVIS_OS_NAME == "linux" ]; then echo "using gcc : : ccache g++-8 ;" > ~/user-config.jam; export CXX="g++-8" ; fi'
+  - 'if [ $TRAVIS_OS_NAME == "osx" ]; then echo "using darwin : : ccache clang++ : <cxxflags>-std=c++14 <compileflags>-Wno-deprecated-declarations ;" > ~/user-config.jam; fi'
   - if [ $TRAVIS_OS_NAME == "osx" ]; then brew update > /dev/null && brew install ccache boost-build && brew upgrade cmake ; fi
   - ccache -V && ccache --show-stats && ccache --zero-stats
 
 script:
 # until we have a version of boost-build that's new enough, disable warnings
 # as errors
-  - ${B2} --hash -j3 variant=$variant -l900 warnings-as-errors=off $toolset $target
+  - ${B2} --hash -j3 variant=$variant -l900 warnings-as-errors=off
   - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=$variant .. && make -j3 && make test
   - ccache --show-stats
 

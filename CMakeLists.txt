@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8.7)
 set(SRC_DIR src)
 set(TEST_SRC_DIR test)
 set(INCLUDE_DIR include)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost COMPONENTS system REQUIRED)
