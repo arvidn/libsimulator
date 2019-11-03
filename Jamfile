@@ -111,6 +111,7 @@ project
 	: default-build
 	<link>static
 	<threading>multi
+	<cxxstd>14
 	;
 
 test-suite simulator-tests : [ run
