@@ -20,7 +20,6 @@ All rights reserved.
 #include "simulator/packet.hpp"
 
 #include <functional>
-#include <boost/optional.hpp>
 
 #define __STDC_FORMAT_MACROS 1
 #include <cinttypes>
@@ -82,17 +81,15 @@ namespace ip {
 	{
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::move(m_accept_handler)
+			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = nullptr;
 		}
 		if (m_accept_handler2)
 		{
-			post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+			post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 				h(boost::system::error_code(error::operation_aborted)
 					, ip::tcp::socket(m_io_service));
 				});
-			m_accept_handler2 = nullptr;
 		}
 	}
 
@@ -103,7 +100,7 @@ namespace ip {
 		{
 			try
 			{
-				post(m_io_service, std::bind(std::move(m_accept_handler)
+				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
 					, boost::system::error_code(error::operation_aborted)));
 			}
 			catch (std::bad_alloc const&)
@@ -114,13 +111,12 @@ namespace ip {
 			{
 				ec = error::no_memory;
 			}
-			m_accept_handler = nullptr;
 		}
 		if (m_accept_handler2)
 		{
 			try
 			{
-				post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+				post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 					h(boost::system::error_code(error::operation_aborted)
 						, ip::tcp::socket(m_io_service));
 				});
@@ -133,7 +129,6 @@ namespace ip {
 			{
 				ec = error::no_memory;
 			}
-			m_accept_handler2 = nullptr;
 		}
 	}
 
@@ -156,17 +151,19 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::move(m_accept_handler)
+			m_accept_into = nullptr;
+			m_remote_endpoint = nullptr;
+			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = nullptr;
 		}
 		if (m_accept_handler2)
 		{
-			post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+			m_accept_into = nullptr;
+			m_remote_endpoint = nullptr;
+			post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 				h(boost::system::error_code(error::operation_aborted)
 					, ip::tcp::socket(m_io_service));
 			});
-			m_accept_handler2 = nullptr;
 		}
 		m_accept_handler = std::move(h);
 		m_accept_into = &peer;
@@ -187,17 +184,15 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::move(m_accept_handler)
+			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = nullptr;
 		}
 		if (m_accept_handler2)
 		{
-			post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+			post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 				h(boost::system::error_code(error::operation_aborted)
 					, ip::tcp::socket(m_io_service));
 			});
-			m_accept_handler2 = nullptr;
 		}
 		m_accept_handler = std::move(h);
 		m_accept_into = &peer;
@@ -208,23 +203,24 @@ namespace ip {
 
 	void tcp::acceptor::async_accept(aux::function<void(boost::system::error_code const&, ip::tcp::socket peer)> h)
 	{
+		m_remote_endpoint = nullptr;
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::move(m_accept_handler)
+			m_accept_into = nullptr;
+			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
-			m_accept_handler = nullptr;
 		}
 		if (m_accept_handler2)
 		{
-			post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+			m_accept_into = nullptr;
+			post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 				h(boost::system::error_code(error::operation_aborted)
 					, ip::tcp::socket(m_io_service));
 			});
-			m_accept_handler2 = nullptr;
 		}
+		m_new_socket.emplace(m_io_service);
 		m_accept_handler2 = std::move(h);
-		m_accept_into = nullptr;
-		m_remote_endpoint = nullptr;
+		m_accept_into = &*m_new_socket;
 
 		check_accept_queue();
 	}
@@ -247,21 +243,19 @@ namespace ip {
 				assert(false); // something is not wired up correctly
 				if (m_accept_handler)
 				{
-					post(m_io_service, std::bind(std::move(m_accept_handler)
-						, boost::system::error_code(error::operation_aborted)));
-					m_accept_handler = nullptr;
 					m_accept_into = nullptr;
 					m_remote_endpoint = nullptr;
+					post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+						, boost::system::error_code(error::operation_aborted)));
 				}
 				if (m_accept_handler2)
 				{
-					post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+					m_accept_into = nullptr;
+					m_remote_endpoint = nullptr;
+					post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 						h(boost::system::error_code(error::operation_aborted)
 							, ip::tcp::socket(m_io_service));
 					});
-					m_accept_handler2 = nullptr;
-					m_accept_into = nullptr;
-					m_remote_endpoint = nullptr;
 				}
 				return;
 			default:
@@ -297,21 +291,19 @@ namespace ip {
 
 			if (m_accept_handler)
 			{
-				post(m_io_service, std::bind(std::move(m_accept_handler)
-					, boost::system::error_code(error::operation_aborted)));
-				m_accept_handler = nullptr;
 				m_accept_into = nullptr;
 				m_remote_endpoint = nullptr;
+				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+					, boost::system::error_code(error::operation_aborted)));
 			}
 			if (m_accept_handler2)
 			{
-				post(m_io_service, [&, h = std::move(m_accept_handler2)] () mutable {
+				m_accept_into = nullptr;
+				m_remote_endpoint = nullptr;
+				post(m_io_service, [&, h = std::exchange(m_accept_handler2, nullptr)] () mutable {
 					h(boost::system::error_code(error::operation_aborted)
 						, ip::tcp::socket(m_io_service));
 				});
-				m_accept_handler2 = nullptr;
-				m_accept_into = nullptr;
-				m_remote_endpoint = nullptr;
 			}
 		}
 
@@ -327,13 +319,7 @@ namespace ip {
 		// this was initiated at least one 3-way handshake ago.
 		// we can pick it up and consider it connected
 		if (m_remote_endpoint) *m_remote_endpoint = c->ep[0];
-
-		boost::optional<ip::tcp::socket> new_socket;
-		if (m_accept_into == nullptr)
-		{
-			new_socket.emplace(m_io_service);
-			m_accept_into = &*new_socket;
-		}
+		m_remote_endpoint = nullptr;
 
 		boost::system::error_code ec;
 		// if the acceptor socket is closed. Any potential socket in the queue
@@ -360,20 +346,27 @@ namespace ip {
 
 		forward_packet(std::move(p));
 
-		if (m_accept_handler)
+		try
 		{
-			post(m_io_service, std::bind(std::move(m_accept_handler), ec));
-			m_accept_handler = nullptr;
+			if (m_accept_handler)
+			{
+				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr), ec));
+			}
+			else if (m_accept_handler2)
+			{
+				post(m_io_service, [h = std::exchange(m_accept_handler2, nullptr), ec, s = std::move(*m_accept_into)] () mutable {
+					h(ec, std::move(s));
+				});
+			}
 		}
-		else if (m_accept_handler2)
+		catch (...)
 		{
-			post(m_io_service, [h = std::move(m_accept_handler2), ec, s = std::move(*m_accept_into)] () mutable {
-				h(ec, std::move(s));
-			});
-			m_accept_handler2 = nullptr;
+			m_new_socket.reset();
+			m_accept_into = nullptr;
+			throw;
 		}
+		m_new_socket.reset();
 		m_accept_into = nullptr;
-		m_remote_endpoint = nullptr;
 	}
 
 	bool tcp::acceptor::internal_is_listening()

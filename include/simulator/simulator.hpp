@@ -37,6 +37,8 @@ All rights reserved.
 #include <boost/asio/defer.hpp>
 #include <boost/asio/dispatch.hpp>
 
+#include <boost/optional.hpp>
+
 #include "simulator/pop_warnings.hpp"
 
 #include "simulator/chrono.hpp"
@@ -956,6 +958,9 @@ namespace sim
 			// checked first before waiting for a connection attempt.
 			using incoming_conns_t = std::vector<std::shared_ptr<aux::channel> >;
 			incoming_conns_t m_incoming_conns;
+
+			// for new-style accept, allocate socket in here just to fail early
+			boost::optional<ip::tcp::socket> m_new_socket;
 
 			// the socket to accept a connection into
 			tcp::socket* m_accept_into;
