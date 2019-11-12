@@ -193,7 +193,7 @@ namespace ip {
 	{
 		if (m_send_handler)
 			post(m_io_service, make_malloc(std::bind(std::ref(m_send_handler)
-				, boost::system::error_code(error::operation_aborted), 0)));
+				, boost::system::error_code(error::operation_aborted), std::size_t(0))));
 
 		if (m_wait_send_handler)
 			post(m_io_service, make_malloc(std::bind(std::ref(m_wait_send_handler)
@@ -209,7 +209,7 @@ namespace ip {
 	{
 		if (m_recv_handler)
 			post(m_io_service, make_malloc(std::bind(std::move(m_recv_handler)
-				, boost::system::error_code(error::operation_aborted), 0)));
+				, boost::system::error_code(error::operation_aborted), std::size_t(0))));
 
 		if (m_wait_recv_handler)
 			post(m_io_service, make_malloc(std::bind(std::move(m_wait_recv_handler)
@@ -277,7 +277,7 @@ namespace ip {
 		}
 
 		aux::packet& p = m_incoming_queue.front();
-		if (sender) *sender = *p.from;
+		if (sender) *sender = p.from;
 
 		int read = 0;
 		for (auto const& buf : bufs)
@@ -285,7 +285,7 @@ namespace ip {
 			char* ptr = static_cast<char*>(buf.data());
 			int const len = int(buf.size());
 			int const to_copy = (std::min)(int(p.buffer.size()), len);
-			memcpy(ptr, &p.buffer[0], to_copy);
+			memcpy(ptr, p.buffer.data(), to_copy);
 			read += to_copy;
 			p.buffer.erase(p.buffer.begin(), p.buffer.begin() + to_copy);
 			m_queue_size -= to_copy;
@@ -348,7 +348,7 @@ namespace ip {
 
 		if (ec)
 		{
-			post(m_io_service, make_malloc(std::bind(std::move(handler), ec, 0)));
+			post(m_io_service, make_malloc(std::bind(std::move(handler), ec, std::size_t(0))));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			m_recv_sender = nullptr;
@@ -430,7 +430,7 @@ namespace ip {
 		aux::packet p;
 		p.overhead = 28;
 		p.type = aux::packet::type_t::payload;
-		*p.from = m_bound_to;
+		p.from = m_bound_to;
 		p.hops = hops;
 		for (std::vector<asio::const_buffer>::const_iterator i = b.begin()
 			, end(b.end()); i != end; ++i)

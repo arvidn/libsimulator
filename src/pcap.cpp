@@ -168,7 +168,7 @@ namespace {
 
 		// TODO: if the packet has error set with asio::error::eof
 		// set the FIN flag
-		write_tcp_header(m_file, p.from->port(), dst.port(), p.byte_counter);
+		write_tcp_header(m_file, p.from.port(), dst.port(), p.byte_counter);
 
 		m_file.write(reinterpret_cast<char const*>(p.buffer.data()), p.buffer.size());
 	}
@@ -195,7 +195,7 @@ namespace {
 		write_ip_header(m_file, packet_size, 17
 			, src.address().to_v4(), dst.address().to_v4());
 
-		write_udp_header(m_file, static_cast<int>(p.buffer.size()), p.from->port(), static_cast<int>(dst.port()));
+		write_udp_header(m_file, static_cast<int>(p.buffer.size()), p.from.port(), static_cast<int>(dst.port()));
 
 		m_file.write(reinterpret_cast<char const*>(p.buffer.data()), p.buffer.size());
 	}

@@ -21,6 +21,7 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 #include "simulator/packet.hpp"
+#include "simulator/mallocator.hpp"
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -83,7 +84,7 @@ namespace sim {
 		std::string m_node_name;
 
 		// this is the queue of packets and the time each packet was enqueued
-		std::deque<timed_packet> m_queue;
+		std::deque<timed_packet, aux::mallocator<timed_packet>> m_queue;
 		asio::high_resolution_timer m_forward_timer;
 
 		chrono::high_resolution_clock::time_point m_last_forward;

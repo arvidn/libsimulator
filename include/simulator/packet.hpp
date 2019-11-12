@@ -30,7 +30,6 @@ namespace sim { namespace aux {
 	{
 		packet()
 			: type(type_t::uninitialized)
-			, from(new asio::ip::udp::endpoint)
 			, overhead{20}
 			, seq_nr{0}
 			, byte_counter{0}
@@ -66,9 +65,7 @@ namespace sim { namespace aux {
 		std::vector<boost::uint8_t> buffer;
 
 		// used for UDP packets
-		// this is a unique_ptr just to make this type movable. the endpoint
-		// itself isn't
-		std::unique_ptr<asio::ip::udp::endpoint> from;
+		asio::ip::udp::endpoint from;
 
 		// the number of bytes of overhead for this packet. The total packet
 		// size is the number of bytes in the buffer + this number

@@ -21,6 +21,8 @@ All rights reserved.
 
 #include <utility>
 
+#include "simulator/mallocator.hpp"
+
 namespace sim {
 namespace aux {
 
@@ -32,28 +34,19 @@ namespace aux {
 		return temp;
 	}
 
-	template <typename T>
-	void* asio_handler_allocate(std::size_t size, T*)
-	{
-		return new char[size];
-	}
-
-	template <typename T>
-	void asio_handler_deallocate(void* ptr, std::size_t, T*)
-	{
-		delete[] static_cast<char*>(ptr);
-	}
-
 	template <typename T, typename Fun>
 	T* allocate_handler(Fun h)
 	{
-		void* ptr = asio_handler_allocate(sizeof(T), &h);
+		using alloc = typename boost::asio::associated_allocator<typename std::remove_reference<Fun>::type>::type;
+		using our_alloc = typename alloc::template rebind<T>::other;
+		our_alloc al(boost::asio::get_associated_allocator(h));
+		void* ptr = al.allocate(1);
 		if (ptr == nullptr) throw std::bad_alloc();
 		try {
 			return new (ptr) T(std::move(h));
 		}
 		catch (...) {
-			asio_handler_deallocate(ptr, sizeof(T), &h);
+			al.deallocate(reinterpret_cast<T*>(ptr), 1);
 			throw;
 		}
 	}
@@ -94,7 +87,10 @@ namespace aux {
 		Handler handler = std::move(obj->handler);
 
 		obj->~function_impl();
-		asio_handler_deallocate(mem, sizeof(*obj), &handler);
+		using alloc = typename boost::asio::associated_allocator<Handler>::type;
+		using our_alloc = typename alloc::template rebind<typename std::remove_reference<decltype(*obj)>::type>::other;
+		our_alloc al(boost::asio::get_associated_allocator(handler));
+		al.deallocate(obj, 1);
 
 		return handler(std::forward<A>(a)...);
 	}
@@ -104,8 +100,12 @@ namespace aux {
 	{
 		auto* obj = static_cast<function_impl<Handler, R, A...>*>(mem);
 		Handler h = std::move(obj->handler);
+
 		obj->~function_impl();
-		asio_handler_deallocate(mem, sizeof(*obj), &h);
+		using alloc = typename boost::asio::associated_allocator<Handler>::type;
+		using our_alloc = typename alloc::template rebind<typename std::remove_reference<decltype(*obj)>::type>::other;
+		our_alloc al(boost::asio::get_associated_allocator(h));
+		al.deallocate(obj, 1);
 	}
 
 	template <typename Fun>
@@ -115,6 +115,9 @@ namespace aux {
 	struct function<R(A...)>
 	{
 		using result_type = R;
+
+		using allocator_type = aux::mallocator<R(A...)>;
+		allocator_type get_allocator() const { return allocator_type{}; }
 
 		template <typename C>
 		function(C c)
@@ -149,7 +152,8 @@ namespace aux {
 			fun(m_callable);
 			m_callable = nullptr;
 		}
-		R operator()(A... a)
+		template <typename... Args>
+		R operator()(Args&&... a)
 		{
 			assert(m_callable);
 			auto fun = m_callable->call_fun;
@@ -170,7 +174,7 @@ namespace aux {
 	template <typename Callable, typename R, typename... A>
 	struct move_binder
 	{
-		move_binder(Callable c, A... a)
+		move_binder(Callable c, A&&... a)
 			: m_args(std::move(a)...)
 			, m_callable(std::move(c))
 		{}
@@ -201,7 +205,7 @@ namespace aux {
 	};
 
 	template <typename R, typename C, typename... A>
-	move_binder<C, R, A...> move_bind(C c, A... a)
+	move_binder<C, R, A...> move_bind(C c, A&&... a)
 	{
 		return move_binder<C, R, A...>(std::move(c), std::forward<A>(a)...);
 	}
