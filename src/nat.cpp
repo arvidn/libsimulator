@@ -30,7 +30,7 @@ namespace sim {
 		// unconditionally replacing the "from" address is fine because of our
 		// simplified network model where the two paths of a connection are set up
 		// independently, and we can set up the nat hop only on the outgoing path
-		if (p.from) p.from->address(m_external_addr);
+		p.from.address(m_external_addr);
 		if (p.channel) {
 			p.channel->visible_ep[0].address(m_external_addr);
 		}

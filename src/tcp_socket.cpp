@@ -188,7 +188,7 @@ namespace ip {
 				aux::packet p;
 				p.type = aux::packet::type_t::error;
 				p.ec = asio::error::eof;
-				*p.from = asio::ip::udp::endpoint(
+				p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.overhead = 40;
 				p.hops = hops;
@@ -381,7 +381,7 @@ namespace ip {
 	void tcp::socket::abort_recv_handlers()
 	{
 		if (m_recv_handler) post(m_io_service, aux::make_malloc(std::bind(std::move(m_recv_handler)
-			, boost::system::error_code(error::operation_aborted), 0)));
+			, boost::system::error_code(error::operation_aborted), std::size_t(0))));
 
 		if (m_wait_recv_handler) post(m_io_service, aux::make_malloc(std::bind(std::move(m_wait_recv_handler)
 			, boost::system::error_code(error::operation_aborted))));
@@ -396,7 +396,7 @@ namespace ip {
 	void tcp::socket::abort_send_handlers()
 	{
 		if (m_send_handler) post(m_io_service, aux::make_malloc(std::bind(std::move(m_send_handler)
-			, boost::system::error_code(error::operation_aborted), 0)));
+			, boost::system::error_code(error::operation_aborted), std::size_t(0))));
 
 		if (m_wait_send_handler) post(m_io_service, aux::make_malloc(std::bind(std::move(m_wait_send_handler)
 			, boost::system::error_code(error::operation_aborted))));
@@ -425,7 +425,7 @@ namespace ip {
 
 		if (ec)
 		{
-			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec, 0)));
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec, std::size_t(0))));
 			m_send_handler = nullptr;
 			m_send_buffer.clear();
 			return;
@@ -491,7 +491,7 @@ namespace ip {
 				aux::packet p;
 				p.type = aux::packet::type_t::payload;
 				p.buffer.assign(ptr, ptr + packet_size);
-				*p.from = asio::ip::udp::endpoint(
+				p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.overhead = 40;
 				p.hops = hops;
@@ -639,7 +639,7 @@ namespace ip {
 
 		if (ec)
 		{
-			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec, 0)));
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec, std::size_t(0))));
 			m_recv_handler = nullptr;
 			m_recv_buffer.clear();
 			return;

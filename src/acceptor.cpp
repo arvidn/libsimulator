@@ -20,9 +20,12 @@ All rights reserved.
 #include "simulator/packet.hpp"
 
 #include <functional>
+#include <boost/beast/core/bind_handler.hpp>
 
 #define __STDC_FORMAT_MACROS 1
 #include <cinttypes>
+
+using boost::beast::bind_handler;
 
 typedef sim::chrono::high_resolution_clock::time_point time_point;
 typedef sim::chrono::high_resolution_clock::duration duration;
@@ -81,7 +84,7 @@ namespace ip {
 	{
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+			post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
 		}
 		if (m_accept_handler2)
@@ -100,7 +103,7 @@ namespace ip {
 		{
 			try
 			{
-				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+				post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 					, boost::system::error_code(error::operation_aborted)));
 			}
 			catch (std::bad_alloc const&)
@@ -153,7 +156,7 @@ namespace ip {
 		{
 			m_accept_into = nullptr;
 			m_remote_endpoint = nullptr;
-			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+			post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
 		}
 		if (m_accept_handler2)
@@ -184,7 +187,7 @@ namespace ip {
 
 		if (m_accept_handler)
 		{
-			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+			post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
 		}
 		if (m_accept_handler2)
@@ -207,7 +210,7 @@ namespace ip {
 		if (m_accept_handler)
 		{
 			m_accept_into = nullptr;
-			post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+			post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 				, boost::system::error_code(error::operation_aborted)));
 		}
 		if (m_accept_handler2)
@@ -245,7 +248,7 @@ namespace ip {
 				{
 					m_accept_into = nullptr;
 					m_remote_endpoint = nullptr;
-					post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+					post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 						, boost::system::error_code(error::operation_aborted)));
 				}
 				if (m_accept_handler2)
@@ -278,7 +281,7 @@ namespace ip {
 			for (auto const& incoming : m_incoming_conns)
 			{
 				aux::packet p;
-				*p.from = asio::ip::udp::endpoint(
+				p.from = asio::ip::udp::endpoint(
 					m_bound_to.address(), m_bound_to.port());
 				p.type = aux::packet::type_t::error;
 				p.ec = boost::system::error_code(error::connection_reset);
@@ -293,7 +296,7 @@ namespace ip {
 			{
 				m_accept_into = nullptr;
 				m_remote_endpoint = nullptr;
-				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr)
+				post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr)
 					, boost::system::error_code(error::operation_aborted)));
 			}
 			if (m_accept_handler2)
@@ -327,8 +330,7 @@ namespace ip {
 
 		// notify the other end
 		aux::packet p;
-		*p.from = asio::ip::udp::endpoint(
-			m_bound_to.address(), m_bound_to.port());
+		p.from = asio::ip::udp::endpoint(m_bound_to.address(), m_bound_to.port());
 		if (ec)
 		{
 			c->hops[1] = route();
@@ -350,13 +352,12 @@ namespace ip {
 		{
 			if (m_accept_handler)
 			{
-				post(m_io_service, std::bind(std::exchange(m_accept_handler, nullptr), ec));
+				post(m_io_service, bind_handler(std::exchange(m_accept_handler, nullptr), ec));
 			}
 			else if (m_accept_handler2)
 			{
-				post(m_io_service, [h = std::exchange(m_accept_handler2, nullptr), ec, s = std::move(*m_accept_into)] () mutable {
-					h(ec, std::move(s));
-				});
+				post(m_io_service, bind_handler(std::exchange(m_accept_handler2, nullptr)
+					, ec, std::move(*m_accept_into)));
 			}
 		}
 		catch (...)

@@ -45,6 +45,7 @@ All rights reserved.
 #include "simulator/sink_forwarder.hpp"
 #include "simulator/function.hpp"
 #include "simulator/noexcept_movable.hpp"
+#include "simulator/mallocator.hpp"
 
 #include <deque>
 #include <mutex>
@@ -96,7 +97,7 @@ namespace sim
 		{ return hops.back(); }
 
 	private:
-		std::deque<std::shared_ptr<sink>> hops;
+		std::deque<std::shared_ptr<sink>, aux::mallocator<std::shared_ptr<sink>>> hops;
 	};
 
 	void forward_packet(aux::packet p);
@@ -195,10 +196,7 @@ namespace sim
 	template <typename Protocol>
 	struct socket_base
 	{
-		socket_base(io_context& ios)
-			: m_io_service(ios)
-		{}
-
+		socket_base(io_context& ios) : m_io_service(ios) {}
 		socket_base(socket_base&& s) = default;
 
 		enum wait_type_t
@@ -405,7 +403,7 @@ namespace sim
 		basic_resolver(io_context& ios);
 
 		using protocol_type = Protocol;
-		using results_type = std::vector<basic_resolver_entry<Protocol>>;
+		using results_type = std::vector<basic_resolver_entry<Protocol>, aux::mallocator<basic_resolver_entry<Protocol>>>;
 
 		void cancel();
 
@@ -670,7 +668,7 @@ namespace sim
 			asio::high_resolution_timer m_send_timer;
 
 			// this is the incoming queue of packets for each socket
-			std::list<aux::packet> m_incoming_queue;
+			std::list<aux::packet, aux::mallocator<aux::packet>> m_incoming_queue;
 
 			bool m_recv_null_buffers;
 
@@ -858,7 +856,7 @@ namespace sim
 			std::vector<asio::const_buffer> m_send_buffer;
 
 			// this is the incoming queue of packets for each socket
-			std::list<aux::packet> m_incoming_queue;
+			std::list<aux::packet, aux::mallocator<aux::packet>> m_incoming_queue;
 
 			// the number of bytes in the incoming packet queue
 			int m_queue_size = 0;
@@ -908,7 +906,7 @@ namespace sim
 			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
 
 			// packets to re-send (because they were dropped)
-			std::list<aux::packet> m_outgoing_packets;
+			std::list<aux::packet, aux::mallocator<aux::packet>> m_outgoing_packets;
 		};
 
 		struct SIMULATOR_DECL acceptor : socket
@@ -956,7 +954,7 @@ namespace sim
 			// these are incoming connection attempts. Both half-open and
 			// completely connected. When accepting a connection, this queue is
 			// checked first before waiting for a connection attempt.
-			using incoming_conns_t = std::vector<std::shared_ptr<aux::channel> >;
+			using incoming_conns_t = std::vector<std::shared_ptr<aux::channel>, aux::mallocator<std::shared_ptr<aux::channel>>>;
 			incoming_conns_t m_incoming_conns;
 
 			// for new-style accept, allocate socket in here just to fail early
@@ -1071,11 +1069,11 @@ namespace sim
 
 		// all non-expired timers
 		std::mutex m_timer_queue_mutex;
-		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare>;
+		using timer_queue_t = std::multiset<asio::high_resolution_timer*, timer_compare, aux::mallocator<asio::high_resolution_timer*>>;
 		timer_queue_t m_timer_queue;
 
 		// these are the io services that represent nodes on the network
-		std::unordered_set<asio::io_context*> m_nodes;
+		std::unordered_set<asio::io_context*, std::hash<asio::io_context*>, std::equal_to<asio::io_context*>, aux::mallocator<asio::io_context*>> m_nodes;
 
 		using listen_sockets_t = std::map<asio::ip::tcp::endpoint, asio::ip::tcp::socket*>;
 		using listen_socket_iter_t = listen_sockets_t::iterator;
