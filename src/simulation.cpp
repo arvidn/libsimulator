@@ -31,6 +31,7 @@ namespace sim
 	simulation::simulation(configuration& config)
 		: m_config(config)
 		, m_internal_ios(new asio::io_service(*this))
+		, m_service(1)
 	{
 		m_config.build(*this);
 	}

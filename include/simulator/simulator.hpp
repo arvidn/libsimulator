@@ -1186,7 +1186,7 @@ namespace sim
 		io_service(sim::simulation& sim);
 		io_service(sim::simulation& sim, ip::address const& ip);
 		io_service(sim::simulation& sim, std::vector<ip::address> const& ips);
-		io_service();
+		io_service(int threads_hint = 0);
 		~io_service();
 
 #if BOOST_VERSION >= 106600
