@@ -835,7 +835,7 @@ namespace ip {
 							"than expected: %" PRId64 "\n", p.seq_nr, m_next_incoming_seq);
 					}
 
-					m_reorder_buffer.insert(std::make_pair(p.seq_nr, std::move(p)));
+					m_reorder_buffer.emplace(p.seq_nr, std::move(p));
 					return;
 				}
 
