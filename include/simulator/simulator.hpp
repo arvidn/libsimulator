@@ -900,10 +900,10 @@ namespace sim
 			int m_bytes_in_flight = 0;
 
 			// reorder buffer for when packets are dropped
-			std::map<std::uint64_t, aux::packet> m_reorder_buffer;
+			std::map<std::uint64_t, aux::packet, std::less<std::uint64_t>, aux::mallocator<std::pair<std::uint64_t const, aux::packet>>> m_reorder_buffer;
 
 			// the sizes of packets given their sequence number
-			std::unordered_map<std::uint64_t, int> m_outstanding_packet_sizes;
+			std::unordered_map<std::uint64_t, int, std::hash<std::uint64_t>, std::equal_to<std::uint64_t>, aux::mallocator<std::pair<std::uint64_t const, int>>> m_outstanding_packet_sizes;
 
 			// packets to re-send (because they were dropped)
 			std::list<aux::packet, aux::mallocator<aux::packet>> m_outgoing_packets;
