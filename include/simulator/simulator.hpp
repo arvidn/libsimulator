@@ -1110,7 +1110,7 @@ namespace sim
 		io_context(sim::simulation& sim);
 		io_context(sim::simulation& sim, ip::address const& ip);
 		io_context(sim::simulation& sim, std::vector<ip::address> const& ips);
-		io_context();
+		io_context(std::size_t threads_hint = 0);
 		~io_context();
 
 		// not copyable and non movable (it's not movable because we currently

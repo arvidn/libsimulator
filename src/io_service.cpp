@@ -49,7 +49,7 @@ namespace sim { namespace asio {
 		m_sim.remove_io_service(this);
 	}
 
-	io_context::io_context()
+	io_context::io_context(std::size_t)
 		: m_sim(*reinterpret_cast<sim::simulation*>(0))
 	{
 		assert(false);
