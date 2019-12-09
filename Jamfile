@@ -73,6 +73,9 @@ lib simulator
 	<link>shared:<define>SIMULATOR_BUILDING_SHARED
 	<define>_CRT_SECURE_NO_WARNINGS
 
+	# https://github.com/chriskohlhoff/asio/issues/290#issuecomment-377727614
+	<define>_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING
+
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
 	<define>BOOST_ASIO_HAS_MOVE
 	<define>BOOST_ASIO_ENABLE_CANCELIO
