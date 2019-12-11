@@ -20,6 +20,7 @@ All rights reserved.
 #define SIMULATOR_FUNCTION_HPP_INCLUDED
 
 #include <utility>
+#include <memory> // for allocator_traits
 
 #include "simulator/mallocator.hpp"
 
@@ -38,7 +39,7 @@ namespace aux {
 	T* allocate_handler(Fun h)
 	{
 		using alloc = typename boost::asio::associated_allocator<typename std::remove_reference<Fun>::type>::type;
-		using our_alloc = typename alloc::template rebind<T>::other;
+		using our_alloc = typename std::allocator_traits<alloc>::template rebind_alloc<T>;
 		our_alloc al(boost::asio::get_associated_allocator(h));
 		void* ptr = al.allocate(1);
 		if (ptr == nullptr) throw std::bad_alloc();
@@ -88,7 +89,8 @@ namespace aux {
 
 		obj->~function_impl();
 		using alloc = typename boost::asio::associated_allocator<Handler>::type;
-		using our_alloc = typename alloc::template rebind<typename std::remove_reference<decltype(*obj)>::type>::other;
+		using our_alloc = typename std::allocator_traits<alloc>::
+			template rebind_alloc<typename std::remove_reference<decltype(*obj)>::type>;
 		our_alloc al(boost::asio::get_associated_allocator(handler));
 		al.deallocate(obj, 1);
 
@@ -103,7 +105,8 @@ namespace aux {
 
 		obj->~function_impl();
 		using alloc = typename boost::asio::associated_allocator<Handler>::type;
-		using our_alloc = typename alloc::template rebind<typename std::remove_reference<decltype(*obj)>::type>::other;
+		using our_alloc = typename std::allocator_traits<alloc>::
+			template rebind_alloc<typename std::remove_reference<decltype(*obj)>::type>;
 		our_alloc al(boost::asio::get_associated_allocator(h));
 		al.deallocate(obj, 1);
 	}
