@@ -181,6 +181,14 @@ namespace sim
 		using receive_buffer_size = boost::asio::socket_base::receive_buffer_size;
 
 		template <class Option>
+		void set_option(Option const& opt)
+		{
+			boost::system::error_code ec;
+			set_option(opt, ec);
+			if (ec) throw boost::system::system_error(ec);
+		}
+
+		template <class Option>
 		boost::system::error_code set_option(Option const& opt
 			, boost::system::error_code& ec)
 		{

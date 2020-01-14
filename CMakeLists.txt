@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Boost COMPONENTS system REQUIRED)
+find_package(Threads REQUIRED)
 
 set(SIMULATOR_SRC_FILES
   ${SRC_DIR}/acceptor.cpp
@@ -38,6 +39,7 @@ function(define_test)
   set(NAME ${ARGV0})
   add_executable(${NAME} ${TEST_SRC_DIR}/${NAME}.cpp ${TEST_SRC_DIR}/main.cpp)
   target_link_libraries(${NAME} simulator ${Boost_LIBRARIES})
+  target_link_libraries(${NAME} Threads::Threads)
   add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
 
