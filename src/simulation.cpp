@@ -188,7 +188,9 @@ namespace sim
 		{
 			// if the socket is being bound to port 0, it means the system picks a
 			// free port.
-			ep.port(2000);
+
+			ep.port(m_next_bind_port++);
+			if (m_next_bind_port > 65534) m_next_bind_port = 2000;
 			udp_socket_iter_t i = m_udp_sockets.lower_bound(ep);
 			while (i != m_udp_sockets.end() && i->first == ep)
 			{

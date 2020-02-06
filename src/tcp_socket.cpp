@@ -148,7 +148,7 @@ namespace ip {
 		ip::tcp::endpoint addr = m_io_service.bind_socket(this, ep, ec);
 		if (ec) return;
 		m_bound_to = addr;
-		m_user_bound_to = ep;
+		m_user_bound_to = addr;
 	}
 	catch (std::bad_alloc const&)
 	{
