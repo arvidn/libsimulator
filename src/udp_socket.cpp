@@ -72,7 +72,7 @@ namespace ip {
 		ip::udp::endpoint addr = m_io_service.bind_udp_socket(this, ep, ec);
 		if (ec) return ec;
 		m_bound_to = addr;
-		m_user_bound_to = ep;
+		m_user_bound_to = addr;
 		return ec;
 	}
 	catch (std::bad_alloc const&)
