@@ -76,6 +76,11 @@ namespace sim
 		return 1;
 	}
 
+	high_resolution_timer::~high_resolution_timer()
+	{
+		cancel();
+	}
+
 	std::size_t high_resolution_timer::cancel()
 	{
 		if (m_expired) return 0;
