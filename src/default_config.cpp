@@ -39,6 +39,13 @@ namespace sim {
 		m_sim = &sim;
 	}
 
+	void default_config::clear()
+	{
+		m_network.reset();
+		m_outgoing.clear();
+		m_incoming.clear();
+	}
+
 	route default_config::channel_route(
 		asio::ip::address /* src */
 		, asio::ip::address /* dst */)

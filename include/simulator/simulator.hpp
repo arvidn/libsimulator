@@ -124,6 +124,7 @@ namespace sim
 			const duration_type& expiry_time);
 		high_resolution_timer(high_resolution_timer&&) noexcept = default;
 		high_resolution_timer& operator=(high_resolution_timer&&) noexcept = default;
+		~high_resolution_timer();
 
 		std::size_t cancel(boost::system::error_code& ec);
 		std::size_t cancel();
@@ -1332,25 +1333,26 @@ namespace sim
 			, std::string hostname
 			, std::vector<asio::ip::address>& result
 			, boost::system::error_code& ec) = 0;
+
+		virtual void clear() = 0;
 	};
 
 	struct SIMULATOR_DECL default_config : configuration
 	{
 		default_config() : m_sim(nullptr) {}
 
-		virtual void build(simulation& sim) override;
-		virtual route channel_route(asio::ip::address src
-			, asio::ip::address dst) override;
-		virtual route incoming_route(asio::ip::address ip) override;
-		virtual route outgoing_route(asio::ip::address ip) override;
-		virtual int path_mtu(asio::ip::address ip1, asio::ip::address ip2)
-			override;
-		virtual chrono::high_resolution_clock::duration hostname_lookup(
+		void build(simulation& sim) override;
+		route channel_route(asio::ip::address src, asio::ip::address dst) override;
+		route incoming_route(asio::ip::address ip) override;
+		route outgoing_route(asio::ip::address ip) override;
+		int path_mtu(asio::ip::address ip1, asio::ip::address ip2) override;
+		chrono::high_resolution_clock::duration hostname_lookup(
 			asio::ip::address const& requestor
 			, std::string hostname
 			, std::vector<asio::ip::address>& result
 			, boost::system::error_code& ec) override;
 
+		void clear() override;
 	protected:
 		std::shared_ptr<queue> m_network;
 		std::map<asio::ip::address, std::shared_ptr<queue>> m_incoming;

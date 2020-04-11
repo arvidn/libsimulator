@@ -48,7 +48,24 @@ namespace ip {
 	tcp::socket::~socket()
 	{
 		boost::system::error_code ec;
-		close(ec);
+
+		m_channel.reset();
+
+		if (m_bound_to != ip::tcp::endpoint())
+		{
+			m_io_service.unbind_socket(this, m_bound_to);
+			m_bound_to = ip::tcp::endpoint();
+			m_user_bound_to = ip::tcp::endpoint();
+		}
+		m_open = false;
+
+		// prevent any more packets from being delivered to this socket
+		if (m_forwarder)
+		{
+			m_forwarder->clear();
+			m_forwarder.reset();
+		}
+		cancel(ec);
 	}
 
 	boost::system::error_code tcp::socket::open(tcp protocol
@@ -140,8 +157,8 @@ namespace ip {
 	boost::system::error_code tcp::socket::close()
 	{
 		boost::system::error_code ec;
-		if (ec) throw boost::system::system_error(ec);
 		close(ec);
+		if (ec) throw boost::system::system_error(ec);
 		return ec;
 	}
 
@@ -255,7 +272,7 @@ namespace ip {
 		return ret;
 	}
 
-	boost::system::error_code tcp::socket::cancel(boost::system::error_code & ec)
+	boost::system::error_code tcp::socket::cancel(boost::system::error_code& ec)
 	{
 		if (m_recv_handler) abort_recv_handler();
 		if (m_send_handler) abort_send_handler();
