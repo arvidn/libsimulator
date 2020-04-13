@@ -36,9 +36,14 @@ namespace sim
 		m_config.build(*this);
 	}
 
-	simulation::~simulation() {}
+	simulation::~simulation()
+	{
+		m_config.clear();
 
-	std::size_t simulation::run()
+		assert(m_timer_queue.empty());
+	}
+
+	std::size_t simulation::run() try
 	{
 		std::size_t ret = 0;
 		std::size_t last_executed = 0;
@@ -77,6 +82,24 @@ namespace sim
 //			, int(last_executed), m_stopped, int(m_timer_queue.size()), int(ret));
 		return ret;
 	}
+	catch (...)
+	{
+		// cancel all outstanding timers
+		// we make a copy, since cancelling the timers will mutate m_timer_queue
+		auto queue = m_timer_queue;
+		for (auto& t : queue)
+			t->cancel();
+
+		auto listen_sockets = m_listen_sockets;
+		for (auto& s : listen_sockets)
+			s.second->cancel();
+
+		auto udp_sockets = m_udp_sockets;
+		for (auto& s : udp_sockets)
+			s.second->cancel();
+		m_stopped = true;
+		throw;
+	}
 
 	void simulation::stop() { m_stopped = true; }
 	bool simulation::stopped() const { return m_stopped; }
@@ -84,6 +107,7 @@ namespace sim
 
 	void simulation::add_timer(asio::high_resolution_timer* t)
 	{
+		assert(!m_stopped);
 		if (t->expiry() == sim::chrono::high_resolution_clock::now())
 		{
 			std::fprintf(stderr, "WARNING: timer scheduled for current time!\n");
