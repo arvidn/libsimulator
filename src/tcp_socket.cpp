@@ -84,7 +84,24 @@ namespace ip {
 	tcp::socket::~socket()
 	{
 		boost::system::error_code ec;
-		close(ec);
+
+		m_channel.reset();
+
+		if (m_bound_to != ip::tcp::endpoint())
+		{
+			m_io_service.unbind_socket(this, m_bound_to);
+			m_bound_to = ip::tcp::endpoint();
+			m_user_bound_to = ip::tcp::endpoint();
+		}
+		m_open = false;
+
+		// prevent any more packets from being delivered to this socket
+		if (m_forwarder)
+		{
+			m_forwarder->reset();
+			m_forwarder.reset();
+		}
+		cancel(ec);
 	}
 
 	void tcp::socket::open(tcp protocol, boost::system::error_code& ec) try

@@ -59,7 +59,7 @@ namespace sim {
 		queue& operator=(queue const&) = delete;
 
 		queue(queue&&) = default;
-		queue& operator=(queue&&) = default;
+		queue& operator=(queue&&) = delete;
 
 	private:
 
