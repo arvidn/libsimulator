@@ -22,7 +22,6 @@ All rights reserved.
 #include <functional>
 #include <boost/beast/core/bind_handler.hpp>
 
-#define __STDC_FORMAT_MACROS 1
 #include <cinttypes>
 
 using boost::beast::bind_handler;
