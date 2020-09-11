@@ -28,12 +28,7 @@ namespace sim { namespace aux {
 
 	struct packet
 	{
-		packet()
-			: type(type_t::uninitialized)
-			, overhead{20}
-			, seq_nr{0}
-			, byte_counter{0}
-		{}
+		packet() = default;
 
 		// this is move-only
 		packet(packet const&) = delete;
@@ -57,7 +52,9 @@ namespace sim { namespace aux {
 			ack, // the seq_nr is interpreted as "we received this"
 			error, // the error_code (ec) is set
 			payload // the buffer is filled
-		} type;
+		};
+
+		type_t type = type_t::uninitialized;
 
 		boost::system::error_code ec;
 
@@ -69,7 +66,7 @@ namespace sim { namespace aux {
 
 		// the number of bytes of overhead for this packet. The total packet
 		// size is the number of bytes in the buffer + this number
-		int overhead;
+		int overhead = 20;
 
 		// each hop in the route will pop itself off and forward the packet to
 		// the next hop
@@ -80,11 +77,11 @@ namespace sim { namespace aux {
 		std::shared_ptr<aux::channel> channel;
 
 		// sequence number of this packet (used for debugging)
-		std::uint64_t seq_nr;
+		std::uint64_t seq_nr = 0;
 
 		// the number of (payload) bytes sent over this channel so far. This is
 		// meant to map to the TCP sequence number
-		std::uint32_t byte_counter;
+		std::uint32_t byte_counter = 0;
 
 		// this function must be called with this packet in case the packet is
 		// dropped.

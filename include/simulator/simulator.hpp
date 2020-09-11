@@ -75,7 +75,7 @@ namespace sim
 	struct SIMULATOR_DECL route
 	{
 		friend route operator+(route lhs, route rhs)
-		{ return lhs.append(std::move(rhs)); }
+		{ return std::move(lhs.append(std::move(rhs))); }
 
 		std::shared_ptr<sink> next_hop() const { return hops.front(); }
 		std::shared_ptr<sink> pop_front()

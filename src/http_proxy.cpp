@@ -145,7 +145,7 @@ namespace sim
 
 		std::string::size_type const host_end = req.req.substr(0, path_start).find_last_of(':');
 
-		std::string host = req.req.substr(7, host_end != std::string::npos && host_end > 7
+		std::string host = req.req.substr(7, (host_end != std::string::npos && host_end > 7)
 			? host_end - 7 : path_start - 7);
 
 		// if the hostname is an IPv6 address, strip the brackets around it to
@@ -153,7 +153,7 @@ namespace sim
 		if (host.size() >= 2 && host.front() == '[' && host.back() == ']')
 			host = host.substr(1, host.size() - 2);
 
-		int const port = host_end == std::string::npos && host_end > 7 ? 80
+		int const port = host_end == std::string::npos || host_end <= 7 ? 80
 			: atoi(req.req.substr(host_end + 1, path_start).c_str());
 		assert(port >= 0 && port < 0xffff);
 
