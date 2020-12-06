@@ -33,6 +33,10 @@ set(SIMULATOR_SRC_FILES
 add_library(simulator ${SIMULATOR_SRC_FILES})
 include_directories(${Boost_INCLUDE_DIR} ${INCLUDE_DIR})
 
+if(WIN32)
+  target_link_libraries(simulator PRIVATE ws2_32)
+endif()
+
 enable_testing()
 
 function(define_test)
