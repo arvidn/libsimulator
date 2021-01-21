@@ -396,10 +396,17 @@ namespace ip {
 		const int bandwidth = 100000000; // 100 MB/s
 		const int mtu = m_io_service.get_path_mtu(m_bound_to.address(), dst.address());
 
-		if (int(ret) > 65535 || (int(ret) > mtu && m_dont_fragment))
+		if (int(ret) > 65535)
 		{
 			ec = boost::system::error_code(error::message_size);
 			return 0;
+		}
+
+		if (m_dont_fragment && int(ret) > mtu)
+		{
+			// silently drop packet
+			ec.clear();
+			return ret;
 		}
 
 		// determine the bandwidth in terms of nanoseconds / byte
