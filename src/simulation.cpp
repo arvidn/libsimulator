@@ -33,6 +33,7 @@ namespace sim
 		, m_internal_ios(new asio::io_context(*this))
 		, m_service(1)
 	{
+		sim::chrono::reset_clock();
 		m_config.build(*this);
 	}
 
