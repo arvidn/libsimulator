@@ -41,6 +41,11 @@ namespace sim { namespace chrono {
 		g_simulation_time += d;
 	}
 
+	void reset_clock()
+	{
+		g_simulation_time = high_resolution_clock::time_point{};
+	}
+
 } // chrono
 } // sim
 
