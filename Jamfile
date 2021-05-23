@@ -111,6 +111,7 @@ project
 	<define>BOOST_ALL_NO_LIB
 	: default-build
 	<link>static
+	<threading>multi
 	;
 
 test-suite simulator-tests : [ run
