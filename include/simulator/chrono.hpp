@@ -78,6 +78,9 @@ namespace sim { namespace chrono
 		static void fast_forward(high_resolution_clock::duration d);
 	};
 
+	// private interface
+	void reset_clock();
+
 } // chrono
 } // sim
 
