@@ -40,7 +40,7 @@ enum socks_flag
 struct SIMULATOR_DECL socks_connection : std::enable_shared_from_this<socks_connection>
 {
 	socks_connection(asio::io_context& ios, int version, std::array<int, 3>& cmd_counts
-		, std::uint32_t flags);
+		, std::uint32_t flags, int& bind_port);
 
 	asio::ip::tcp::socket& socket() { return m_client_connection; }
 
@@ -85,6 +85,8 @@ private:
 
 	char const* command() const;
 
+	int& m_bind_port;
+
 	asio::io_context& m_ios;
 
 	asio::ip::tcp::resolver m_resolver;
@@ -115,7 +117,7 @@ private:
 	int m_num_in_bytes;
 
 	// set to true when shutting down
-	bool m_close;
+	bool m_close = false;
 
 	// the SOCKS protocol version (4 or 5)
 	const int m_version;
@@ -136,6 +138,8 @@ struct SIMULATOR_DECL socks_server
 
 	void stop();
 
+	void bind_start_port(int const port) { m_bind_port = port; }
+
 	// return the number of CONNECT, BIND and UDP_ASSOCIATE commands the proxy
 	// has received
 	std::array<int, 3> cmd_counts() const
@@ -153,8 +157,10 @@ private:
 
 	asio::ip::tcp::endpoint m_ep;
 
+	int m_bind_port = 2048;
+
 	// set to true when shutting down
-	bool m_close;
+	bool m_close = false;
 
 	// the SOCKS protocol version (4 or 5)
 	const int m_version;
