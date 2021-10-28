@@ -38,8 +38,7 @@ namespace sim
 		, std::uint32_t const flags)
 		: m_ios(ios)
 		, m_listen_socket(ios)
-		, m_conn(std::make_shared<socks_connection>(m_ios, version, m_cmd_counts, flags))
-		, m_close(false)
+		, m_conn(std::make_shared<socks_connection>(m_ios, version, m_cmd_counts, flags, m_bind_port))
 		, m_version(version)
 		, m_flags(flags)
 	{
@@ -79,7 +78,7 @@ namespace sim
 		m_conn->start();
 
 		// create a new connection to accept into
-		m_conn = std::make_shared<socks_connection>(m_ios, m_version, m_cmd_counts, m_flags);
+		m_conn = std::make_shared<socks_connection>(m_ios, m_version, m_cmd_counts, m_flags, m_bind_port);
 
 		// now we can accept another connection
 		m_listen_socket.async_accept(m_conn->socket(), m_ep
@@ -93,8 +92,9 @@ namespace sim
 	}
 
 	socks_connection::socks_connection(asio::io_context& ios
-		, int version, std::array<int, 3>& cmd_counts, std::uint32_t const flags)
-		: m_ios(ios)
+		, int version, std::array<int, 3>& cmd_counts, std::uint32_t const flags, int& bind_port)
+		: m_bind_port(bind_port)
+		, m_ios(ios)
 		, m_resolver(m_ios)
 		, m_client_connection(ios)
 		, m_server_connection(m_ios)
@@ -102,7 +102,6 @@ namespace sim
 		, m_udp_associate(m_ios)
 		, m_num_out_bytes(0)
 		, m_num_in_bytes(0)
-		, m_close(false)
 		, m_version(version)
 		, m_command(0)
 		, m_cmd_counts(cmd_counts)
@@ -524,7 +523,7 @@ namespace sim
 		}
 		else
 		{
-			m_udp_associate.bind(udp::endpoint(address_v4(), 0), ec);
+			m_udp_associate.bind(udp::endpoint(address_v4(), std::uint16_t(m_bind_port++)), ec);
 			if (ec)
 			{
 				std::printf("ERROR: binding socket failed: (%d) %s\n"
