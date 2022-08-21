@@ -539,7 +539,9 @@ namespace sim
 
 		int const response = ec ? 1 : 0;
 		udp::endpoint ep = m_udp_associate.local_bound_to();
-		int const len = format_response(ep.address(), ep.port(), response);
+		int const len = (m_flags & udp_associate_respond_empty_hostname)
+			? format_hostname_response("", ep.port(), response)
+			: format_response(ep.address(), ep.port(), response);
 
 		if (ec)
 		{
@@ -730,6 +732,35 @@ namespace sim
 			memcpy(&m_in_buffer[i], &b[0], b.size());
 			i += int(b.size());
 		}
+		return i;
+	}
+
+	int socks_connection::format_hostname_response(char const* hostname, int const port
+		, int const response)
+	{
+		int i = 0;
+		if (m_version != 5)
+		{
+			std::printf("socks_connection: hostname response requires SOCKS v5\n");
+			close_connection();
+			return 0;
+		}
+// +----+-----+-------+------+----------+----------+
+// |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+// +----+-----+-------+------+----------+----------+
+// | 1  |  1  | X'00' |  1   | Variable |    2     |
+// +----+-----+-------+------+----------+----------+
+
+		m_in_buffer[i++] = char(m_version); // version
+		m_in_buffer[i++] = char(response); // response
+		m_in_buffer[i++] = 0; // reserved
+		m_in_buffer[i++] = 3; // DOMAINNAME
+		m_in_buffer[i++] = std::uint8_t(::strlen(hostname));
+		for (; *hostname != '\0'; ++hostname)
+			m_in_buffer[i++] = *hostname;
+
+		m_in_buffer[i++] = (port >> 8) & 0xff;
+		m_in_buffer[i++] = port & 0xff;
 		return i;
 	}
 
