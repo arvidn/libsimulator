@@ -34,7 +34,11 @@ enum socks_flag
 {
 	// when this flag is set, the proxy will close the client connection
 	// immediately after sending the response to a UDP ASSOCIATE command
-	disconnect_udp_associate = 1
+	disconnect_udp_associate = 1,
+
+	// when this flag is set, the reponse to UDP ASSOCIATE will contain an empty
+	// hostname, rather than the relay IP address
+	udp_associate_respond_empty_hostname = 2
 };
 
 struct SIMULATOR_DECL socks_connection : std::enable_shared_from_this<socks_connection>
@@ -59,6 +63,7 @@ private:
 	void close_connection();
 
 	int format_response(asio::ip::address const& addr, int port, int response);
+	int format_hostname_response(char const* hostname, int port, int response);
 
 	void on_connected(boost::system::error_code const& ec);
 	void on_request_domain_name(boost::system::error_code const& ec, size_t bytes_transferred);
