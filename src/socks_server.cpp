@@ -540,7 +540,7 @@ namespace sim
 		int const response = ec ? 1 : 0;
 		udp::endpoint ep = m_udp_associate.local_bound_to();
 		int const len = (m_flags & udp_associate_respond_empty_hostname)
-			? format_hostname_response("", ep.port(), response)
+			? format_hostname_response("foobar", ep.port(), response)
 			: format_response(ep.address(), ep.port(), response);
 
 		if (ec)
