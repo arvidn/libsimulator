@@ -26,7 +26,6 @@ All rights reserved.
 
 using namespace sim::asio;
 using namespace sim::asio::ip;
-using namespace std::placeholders;
 
 using boost::system::error_code;
 
@@ -57,7 +56,7 @@ namespace sim
 		m_listen_socket.listen();
 
 		m_listen_socket.async_accept(m_conn->socket(), m_ep
-			, std::bind(&socks_server::on_accept, this, _1));
+			, std::bind(&socks_server::on_accept, this, std::placeholders::_1));
 	}
 
 	void socks_server::on_accept(error_code const& ec)
@@ -82,7 +81,7 @@ namespace sim
 
 		// now we can accept another connection
 		m_listen_socket.async_accept(m_conn->socket(), m_ep
-			, std::bind(&socks_server::on_accept, this, _1));
+			, std::bind(&socks_server::on_accept, this, std::placeholders::_1));
 	}
 
 	void socks_server::stop()
@@ -115,11 +114,11 @@ namespace sim
 		if (m_version == 4)
 		{
 			asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 9)
-				, std::bind(&socks_connection::on_request1, shared_from_this(), _1, _2));
+				, std::bind(&socks_connection::on_request1, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 		} else {
 			// read protocol version and number of auth-methods
 			asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 2)
-				, std::bind(&socks_connection::on_handshake1, shared_from_this(), _1, _2));
+				, std::bind(&socks_connection::on_handshake1, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 		}
 	}
 
@@ -147,7 +146,7 @@ namespace sim
 		asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0],
 				num_methods)
 			, std::bind(&socks_connection::on_handshake2, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_handshake2(error_code const& ec, size_t bytes_transferred)
@@ -172,7 +171,7 @@ namespace sim
 
 		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], 2)
 			, std::bind(&socks_connection::on_handshake3, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_handshake3(error_code const& ec, size_t bytes_transferred)
@@ -187,7 +186,7 @@ namespace sim
 
 		asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[0], 10)
 			, std::bind(&socks_connection::on_request1, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_request1(error_code const& ec, size_t bytes_transferred)
@@ -358,7 +357,7 @@ namespace sim
 				const int additional_bytes = len - 3;
 				asio::async_read(m_client_connection, asio::buffer(&m_out_buffer[10], additional_bytes)
 					, std::bind(&socks_connection::on_request_domain_name
-						, shared_from_this(), _1, _2));
+						, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 				break;
 			}
 			case 4: // IPv6 address
@@ -398,7 +397,7 @@ namespace sim
 		std::snprintf(port_str, sizeof(port_str), "%d", port);
 		m_resolver.async_resolve(hostname, port_str
 			, std::bind(&socks_connection::on_request_domain_lookup
-				, shared_from_this(), _1, _2));
+				, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_request_domain_lookup(boost::system::error_code const& ec
@@ -456,7 +455,7 @@ namespace sim
 		m_server_connection.open(target.protocol());
 		m_server_connection.async_connect(target
 			, std::bind(&socks_connection::on_connected, shared_from_this()
-				, _1));
+				, std::placeholders::_1));
 	}
 
 	void socks_connection::bind_connection(const asio::ip::tcp::endpoint& target)
@@ -504,7 +503,7 @@ namespace sim
 		// send response
 		asio::async_write(m_client_connection
 			, asio::buffer(&m_in_buffer[0], len)
-			, std::bind(&socks_connection::start_accept, shared_from_this(), _1));
+			, std::bind(&socks_connection::start_accept, shared_from_this(), std::placeholders::_1));
 	}
 
 	void socks_connection::udp_associate(const asio::ip::tcp::endpoint& target)
@@ -534,7 +533,7 @@ namespace sim
 			{
 				m_udp_associate.non_blocking(true);
 				m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
-					, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, _1, _2));
+					, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, std::placeholders::_1, std::placeholders::_2));
 			}
 		}
 
@@ -559,7 +558,7 @@ namespace sim
 
 		// send response
 		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], len)
-			, std::bind(&socks_connection::wait_for_eof, shared_from_this(), _1, _2));
+			, std::bind(&socks_connection::wait_for_eof, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::wait_for_eof(boost::system::error_code const& ec, std::size_t)
@@ -583,7 +582,7 @@ namespace sim
 		m_client_connection.async_read_some(
 			asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::wait_for_eof, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_read_udp(boost::system::error_code const& ec
@@ -755,7 +754,7 @@ namespace sim
 		}
 
 		m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
-			, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, _1, _2));
+			, m_udp_from, 0, std::bind(&socks_connection::on_read_udp, this, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::start_accept(boost::system::error_code const& ec)
@@ -771,12 +770,12 @@ namespace sim
 		m_bind_socket.listen();
 		m_bind_socket.async_accept(m_server_connection
 			, std::bind(&socks_connection::on_connected
-				, shared_from_this(), _1));
+				, shared_from_this(), std::placeholders::_1));
 
 		m_client_connection.async_read_some(
 			sim::asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::on_client_receive, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	int socks_connection::format_response(address const& addr, int const port
@@ -913,11 +912,11 @@ namespace sim
 			self->m_server_connection.async_read_some(
 				sim::asio::buffer(m_in_buffer)
 				, std::bind(&socks_connection::on_server_receive, self
-					, _1, _2));
+					, std::placeholders::_1, std::placeholders::_2));
 			self->m_client_connection.async_read_some(
 				sim::asio::buffer(m_out_buffer)
 				, std::bind(&socks_connection::on_client_receive, self
-					, _1, _2));
+					, std::placeholders::_1, std::placeholders::_2));
 			});
 	}
 
@@ -941,7 +940,7 @@ namespace sim
 		}
 		asio::async_write(m_server_connection, asio::buffer(&m_out_buffer[0], bytes_transferred)
 			, std::bind(&socks_connection::on_client_forward, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_client_forward(error_code const& ec
@@ -958,7 +957,7 @@ namespace sim
 		m_client_connection.async_read_some(
 			sim::asio::buffer(m_out_buffer)
 			, std::bind(&socks_connection::on_client_receive, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	// we received some data from the server, forward it to the server
@@ -975,7 +974,7 @@ namespace sim
 
 		asio::async_write(m_client_connection, asio::buffer(&m_in_buffer[0], bytes_transferred)
 			, std::bind(&socks_connection::on_server_forward, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::on_server_forward(error_code const& ec
@@ -992,7 +991,7 @@ namespace sim
 		m_server_connection.async_read_some(
 			sim::asio::buffer(m_in_buffer)
 			, std::bind(&socks_connection::on_server_receive, shared_from_this()
-				, _1, _2));
+				, std::placeholders::_1, std::placeholders::_2));
 	}
 
 	void socks_connection::close_connection()
