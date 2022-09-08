@@ -21,7 +21,18 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#if __GNUC__ >= 9
+#pragma GCC diagnostic ignored "-Wparentheses"
+#endif
+#endif
+
 #include <boost/bimap.hpp>
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #ifdef _MSC_VER
 #pragma warning(push)
