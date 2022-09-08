@@ -21,6 +21,8 @@ All rights reserved.
 
 #include "simulator/simulator.hpp"
 
+#include <boost/bimap.hpp>
+
 #ifdef _MSC_VER
 #pragma warning(push)
 // warning C4251: X: class Y needs to have dll-interface to be used by clients of struct
@@ -94,7 +96,11 @@ private:
 
 	asio::io_context& m_ios;
 
+	asio::ip::udp::resolver m_udp_resolver;
+
 	asio::ip::tcp::resolver m_resolver;
+
+	boost::bimap<asio::ip::address, std::string> m_name_mapping;
 
 	// this is the SOCKS client connection, i.e. the client connecting to us and
 	// being forwarded

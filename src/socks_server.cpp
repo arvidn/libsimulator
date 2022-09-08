@@ -95,6 +95,7 @@ namespace sim
 		, int version, std::array<int, 3>& cmd_counts, std::uint32_t const flags, int& bind_port)
 		: m_bind_port(bind_port)
 		, m_ios(ios)
+		, m_udp_resolver(ios)
 		, m_resolver(m_ios)
 		, m_client_connection(ios)
 		, m_server_connection(m_ios)
@@ -613,53 +614,144 @@ namespace sim
 			// | 2  |  1   |  1   | Variable |    2     | Variable |
 			// +----+------+------+----------+----------+----------+
 
-			char const* ptr = m_udp_buffer.data();
-			if (ptr[2] != 0) std::printf("fragment != 0, not supported\n");
+			char const* buf = m_udp_buffer.data();
+			if (buf[2] != 0) std::printf("fragment != 0, not supported\n");
 
-			// TODO: support hostnames too
-			if (ptr[3] != 1) std::printf("only supports IPv4. ATYP: %d\n", ptr[3]);
+			int const atyp = buf[3];
+			if (atyp == 3)
+			{
+				// hostname
+				int const len = buf[4];
 
-			std::uint32_t addr = ptr[4] & 0xff;
-			addr <<= 8;
-			addr |= ptr[5] & 0xff;
-			addr <<= 8;
-			addr |= ptr[6] & 0xff;
-			addr <<= 8;
-			addr |= ptr[7] & 0xff;
+				buf += 5;
+				bytes_transferred -= 5;
+				std::string const hostname(buf, len);
+				buf += len;
+				bytes_transferred -= len;
 
-			std::uint16_t port = ptr[8] & 0xff;
-			port <<= 8;
-			port |= ptr[9] & 0xff;
+				std::uint16_t port = buf[0] & 0xff;
+				port <<= 8;
+				port |= buf[1] & 0xff;
+				buf += 2;
+				bytes_transferred -= 2;
 
-			asio::ip::udp::endpoint const target(address_v4(addr), port);
-			error_code err;
-			m_udp_associate.send_to(boost::asio::buffer(ptr + 10, bytes_transferred - 10), target, 0, err);
-			if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+				auto it = m_name_mapping.right.find(hostname);
+				if (it != m_name_mapping.right.end())
+				{
+					error_code err;
+					m_udp_associate.send_to(boost::asio::buffer(buf, bytes_transferred)
+						, udp::endpoint(it->second, port), 0, err);
+					if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+					return;
+				}
+
+				std::vector<char> forward_buffer(buf, buf + bytes_transferred);
+
+				m_udp_resolver.async_resolve(hostname.c_str(), std::to_string(port).c_str()
+					, [buf=std::move(forward_buffer), hostname, this]
+						(error_code const& ec, asio::ip::udp::resolver::results_type ips)
+					{
+						if (ec)
+						{
+							std::printf("resolve failed: %s\n", ec.message().c_str());
+							return;
+						}
+
+						for (auto const& ip : ips)
+						{
+							auto const target = ip.endpoint();
+							error_code err;
+							m_udp_associate.send_to(boost::asio::buffer(buf)
+								, target, 0, err);
+							if (!err)
+							{
+								m_name_mapping.insert({target.address(), hostname});
+								break;
+							}
+							std::printf("send_to failed: %s\n", err.message().c_str());
+						}
+					});
+			}
+			else if (atyp == 1)
+			{
+				// IPv4
+				std::uint32_t addr = buf[4] & 0xff;
+				addr <<= 8;
+				addr |= buf[5] & 0xff;
+				addr <<= 8;
+				addr |= buf[6] & 0xff;
+				addr <<= 8;
+				addr |= buf[7] & 0xff;
+
+				std::uint16_t port = buf[8] & 0xff;
+				port <<= 8;
+				port |= buf[9] & 0xff;
+
+				buf += 10;
+				bytes_transferred -= 10;
+
+				asio::ip::udp::endpoint const target(address_v4(addr), port);
+
+				error_code err;
+				m_udp_associate.send_to(boost::asio::buffer(buf, bytes_transferred), target, 0, err);
+				if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+			}
+			else
+			{
+				std::printf("only supports IPv4 and hostname. ATYP: %d\n", atyp);
+			}
 		}
 		else
 		{
-			// add UDP ASSOCIATE header and forward to client
-			std::uint32_t const from_addr = m_udp_from.address().to_v4().to_uint();
 			std::uint16_t const from_port = m_udp_from.port();
-			std::array<char, 10> header;
-			header[0] = 0; // RSV
-			header[1] = 0;
-			header[2] = 0; // fragment
-			header[3] = 1; // ATYP
-			header[4] = (from_addr >> 24) & 0xff; // Address
-			header[5] = (from_addr >> 16) & 0xff;
-			header[6] = (from_addr >> 8) & 0xff;
-			header[7] = (from_addr) & 0xff;
-			header[8] = (from_port >> 8) & 0xff;
-			header[9] = from_port & 0xff;
 
-			std::array<boost::asio::const_buffer, 2> vec{{
-				{header.data(), header.size()},
-				{m_udp_buffer.data(), bytes_transferred}}};
+			auto it = m_name_mapping.left.find(m_udp_from.address());
+			if (it != m_name_mapping.left.end())
+			{
+				std::vector<char> header(7 + it->second.size());
+				header[0] = 0; // RSV
+				header[1] = 0;
+				header[2] = 0; // fragment
+				header[3] = 3; // ATYP
+				header[4] = static_cast<char>(it->second.size());
+				int idx = 5;
+				std::copy(it->second.begin(), it->second.end(), header.data() + idx);
+				idx += it->second.size();
+				header[idx] = (from_port >> 8) & 0xff;
+				header[idx + 1] = from_port & 0xff;
 
-			error_code err;
-			m_udp_associate.send_to(vec, m_udp_associate_ep, 0, err);
-			if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+				std::array<boost::asio::const_buffer, 2> vec{{
+					{header.data(), header.size()},
+					{m_udp_buffer.data(), bytes_transferred}}};
+
+				error_code err;
+				m_udp_associate.send_to(vec, m_udp_associate_ep, 0, err);
+				if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+			}
+			else
+			{
+				// add UDP ASSOCIATE header and forward to client
+				std::uint32_t const from_addr = m_udp_from.address().to_v4().to_uint();
+				std::array<char, 10> header;
+				header[0] = 0; // RSV
+				header[1] = 0;
+				header[2] = 0; // fragment
+				header[3] = 1; // ATYP
+				header[4] = (from_addr >> 24) & 0xff; // Address
+				header[5] = (from_addr >> 16) & 0xff;
+				header[6] = (from_addr >> 8) & 0xff;
+				header[7] = (from_addr) & 0xff;
+				header[8] = (from_port >> 8) & 0xff;
+				header[9] = from_port & 0xff;
+
+				std::array<boost::asio::const_buffer, 2> vec{{
+					{header.data(), header.size()},
+					{m_udp_buffer.data(), bytes_transferred}}};
+
+				error_code err;
+				m_udp_associate.send_to(vec, m_udp_associate_ep, 0, err);
+				if (err) std::printf("send_to failed: %s\n", err.message().c_str());
+			}
 		}
 
 		m_udp_associate.async_receive_from(boost::asio::buffer(m_udp_buffer)
