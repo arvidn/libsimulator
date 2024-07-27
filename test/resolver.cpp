@@ -42,9 +42,6 @@ void on_name_lookup(boost::system::error_code const& ec
 {
 	++num_lookups;
 
-	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now()
-		.time_since_epoch()).count());
-
 	std::vector<address_v4> expect = {
 		make_address_v4("1.2.3.4")
 		, make_address_v4("1.2.3.5")
@@ -70,9 +67,6 @@ void on_failed_name_lookup(boost::system::error_code const& ec
 	++num_lookups;
 
 	assert(ec == boost::system::error_code(asio::error::host_not_found));
-
-	int millis = int(duration_cast<milliseconds>(chrono::high_resolution_clock::now()
-		.time_since_epoch()).count());
 }
 
 struct sim_config : sim::default_config
