@@ -72,5 +72,5 @@ TEST_CASE("headers are parsed", "[parse_request]")
 TEST_CASE("invalid formed request throws parse exception", "[parse_request]")
 {
 	auto str = "INVALID";
-	REQUIRE_THROWS_WITH(sim::parse_request(str, std::strlen(str)), Catch::Contains("parse failed"));
+	REQUIRE_THROWS_WITH(sim::parse_request(str, std::strlen(str)), Catch::Matchers::ContainsSubstring("parse failed"));
 }
