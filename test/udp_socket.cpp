@@ -107,6 +107,7 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
+	CHECK(millis == 56);
 	CHECK(num_sent == num_received);
 	CHECK(num_sent == 100 * 45);
 }

@@ -122,6 +122,7 @@ TEST_CASE("one node can have multiple addresses (UDP)", "[multi-homed]")
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()
 		.time_since_epoch()).count());
 
+	CHECK(millis == 43);
 	CHECK(num_ipv4 == 1);
 	CHECK(num_ipv6 == 1);
 }
