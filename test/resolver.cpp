@@ -53,7 +53,7 @@ void on_name_lookup(boost::system::error_code const& ec
 
 	auto expect_it = expect.begin();
 
-	for (auto const ip : ips)
+	for (auto const& ip : ips)
 	{
 		assert(ip.endpoint().address() == *expect_it);
 		assert(ip.endpoint().port() == 8080);
@@ -178,7 +178,7 @@ TEST_CASE("resolve an IP address", "[resolver]") {
 		std::vector<address_v4> expect = { make_address_v4("10.10.10.10") };
 
 		auto expect_it = expect.begin();
-		for (auto const ip : ips)
+		for (auto const& ip : ips)
 		{
 			assert(ip.endpoint().address() == *expect_it);
 			assert(ip.endpoint().port() == 8080);
