@@ -1,0 +1,114 @@
+name: CI
+
+on:
+   push:
+      branches: [ master ]
+   pull_request:
+
+concurrency:
+   group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event_name }}
+   cancel-in-progress: true
+
+jobs:
+
+   linux:
+      name: Linux (${{ matrix.toolset }})
+      runs-on: ubuntu-24.04
+
+      strategy:
+         fail-fast: false
+         matrix:
+            include:
+               - toolset: gcc
+               - toolset: clang
+
+      steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+           fetch-depth: 1
+
+      - name: update package lists
+        continue-on-error: true
+        run: sudo apt update
+
+      - uses: Chocobo1/setup-ccache-action@v1
+        with:
+          update_packager_index: false
+          override_cache_key: ccache-linux-${{ matrix.toolset }}
+
+      - name: install boost
+        run: |
+          sudo apt install libboost-tools-dev libboost-dev libboost-system-dev
+          echo "using gcc ;" >>~/user-config.jam
+          echo "using clang ;" >>~/user-config.jam
+
+      - name: build and run tests (b2)
+        run: b2 toolset=${{ matrix.toolset }} warnings-as-errors=on simulator-tests
+
+      - name: build and run tests (cmake)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build build --parallel
+          cd build && ctest --output-on-failure
+
+
+   macos:
+      name: macOS
+      runs-on: macos-latest
+
+      steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+           fetch-depth: 1
+
+      - uses: Chocobo1/setup-ccache-action@v1
+        with:
+          update_packager_index: false
+          override_cache_key: ccache-macos
+
+      - name: install boost
+        run: |
+          brew install boost boost-build
+          echo "using darwin ;" >>~/user-config.jam
+
+      - name: build and run tests (b2)
+        run: b2 warnings-as-errors=on simulator-tests
+
+      - name: build and run tests (cmake)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build build --parallel
+          cd build && ctest --output-on-failure
+
+
+   windows:
+      name: Windows (msvc)
+      runs-on: windows-latest
+      defaults:
+         run:
+            shell: cmd
+
+      steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+           fetch-depth: 1
+
+      - name: install boost
+        run: |
+          git clone --depth=1 --recurse-submodules -j10 --branch=boost-1.91.0 https://github.com/boostorg/boost.git
+          cd boost
+          bootstrap.bat
+
+      - name: boost headers
+        run: |
+          cd boost
+          .\b2 headers
+
+      - name: build and run tests (b2)
+        run: |
+          set BOOST_ROOT=%CD%\boost
+          set PATH=%BOOST_ROOT%;%PATH%
+          b2 --hash address-model=64 warnings=all warnings-as-errors=on simulator-tests
