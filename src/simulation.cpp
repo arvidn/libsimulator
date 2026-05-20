@@ -24,6 +24,7 @@ All rights reserved.
 #include <memory> // for make_shared
 #include <cstdio> // for printf
 #include <iostream>
+#include <stdexcept> // for std::runtime_error
 
 using namespace sim::asio;
 
@@ -49,6 +50,17 @@ namespace sim
 	{
 		std::size_t ret = 0;
 		std::size_t last_executed = 0;
+
+		// Detect a runaway loop where events keep firing but simulated time
+		// never advances - typically a timer being repeatedly scheduled at the
+		// current time (a 100% CPU spin that would otherwise hang run()
+		// forever). Legitimate bursts of same-timestamp events are finite, so
+		// a large threshold reliably distinguishes them from an unbounded spin.
+		chrono::high_resolution_clock::time_point prev_time
+			= chrono::high_resolution_clock::now();
+		std::int64_t stalled_iterations = 0;
+		constexpr std::int64_t max_stalled_iterations = 1000;
+
 		do {
 
 			m_service.restart();
@@ -73,6 +85,21 @@ namespace sim
 					next_timer->fire(boost::system::error_code());
 					++last_executed;
 					++ret;
+				}
+			}
+
+			if (last_executed > 0) {
+				if (now == prev_time) {
+					if (++stalled_iterations > max_stalled_iterations) {
+						throw std::runtime_error("libsimulator: simulated time "
+							"has not advanced for too many consecutive iterations "
+							"while events keep firing. The simulation is stuck in a "
+							"busy loop, typically a timer repeatedly scheduled at "
+							"the current time (a 100% CPU spin).");
+					}
+				} else {
+					stalled_iterations = 0;
+					prev_time = now;
 				}
 			}
 
