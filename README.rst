@@ -1,11 +1,8 @@
 libsimulator
 ============
 
-.. image:: https://travis-ci.org/arvidn/libsimulator.svg?branch=master
-    :target: https://travis-ci.org/arvidn/libsimulator
-
-.. image:: https://ci.appveyor.com/api/projects/status/0857n4g3f6mui90i/branch/master
-    :target: https://ci.appveyor.com/project/arvidn/libsimulator/branch/master
+.. image:: https://github.com/arvidn/libsimulator/actions/workflows/ci.yml/badge.svg?branch=master
+    :target: https://github.com/arvidn/libsimulator/actions/workflows/ci.yml
 
 *This is still in initial development, some of this README represents ambitions
 rather than the current state*

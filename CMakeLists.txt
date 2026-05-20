@@ -7,7 +7,10 @@ set(INCLUDE_DIR include)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost COMPONENTS system REQUIRED)
+# Boost.System is header-only (since Boost 1.69), so we only need the Boost
+# headers. Requesting the "system" component fails with recent Boost releases
+# that no longer ship a boost_system CMake config file.
+find_package(Boost REQUIRED)
 find_package(Threads REQUIRED)
 
 set(SIMULATOR_SRC_FILES
@@ -31,7 +34,8 @@ set(SIMULATOR_SRC_FILES
 )
 
 add_library(simulator ${SIMULATOR_SRC_FILES})
-include_directories(${Boost_INCLUDE_DIR} ${INCLUDE_DIR})
+target_include_directories(simulator PUBLIC ${INCLUDE_DIR})
+target_link_libraries(simulator PUBLIC Boost::boost)
 
 if(WIN32)
   target_link_libraries(simulator PRIVATE ws2_32)
@@ -42,7 +46,7 @@ enable_testing()
 function(define_test)
   set(NAME ${ARGV0})
   add_executable(${NAME} ${TEST_SRC_DIR}/${NAME}.cpp ${TEST_SRC_DIR}/main.cpp)
-  target_link_libraries(${NAME} simulator ${Boost_LIBRARIES})
+  target_link_libraries(${NAME} simulator)
   target_link_libraries(${NAME} Threads::Threads)
   add_test(NAME ${NAME} COMMAND ${NAME})
 endfunction()
