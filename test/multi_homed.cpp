@@ -43,7 +43,7 @@ int num_ipv4 = 0;
 
 }
 
-void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferred
+void on_receive(boost::system::error_code const& ec, std::size_t /* bytes_transferred */
 	, udp::socket& s)
 {
 	int millis = int(duration_cast<milliseconds>(high_resolution_clock::now()

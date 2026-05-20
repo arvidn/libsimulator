@@ -53,7 +53,7 @@ void on_receive(boost::system::error_code const& ec, std::size_t bytes_transferr
 		return;
 	}
 
-	num_received += bytes_transferred;
+	num_received += int(bytes_transferred);
 
 	std::printf("[%4d] received %d bytes from %s\n", millis
 		, int(bytes_transferred)
@@ -97,8 +97,8 @@ TEST_CASE("send packet to udp socket", "[udp_socket]")
 
 	for (int i = 1; i < 10; ++i)
 	{
-		num_sent += outgoing.send_to(asio::buffer(send_buf, 100 * i)
-			, udp::endpoint(make_address_v4("40.30.20.10"), 1337), 0, ec);
+		num_sent += int(outgoing.send_to(asio::buffer(send_buf, 100 * i)
+			, udp::endpoint(make_address_v4("40.30.20.10"), 1337), 0, ec));
 		REQUIRE(!ec);
 	}
 

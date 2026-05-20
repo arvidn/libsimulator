@@ -427,10 +427,6 @@ namespace ip {
 	void tcp::socket::async_write_some_impl(std::vector<boost::asio::const_buffer> const& bufs
 		, aux::function<void(boost::system::error_code const&, std::size_t)> handler)
 	{
-		int buf_size = 0;
-		for (int i = 0; i < int(bufs.size()); ++i)
-			buf_size += int(bufs[i].size());
-
 		boost::system::error_code ec;
 		std::size_t const bytes_transferred = write_some_impl(bufs, ec);
 		if (ec == boost::system::error_code(error::would_block))

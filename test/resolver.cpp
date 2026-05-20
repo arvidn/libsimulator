@@ -37,7 +37,7 @@ using chrono::milliseconds;
 
 int num_lookups = 0;
 
-void on_name_lookup(boost::system::error_code const& ec
+void on_name_lookup(boost::system::error_code const& /* ec */
 	, asio::ip::tcp::resolver::results_type ips)
 {
 	++num_lookups;
@@ -62,7 +62,7 @@ void on_name_lookup(boost::system::error_code const& ec
 }
 
 void on_failed_name_lookup(boost::system::error_code const& ec
-	, asio::ip::tcp::resolver::results_type ips)
+	, asio::ip::tcp::resolver::results_type /* ips */)
 {
 	++num_lookups;
 
@@ -166,7 +166,7 @@ TEST_CASE("resolve an IP address", "[resolver]") {
 
 	asio::ip::tcp::resolver resolver(ios);
 	resolver.async_resolve("10.10.10.10", "8080"
-		, [](boost::system::error_code const& ec, asio::ip::tcp::resolver::results_type ips)
+		, [](boost::system::error_code const& /* ec */, asio::ip::tcp::resolver::results_type ips)
 	{
 		++num_lookups;
 		std::vector<address_v4> expect = { make_address_v4("10.10.10.10") };
