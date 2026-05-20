@@ -49,11 +49,26 @@ namespace sim { namespace asio {
 		m_sim.remove_io_service(this);
 	}
 
+	// this constructor is never meant to be called (hence the assert). It only
+	// exists to satisfy interfaces that require a default-like constructor. The
+	// null reference is deliberate, so suppress the warning about it.
+#if defined __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnull-dereference"
+#elif defined __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
 	io_context::io_context(std::size_t)
 		: m_sim(*reinterpret_cast<sim::simulation*>(0))
 	{
 		assert(false);
 	}
+#if defined __clang__
+#pragma clang diagnostic pop
+#elif defined __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 	int io_context::get_path_mtu(const asio::ip::address& source, const asio::ip::address& dest) const
 	{

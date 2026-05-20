@@ -715,7 +715,7 @@ namespace sim
 				header[4] = static_cast<char>(it->second.size());
 				int idx = 5;
 				std::copy(it->second.begin(), it->second.end(), header.data() + idx);
-				idx += it->second.size();
+				idx += static_cast<int>(it->second.size());
 				header[idx] = (from_port >> 8) & 0xff;
 				header[idx + 1] = from_port & 0xff;
 

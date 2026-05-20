@@ -47,7 +47,7 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 		return;
 	}
 
-	num_sent += bytes_transferred;
+	num_sent += int(bytes_transferred);
 	std::printf("[%4d] sent %d bytes (total: %d)\n"
 		, millis, int(bytes_transferred), num_sent);
 
@@ -81,7 +81,7 @@ void on_receive(boost::system::error_code const& ec, ip::tcp::socket& sock)
 		return;
 	}
 
-	num_received += bytes_transferred;
+	num_received += int(bytes_transferred);
 
 	std::printf("[%4d] received %d bytes (total: %d)\n"
 		, millis, int(bytes_transferred), num_received);

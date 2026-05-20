@@ -60,7 +60,7 @@ namespace
 			: m_ioc(ioc)
 		{}
 
-		virtual void incoming_packet(aux::packet p) override final { assert(false); }
+		virtual void incoming_packet(aux::packet /* p */) override final { assert(false); }
 
 		virtual std::string label() const override final
 		{

@@ -30,7 +30,7 @@ All rights reserved.
 TEST_CASE("parse GET request", "[parse_request]")
 {
 	auto str = "GET /foo/bar?x=4 HTTP/1.1\r\n\r\n";
-	sim::http_request req = sim::parse_request(str, std::strlen(str));
+	sim::http_request req = sim::parse_request(str, static_cast<int>(std::strlen(str)));
 	CHECK(req.method == "GET");
 	CHECK(req.req == "/foo/bar?x=4");
 	CHECK(req.path == "/foo/bar");
@@ -40,21 +40,21 @@ TEST_CASE("parse GET request", "[parse_request]")
 TEST_CASE("request path is normalized (no leading slash)", "[parse_request]")
 {
 	auto str = "GET foo/bar HTTP/1.1\r\n\r\n";
-	sim::http_request req = sim::parse_request(str, std::strlen(str));
+	sim::http_request req = sim::parse_request(str, static_cast<int>(std::strlen(str)));
 	CHECK(req.path == "/foo/bar");
 }
 
 TEST_CASE("request path is normalized (..)", "[parse_request]")
 {
 	auto str = "GET /foo/../foo/bar HTTP/1.1\r\n\r\n";
-	sim::http_request req = sim::parse_request(str, std::strlen(str));
+	sim::http_request req = sim::parse_request(str, static_cast<int>(std::strlen(str)));
 	CHECK(req.path == "/foo/bar");
 }
 
 TEST_CASE("parse CONNECT request", "[parse_request]")
 {
 	auto str = "CONNECT 192.168.0.1:8888 HTTP/1.1\r\n\r\n";
-	sim::http_request req = sim::parse_request(str, std::strlen(str));
+	sim::http_request req = sim::parse_request(str, static_cast<int>(std::strlen(str)));
 	CHECK(req.method == "CONNECT");
 	CHECK(req.req == "192.168.0.1:8888");
 	CHECK(req.path == "192.168.0.1:8888");
@@ -64,7 +64,7 @@ TEST_CASE("parse CONNECT request", "[parse_request]")
 TEST_CASE("headers are parsed", "[parse_request]")
 {
 	auto str = "GET / HTTP/1.1\r\nX-Foo: Bar\r\n\r\n";
-	sim::http_request req = sim::parse_request(str, std::strlen(str));
+	sim::http_request req = sim::parse_request(str, static_cast<int>(std::strlen(str)));
 	CHECK(!req.headers.empty());
 	CHECK(req.headers["x-foo"] == "Bar");
 }
@@ -72,5 +72,5 @@ TEST_CASE("headers are parsed", "[parse_request]")
 TEST_CASE("invalid formed request throws parse exception", "[parse_request]")
 {
 	auto str = "INVALID";
-	REQUIRE_THROWS_WITH(sim::parse_request(str, std::strlen(str)), Catch::Matchers::ContainsSubstring("parse failed"));
+	REQUIRE_THROWS_WITH(sim::parse_request(str, static_cast<int>(std::strlen(str))), Catch::Matchers::ContainsSubstring("parse failed"));
 }

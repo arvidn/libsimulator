@@ -49,7 +49,7 @@ void on_sent(boost::system::error_code const& ec, std::size_t bytes_transferred
 		return;
 	}
 
-	num_sent += bytes_transferred;
+	num_sent += int(bytes_transferred);
 
 	std::printf("[%4d] sent %d bytes\n", millis, int(bytes_transferred));
 	std::printf("closing\n");
@@ -67,7 +67,7 @@ void on_receive(boost::system::error_code const& ec
 		return;
 	}
 
-	num_received += bytes_transferred;
+	num_received += int(bytes_transferred);
 
 	std::printf("[%4d] received %d bytes\n", millis, int(bytes_transferred));
 
