@@ -1140,6 +1140,20 @@ namespace sim
 		std::size_t poll_one(boost::system::error_code& ec);
 		std::size_t poll_one();
 
+		template <typename Rep, typename Period>
+		std::size_t run_for(std::chrono::duration<Rep, Period> const&)
+		{
+			assert(false);
+			return 0;
+		}
+
+		template <typename Rep, typename Period>
+		std::size_t poll_one_for(std::chrono::duration<Rep, Period> const&)
+		{
+			assert(false);
+			return 0;
+		}
+
 		void stop();
 		bool stopped() const;
 		void restart();
