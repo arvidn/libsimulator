@@ -899,7 +899,7 @@ namespace sim
 
 		asio::async_write(m_client_connection
 			, asio::buffer(&m_in_buffer[0], len)
-			, [=](boost::system::error_code const& ec, size_t)
+			, [this, self](boost::system::error_code const& ec, size_t)
 			{
 				if (ec)
 				{

@@ -60,7 +60,13 @@ struct SIMULATOR_DECL http_server
 {
 	enum flags_t
 	{
-		keep_alive = 1
+		keep_alive = 1,
+		// behave like an HTTP/1.0 server: respond with an HTTP/1.0 status line
+		// and close the connection after each response. HTTP/1.0 has no
+		// persistent connections, and the Connection header is an HTTP/1.1
+		// mechanism, so no "Connection: close" is sent -- the client must detect
+		// the close from the protocol version (and the socket closing).
+		http_1_0 = 2
 	};
 
 	http_server(asio::io_context& ios, unsigned short listen_port
@@ -77,6 +83,9 @@ struct SIMULATOR_DECL http_server
 		, std::int64_t const size, generator_t gen);
 	void register_redirect(std::string const& path, std::string const& target);
 	void register_stall_handler(std::string const& path);
+
+	// the number of TCP connections that have been accepted so far
+	int accepted_connections() const { return m_accepted_connections; }
 
 private:
 
@@ -110,6 +119,9 @@ private:
 	bool m_close;
 
 	int m_flags;
+
+	// counts the number of accepted TCP connections
+	int m_accepted_connections = 0;
 };
 
 }

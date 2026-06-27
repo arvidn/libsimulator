@@ -156,6 +156,8 @@ namespace sim
 			return;
 		}
 
+		++m_accepted_connections;
+
 		std::printf("http_server accepted connection from: %s : %d\n",
 			m_ep.address().to_string().c_str(), m_ep.port());
 
@@ -327,7 +329,34 @@ namespace sim
 			m_send_buffer = it->second(req.method, req.req, req.headers);
 		}
 
-		bool close = lower_case(req.headers["connection"]) == "close";
+		// decide whether to close the connection after this response, and signal
+		// it to the client appropriately.
+		bool close;
+		if (m_flags & http_1_0)
+		{
+			// an HTTP/1.0 server closes after every response and does not use the
+			// Connection header (that is an HTTP/1.1 mechanism). Downgrade the
+			// status line so the client detects this from the protocol version.
+			close = true;
+			auto const ver = m_send_buffer.find("HTTP/1.1");
+			if (ver != std::string::npos)
+				m_send_buffer.replace(ver, 8, "HTTP/1.0");
+		}
+		else
+		{
+			// close if the client asked us to, or if this server is not
+			// configured for keep-alive. When we do, advertise it with a
+			// "Connection: close" response header so the client knows not to
+			// reuse the socket (rather than discovering it via a failed write).
+			close = lower_case(req.headers["connection"]) == "close"
+				|| !(m_flags & keep_alive);
+			if (close)
+			{
+				auto const status_end = m_send_buffer.find("\r\n");
+				if (status_end != std::string::npos)
+					m_send_buffer.insert(status_end + 2, "Connection: close\r\n");
+			}
+		}
 
 		async_write(m_connection, asio::buffer(m_send_buffer.data()
 			, m_send_buffer.size()), std::bind(&http_server::on_write
@@ -352,7 +381,7 @@ namespace sim
 			return;
 		}
 
-		if (!close && (m_flags & keep_alive))
+		if (!close)
 		{
 			// try to read another request out of the buffer
 			post(m_ios, std::bind(&http_server::on_read, this, error_code(), 0));
