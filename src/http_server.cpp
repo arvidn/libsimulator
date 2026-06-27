@@ -354,7 +354,10 @@ namespace sim
 			{
 				auto const status_end = m_send_buffer.find("\r\n");
 				if (status_end != std::string::npos)
-					m_send_buffer.insert(status_end + 2, "Connection: close\r\n");
+					{
+						assert(m_send_buffer.find("Connection:") == std::string::npos);
+						m_send_buffer.insert(status_end + 2, "Connection: close\r\n");
+					}
 			}
 		}
 
