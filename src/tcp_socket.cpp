@@ -537,6 +537,15 @@ namespace ip {
 		std::vector<boost::asio::mutable_buffer> const& bufs
 		, boost::system::error_code& ec)
 	{
+		// a zero-sized read always completes immediately with 0 bytes;
+		// boost.asio's SSL implementation relies on this to post a
+		// completion handler without transferring any data.
+		if (boost::asio::buffer_size(bufs) == 0)
+		{
+			ec.clear();
+			return 0;
+		}
+
 		assert(!bufs.empty());
 		if (!m_open)
 		{
@@ -635,8 +644,18 @@ namespace ip {
 	void tcp::socket::async_read_some_impl(std::vector<boost::asio::mutable_buffer> const& bufs
 		, aux::function<void(boost::system::error_code const&, std::size_t)> handler)
 	{
+		// a zero-sized read always completes immediately with 0 bytes
+		// transferred, regardless of connection or queue state. boost.asio's
+		// SSL implementation relies on this to bounce a completion handler
+		// through the executor without actually transferring any data.
+		if (boost::asio::buffer_size(bufs) == 0)
+		{
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler)
+				, boost::system::error_code(), std::size_t(0))));
+			return;
+		}
+
 		assert(!bufs.empty());
-		assert(bufs[0].size());
 
 		boost::system::error_code ec;
 		std::size_t bytes_transferred = read_some_impl(bufs, ec);

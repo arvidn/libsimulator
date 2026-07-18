@@ -78,6 +78,12 @@ lib simulator
 	# make sure asio uses std::chrono
 	<define>BOOST_ASIO_HAS_STD_CHRONO
 
+	# io_executor only implements the legacy (Networking TS v1) executor
+	# concept: this falls any_io_executor back to boost::asio::executor,
+	# which it can wrap, so boost::asio::ssl::stream's bookkeeping timers
+	# work for consumers that include simulator/ssl.hpp.
+	<define>BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT
+
 	# disable auto-link
 	<define>BOOST_ALL_NO_LIB
 
@@ -96,6 +102,7 @@ lib simulator
 	<define>BOOST_ASIO_DISABLE_BOOST_DATE_TIME
 	<define>BOOST_ASIO_HAS_MOVE
 	<define>BOOST_ASIO_ENABLE_CANCELIO
+	<define>BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT
 	<threading>multi
 	<include>include
 	<link>shared:<define>SIMULATOR_LINKING_SHARED
