@@ -709,6 +709,37 @@ namespace ip {
 		m_recv_null_buffers = true;
 	}
 
+	void tcp::socket::async_wait_write_impl(
+		aux::function<void(boost::system::error_code const&)> handler)
+	{
+		if (!m_open)
+		{
+			boost::system::error_code const ec(error::bad_descriptor);
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec)));
+			return;
+		}
+
+		if (!m_channel)
+		{
+			boost::system::error_code const ec(error::not_connected);
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec)));
+			return;
+		}
+
+		if (!m_connect_handler && m_bytes_in_flight + m_mss <= m_cwnd)
+		{
+			// the socket is writable right now. complete immediately without
+			// actually writing anything, this is the null_buffers equivalent
+			// for writes
+			boost::system::error_code const ec;
+			post(m_io_service, aux::make_malloc(std::bind(std::move(handler), ec)));
+			return;
+		}
+
+		m_wait_send_handler = std::move(handler);
+		m_send_null_buffers = true;
+	}
+
 	// if there is an outstanding read operation, and this was the first incoming
 	// operation since we last drained, wake up the reader
 	void tcp::socket::maybe_wakeup_reader()
@@ -731,12 +762,11 @@ namespace ip {
 
 	void tcp::socket::maybe_wakeup_writer()
 	{
-		if (!m_send_handler) return;
+		if (!m_send_handler && !m_wait_send_handler) return;
 
 		if (m_send_null_buffers)
 		{
-			assert(false && "not supported yet");
-//			async_wait_write_impl(m_recv_handler);
+			async_wait_write_impl(std::move(m_wait_send_handler));
 		}
 		else
 		{

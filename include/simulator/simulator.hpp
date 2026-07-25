@@ -208,6 +208,10 @@ namespace sim
 			wait_read, wait_write, wait_error
 		};
 
+		// alias matching the name used by boost.asio's basic_socket::wait_type,
+		// for code that's written against both APIs
+		using wait_type = wait_type_t;
+
 		// io_control
 		using reuse_address = boost::asio::socket_base::reuse_address;
 		using executor_type = io_executor;
@@ -767,7 +771,7 @@ namespace sim
 				if (w == socket_base::wait_type_t::wait_write)
 				{
 					abort_send_handlers();
-					assert(false && "not supported yet");
+					async_wait_write_impl(std::move(handler));
 				}
 				else if (w == socket_base::wait_type_t::wait_read)
 				{
@@ -840,6 +844,8 @@ namespace sim
 			void async_read_some_impl(std::vector<asio::mutable_buffer> const& bufs
 				, aux::function<void(boost::system::error_code const&, std::size_t)> handler);
 			void async_wait_read_impl(
+				aux::function<void(boost::system::error_code const&)> handler);
+			void async_wait_write_impl(
 				aux::function<void(boost::system::error_code const&)> handler);
 			std::size_t write_some_impl(std::vector<asio::const_buffer> const& bufs
 				, boost::system::error_code& ec);
