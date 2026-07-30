@@ -36,6 +36,14 @@ All rights reserved.
 #include <boost/asio/post.hpp>
 #include <boost/asio/defer.hpp>
 #include <boost/asio/dispatch.hpp>
+#include <boost/asio/error.hpp>
+
+// only for boost::beast::role_type, used by the teardown()/async_teardown()
+// overloads below (customization points boost::beast::websocket::stream
+// needs for any non-boost::asio socket type it's instantiated over); this
+// is the single lightweight header that defines it, not a dependency on
+// beast's websocket/http machinery.
+#include <boost/beast/core/role.hpp>
 
 #include <boost/optional.hpp>
 
@@ -48,6 +56,7 @@ All rights reserved.
 #include "simulator/mallocator.hpp"
 
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <map>
 #include <unordered_map>
@@ -56,6 +65,7 @@ All rights reserved.
 #include <vector>
 #include <list>
 #include <functional>
+#include <utility>
 
 #ifndef IP_DONTFRAGMENT
 #define IP_DONTFRAGMENT 1
@@ -116,6 +126,15 @@ namespace sim
 	using boost::asio::const_buffer;
 	using boost::asio::mutable_buffer;
 	using boost::asio::buffer;
+
+	// brought in here (rather than relying on ADL at each call site below)
+	// so buffer sequence types whose associated namespaces don't include
+	// boost::asio (e.g. boost::beast's internal buffer sequence types) are
+	// still found; the "using" also participates in ADL's overload set at
+	// the point of an unqualified call, so this doesn't shadow lookups for
+	// types that do live in boost::asio.
+	using boost::asio::buffer_sequence_begin;
+	using boost::asio::buffer_sequence_end;
 
 	using boost::asio::post;
 	using boost::asio::dispatch;
@@ -1008,7 +1027,96 @@ namespace sim
 	extern template struct basic_resolver<udp>;
 	extern template struct basic_resolver<tcp>;
 
+	// boost::beast looks up a close function for a socket-like type via
+	// unqualified lookup + ADL under the name "beast_close_socket" (see
+	// boost/beast/core/stream_traits.hpp); this satisfies that customization
+	// point for tcp::socket - it's just a free function beast's ADL-based
+	// lookup will find because it lives in tcp::socket's own namespace, so
+	// beast::websocket::stream<tcp::socket> doesn't need this header to
+	// declare it inside boost::beast itself.
+	inline void beast_close_socket(tcp::socket& s)
+	{
+		boost::system::error_code ec;
+		s.close(ec);
+	}
+
+	// same idea for the teardown()/async_teardown() customization points
+	// boost::beast::websocket::stream<Socket> looks up (via ADL, from
+	// boost::beast::websocket) for any Socket type it's instantiated over
+	// that isn't a boost::asio socket -- see
+	// boost/beast/websocket/teardown.hpp. tcp::socket has no half-close/
+	// non-blocking read-drain support to mirror the real graceful-shutdown
+	// sequence those implement for a real socket, so this just closes it;
+	// that's sufficient for driving deterministic test scenarios, which is
+	// the only thing this socket type is ever used for.
+	inline void teardown(boost::beast::role_type, tcp::socket& s, boost::system::error_code& ec)
+	{
+		s.close(ec);
+	}
+
+	template <class Handler>
+	void async_teardown(boost::beast::role_type, tcp::socket& s, Handler&& handler)
+	{
+		boost::system::error_code ec;
+		s.close(ec);
+		boost::asio::post(s.get_executor(), std::bind(std::forward<Handler>(handler), ec));
+	}
+
 	} // ip
+
+	// mirrors (a subset of) boost::asio::async_connect(socket, begin, end,
+	// handler): tries each endpoint in the range in turn, closing and
+	// advancing to the next on failure, until one connects or the range is
+	// exhausted. Calls handler(error_code, Iterator) with the iterator that
+	// succeeded, or the end iterator carrying the last endpoint's error if
+	// all of them failed. Lives directly in sim::asio, alongside the
+	// boost::asio free function it mirrors, rather than in sim::asio::ip, so
+	// that unqualified calls resolve to whichever of the two applies via
+	// ADL (ip::tcp::socket's base, socket_base<tcp>, is declared in this
+	// namespace, which is what makes that lookup work).
+	template <typename Iterator, typename Handler>
+	void async_connect(ip::tcp::socket& s, Iterator begin, Iterator end, Handler handler)
+	{
+		struct op : std::enable_shared_from_this<op>
+		{
+			op(ip::tcp::socket& sock, Iterator b, Iterator e, Handler h)
+				: socket(sock), iter(b), end(e), handler(std::move(h))
+			{}
+
+			void attempt()
+			{
+				socket.async_connect(*iter, [self = this->shared_from_this()]
+					(boost::system::error_code const& ec) { self->on_connect(ec); });
+			}
+
+			void on_connect(boost::system::error_code const& ec)
+			{
+				if (ec && std::next(iter) != end)
+				{
+					boost::system::error_code ignore;
+					socket.close(ignore);
+					++iter;
+					attempt();
+					return;
+				}
+
+				handler(ec, iter);
+			}
+
+			ip::tcp::socket& socket;
+			Iterator iter;
+			Iterator end;
+			Handler handler;
+		};
+
+		if (begin == end)
+		{
+			handler(boost::asio::error::make_error_code(boost::asio::error::not_found), end);
+			return;
+		}
+
+		std::make_shared<op>(s, begin, end, std::move(handler))->attempt();
+	}
 
 	} // asio
 
