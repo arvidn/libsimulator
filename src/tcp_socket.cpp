@@ -307,6 +307,12 @@ namespace ip {
 			post(m_io_service, aux::make_malloc(std::bind(std::move(m_connect_handler)
 				, boost::system::error_code(error::operation_aborted))));
 			m_connect_handler = nullptr;
+
+			// close() uses m_connect_handler as its sole signal for whether
+			// m_channel is an established connection vs. still routed to the
+			// acceptor; clear it here too, or a later close() call is fooled
+			// into treating this channel as established.
+			m_channel.reset();
 		}
 	}
 
