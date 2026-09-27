@@ -620,7 +620,7 @@ namespace sim
 			if (atyp == 3)
 			{
 				// hostname
-				int const len = buf[4];
+				int const len = static_cast<unsigned char>(buf[4]);
 
 				buf += 5;
 				bytes_transferred -= 5;
